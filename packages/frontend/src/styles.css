@@ -1,0 +1,18 @@
+*{box-sizing:border-box}
+body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; margin:0;background:#f4f6f8}
+.header{background:#1f2937;color:white;padding:12px 20px}
+.header h1{margin:0;font-size:18px}
+.container{display:flex;height:calc(100vh - 56px)}
+.sidebar{width:220px;padding:16px;background:#fff;border-right:1px solid #e6e9ee}
+.tables{margin-bottom:12px}
+.table-btn{display:block;width:100%;margin:6px 0;padding:8px;border-radius:6px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
+.table-btn.active{background:#111827;color:white}
+.add-order{margin-top:8px;padding:8px;width:100%;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer}
+.main{flex:1;padding:16px;overflow:auto}
+.order-card{background:#fff;border:1px solid #e6e9ee;padding:12px;border-radius:8px;margin-bottom:10px}
+.order-title{font-weight:600;margin-bottom:6px}
+.order-items{margin:0 0 8px 0;padding-left:16px}
+.order-actions button{margin-right:8px;padding:6px 8px;border-radius:6px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
+.print-btn{background:#3b82f6;color:white;border:none}
+.remove-btn{background:#ef4444;color:white;border:none}
+@media (max-width:700px){.container{flex-direction:column}.sidebar{width:100%;border-right:none;border-bottom:1px solid #e6e9ee;height:auto}}

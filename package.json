@@ -1,0 +1,16 @@
+{
+  "name": "bar-restaurant-ticketing",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "bootstrap": "npm install",
+    "build": "npm run -w backend build && npm run -w frontend build && npm run -w shared build",
+    "dev": "concurrently \"npm:dev -w backend\" \"npm:dev -w frontend\""
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "concurrently": "^8.0.0"
+  }
+}
