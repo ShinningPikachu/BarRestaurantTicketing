@@ -24,6 +24,7 @@ model Order {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   items      OrderItem[]
+  payments   Payment[]
 }
 
 model OrderItem {
@@ -37,10 +38,13 @@ model OrderItem {
 }
 
 model MenuItem {
-  id         Int    @id @default(autoincrement())
-  name       String
-  priceCents Int
-  sku        String?
+  id          Int     @id @default(autoincrement())
+  name        String
+  priceCents  Int
+  sku         String?
+  category    String?
+  description String?
+  available   Boolean @default(true)
 }
 
 model User {

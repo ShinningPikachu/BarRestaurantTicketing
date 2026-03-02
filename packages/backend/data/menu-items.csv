@@ -1,0 +1,22 @@
+name,priceCents,sku,category,description,available
+Classic Burger,1299,FOOD-001,Main Course,Juicy beef patty with lettuce tomato and special sauce,true
+Cheeseburger,1499,FOOD-002,Main Course,Classic burger with melted cheddar cheese,true
+Veggie Burger,1199,FOOD-003,Main Course,Plant-based patty with fresh vegetables,true
+Fish and Chips,1599,FOOD-004,Main Course,Crispy battered fish with golden fries,true
+Grilled Chicken Sandwich,1399,FOOD-005,Main Course,Tender grilled chicken with mayo and lettuce,true
+Caesar Salad,899,FOOD-006,Salad,Fresh romaine with parmesan and croutons,true
+Garden Salad,799,FOOD-007,Salad,Mixed greens with tomatoes and cucumbers,true
+French Fries,499,FOOD-008,Sides,Crispy golden fries,true
+Onion Rings,599,FOOD-009,Sides,Beer-battered onion rings,true
+Mozzarella Sticks,699,FOOD-010,Appetizer,Breaded mozzarella with marinara sauce,true
+Chicken Wings,1099,FOOD-011,Appetizer,Spicy buffalo wings with ranch dressing,true
+Nachos,899,FOOD-012,Appetizer,Tortilla chips with cheese jalapeños and salsa,true
+Chocolate Cake,599,FOOD-013,Dessert,Rich chocolate layer cake,true
+Cheesecake,649,FOOD-014,Dessert,Creamy New York style cheesecake,true
+Ice Cream Sundae,449,FOOD-015,Dessert,Vanilla ice cream with chocolate sauce,true
+Draft Beer,599,DRINK-001,Beverage,Local craft beer on tap,true
+House Wine,799,DRINK-002,Beverage,Red or white house wine,true
+Cocktail,999,DRINK-003,Beverage,Specialty cocktail of the day,true
+Soda,299,DRINK-004,Beverage,Coca-Cola Sprite or other soft drinks,true
+Iced Tea,299,DRINK-005,Beverage,Fresh brewed iced tea,true
+Coffee,249,DRINK-006,Beverage,Hot brewed coffee,true

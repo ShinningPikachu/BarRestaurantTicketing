@@ -51,6 +51,37 @@ app.delete('/api/orders/:id', async (req, res) => {
   }
 });
 
+// Menu items endpoints
+app.get('/api/menu', async (_req, res) => {
+  try {
+    const items = await prisma.menuItem.findMany({ where: { available: true } });
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/menu/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = await prisma.menuItem.findUnique({ where: { id: parseInt(id) } });
+    if (!item) return res.status(404).json({ error: 'Menu item not found' });
+    res.json(item);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/menu/category/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const items = await prisma.menuItem.findMany({ where: { category, available: true } });
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   // eslint-disable-next-line no-console

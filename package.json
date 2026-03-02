@@ -10,7 +10,8 @@
     "dev": "concurrently \"npm:dev -w backend\" \"npm:dev -w frontend\""
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "concurrently": "^8.0.0"
+    "@types/cors": "^2.8.19",
+    "concurrently": "^8.0.0",
+    "typescript": "^5.0.0"
   }
 }
