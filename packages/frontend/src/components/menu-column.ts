@@ -1,11 +1,6 @@
 import { renderMenuItemSquare } from './menu-item-square';
 import type { MenuItem } from '@shared';
-
-function el(tag: string, cls?: string) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  return e;
-}
+import { el } from '../utils/dom';
 
 export function renderMenuColumn(
   menuItems: MenuItem[],

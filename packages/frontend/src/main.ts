@@ -1,54 +1,35 @@
-import { renderTablesColumn } from './tables-column';
-import { renderMenuColumn } from './menu-column';
-import { renderOrderColumn } from './order-column';
-
-type OrderItem = { name: string; qty: number };
-type Order = { id: string; tableId?: number; table?: { number: number }; items: OrderItem[] };
-type MenuItem = { 
-  id: number; 
-  name: string; 
-  priceCents: number; 
-  sku?: string; 
-  category?: string; 
-  description?: string; 
-  available?: boolean 
-};
+import './styles/main.css';
+import { renderOrdersView, printTicket } from './pages/orders-view';
+import { apiService } from './services/api.service';
+import { storageService } from './services';
+import type { Order, MenuItem, PreOrderItem, TableZone } from '@shared';
+import type { TableDef } from './components';
+import { el } from './utils/dom';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app element');
 
-let selectedTable = 1;
-let selectedMenuItems: { [key: number]: number } = {}; // menuItemId -> qty
+let tables: TableDef[] = storageService.loadTables();
+let selectedTable = tables[0]?.number || 1;
+let preorderItems: PreOrderItem[] = storageService.loadPreOrderItems(selectedTable);
+let tempMenuItems: { [key: number]: number } = {}; // for tracking from menu clicks
 let orders: Order[] = [];
 let menuItems: MenuItem[] = [];
 
 async function loadOrders() {
   try {
-    const res = await fetch('/api/orders');
-    if (!res.ok) throw new Error('Failed to fetch');
-    const data = await res.json();
-    orders = data;
+    orders = await apiService.fetchOrders();
   } catch (e) {
-    // fallback to empty
     orders = [];
   }
 }
 
 async function loadMenu() {
   try {
-    const res = await fetch('/api/menu');
-    if (!res.ok) throw new Error('Failed to fetch menu');
-    const data = await res.json();
-    menuItems = data;
+    menuItems = await apiService.fetchMenu();
   } catch (e) {
     menuItems = [];
   }
-}
-
-function el(tag: string, cls?: string) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  return e;
 }
 
 function render() {
@@ -58,122 +39,117 @@ function render() {
   header.innerHTML = '<h1>Bar Ticketing — Desktop</h1>';
 
   const container = el('div', 'container');
-  renderOrdersView(container);
+  renderOrdersView(
+    container,
+    selectedTable,
+    tables,
+    preorderItems,
+    tempMenuItems,
+    orders,
+    menuItems,
+    {
+      onTableSelect: (tableNum: number) => {
+        storageService.savePreOrderItems(selectedTable, preorderItems);
+        selectedTable = tableNum;
+        preorderItems = storageService.loadPreOrderItems(tableNum);
+        tempMenuItems = {};
+        render();
+      },
+      onAddTable: (zone: TableZone) => {
+        const maxNumber = tables.reduce((max, table) => Math.max(max, table.number), 0);
+        const newTable: TableDef = { number: maxNumber + 1, zone };
+        tables = [...tables, newTable];
+        storageService.saveTables(tables);
+        storageService.savePreOrderItems(selectedTable, preorderItems);
+        selectedTable = newTable.number;
+        preorderItems = [];
+        tempMenuItems = {};
+        render();
+      },
+      onAddMenuItem: (menuId: number) => {
+        if (!tempMenuItems[menuId]) {
+          tempMenuItems[menuId] = 0;
+        }
+        tempMenuItems[menuId]++;
+
+        // Add to preorder with deduplication
+        const menuItem = menuItems.find(m => m.id === menuId);
+        if (menuItem) {
+          const existingItem = preorderItems.find(i => i.menuId === menuId);
+          if (existingItem) {
+            existingItem.qty++;
+          } else {
+            preorderItems.push({ menuId, qty: 1, priceCents: menuItem.priceCents });
+          }
+        }
+        render();
+      },
+      onAddPendingItem: (menuId: number) => {
+        const existingItem = preorderItems.find(i => i.menuId === menuId);
+        if (existingItem) {
+          existingItem.qty++;
+        }
+        render();
+      },
+      onRemovePendingItem: (menuId: number) => {
+        const idx = preorderItems.findIndex(i => i.menuId === menuId);
+        if (idx >= 0) {
+          preorderItems[idx].qty--;
+          if (preorderItems[idx].qty <= 0) {
+            preorderItems.splice(idx, 1);
+          }
+        }
+        render();
+      },
+      onSetItemPrice: (menuId: number, priceCents: number) => {
+        const item = preorderItems.find(i => i.menuId === menuId);
+        if (item) {
+          item.priceCents = priceCents;
+        }
+        render();
+      },
+      onConfirmOrder: async () => {
+        const items = [];
+        for (const item of preorderItems) {
+          const menuItem = menuItems.find(m => m.id === item.menuId);
+          if (menuItem) {
+            items.push({ name: menuItem.name, qty: item.qty, unitPriceCents: item.priceCents });
+          }
+        }
+        const payload = { tableId: selectedTable, items };
+        try {
+          await apiService.createOrder(selectedTable, items);
+          preorderItems = [];
+          tempMenuItems = {};
+          storageService.savePreOrderItems(selectedTable, []);
+          await loadOrders();
+          render();
+        } catch (e) {
+          alert('Failed to create order');
+        }
+      },
+      onClearItems: () => {
+        preorderItems = [];
+        tempMenuItems = {};
+        render();
+      },
+      onRemoveOrder: async (orderId: string) => {
+        try {
+          await apiService.deleteOrder(orderId);
+          await loadOrders();
+          render();
+        } catch (e) {
+          alert('Failed to remove order');
+        }
+      },
+      onPrintTicket: (order: Order) => {
+        printTicket(order);
+      }
+    }
+  );
 
   root.appendChild(header);
   root.appendChild(container);
-}
-
-function renderOrdersView(container: HTMLElement) {
-  const wrapper = el('div', 'orders-wrapper');
-
-  // LEFT COLUMN: Tables
-  const tablesColumn = renderTablesColumn(selectedTable, (tableNum: number) => {
-    selectedTable = tableNum;
-    selectedMenuItems = {};
-    render();
-  });
-  wrapper.appendChild(tablesColumn);
-
-  // MIDDLE COLUMN: Menu Items
-  const menuColumn = renderMenuColumn(menuItems, selectedMenuItems, (menuId: number) => {
-    if (!selectedMenuItems[menuId]) {
-      selectedMenuItems[menuId] = 0;
-    }
-    selectedMenuItems[menuId]++;
-    render();
-  });
-  wrapper.appendChild(menuColumn);
-
-  // RIGHT COLUMN: Order Details
-  const orderColumn = renderOrderColumn(
-    selectedTable,
-    orders,
-    menuItems,
-    selectedMenuItems,
-    async () => {
-      // Submit Order
-      const items = [];
-      for (const menuId in selectedMenuItems) {
-        const qty = selectedMenuItems[menuId as any];
-        const menuItem = menuItems.find(m => m.id === parseInt(menuId));
-        if (menuItem && qty > 0) {
-          items.push({ name: menuItem.name, qty, unitPriceCents: menuItem.priceCents });
-        }
-      }
-      const payload = { tableId: selectedTable, items };
-      try {
-        const res = await fetch('/api/orders', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify(payload) 
-        });
-        if (res.ok) {
-          selectedMenuItems = {};
-          await loadOrders();
-          render();
-        } else {
-          alert('Failed to create order');
-        }
-      } catch (e) {
-        alert('Failed to reach backend');
-      }
-    },
-    () => {
-      // Clear Items
-      selectedMenuItems = {};
-      render();
-    },
-    async (orderId: string) => {
-      // Remove Order
-      try {
-        const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
-        if (res.ok) {
-          await loadOrders();
-          render();
-        } else alert('Failed to remove');
-      } catch (e) {
-        alert('Failed to reach backend');
-      }
-    },
-    (order: Order) => {
-      // Print Ticket
-      printTicket(order);
-    }
-  );
-  wrapper.appendChild(orderColumn);
-
-  container.appendChild(wrapper);
-}
-
-function printTicket(order: Order) {
-  const w = window.open('', '_blank', 'width=400,height=600');
-  if (!w) return alert('Popup blocked — allow popups to print tickets');
-  const tableNumber = order.table?.number || order.tableId;
-  const html = `
-    <html>
-    <head>
-      <title>Ticket ${order.id}</title>
-      <style>
-        body{font-family:sans-serif;padding:20px}
-        h2{margin-bottom:0}
-        ul{list-style:none;padding:0}
-      </style>
-    </head>
-    <body>
-      <h2>Ticket — Table ${tableNumber}</h2>
-      <p>Order ${order.id}</p>
-      <ul>
-        ${order.items.map((i) => `<li>${i.qty} × ${i.name}</li>`).join('')}
-      </ul>
-      <p>Thank you!</p>
-    </body>
-    </html>
-  `;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 300);
 }
 
 // Initialize

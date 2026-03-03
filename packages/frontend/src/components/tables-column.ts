@@ -1,15 +1,10 @@
 import type { TableZone } from '@shared';
+import { el } from '../utils/dom';
 
 export type TableDef = {
   number: number;
   zone: TableZone;
 };
-
-function el(tag: string, cls?: string) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  return e;
-}
 
 export function renderTablesColumn(
   selectedTable: number,

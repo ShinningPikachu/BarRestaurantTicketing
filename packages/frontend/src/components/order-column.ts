@@ -1,11 +1,6 @@
-import { createTruncatedText } from './truncated-text';
+import { createTruncatedText } from '../utils/truncated-text';
 import type { OrderItem, Order, MenuItem, PreOrderItem } from '@shared';
-
-function el(tag: string, cls?: string) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  return e;
-}
+import { el } from '../utils/dom';
 
 export function renderOrderColumn(
   selectedTable: number,
