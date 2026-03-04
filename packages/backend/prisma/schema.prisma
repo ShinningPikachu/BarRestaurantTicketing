@@ -42,7 +42,7 @@ model MenuItem {
   name        String
   priceCents  Int
   sku         String?
-  category    String?
+  category    String  @default("Uncategorized")
   description String?
   available   Boolean @default(true)
 }

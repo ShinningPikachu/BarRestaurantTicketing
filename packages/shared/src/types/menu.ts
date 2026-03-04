@@ -7,7 +7,7 @@ export interface MenuItem {
   name: string;
   priceCents: number;
   sku?: string;
-  category?: string;
+  category: string;
   description?: string;
   available?: boolean;
 }

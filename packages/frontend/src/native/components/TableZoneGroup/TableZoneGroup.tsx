@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { TableId, TableZone, tableKey } from '../types';
+import { TableId, TableZone, tableKey } from '../../types';
 import { styles } from './TableZoneGroup.styles';
 
 interface TableZoneGroupProps {

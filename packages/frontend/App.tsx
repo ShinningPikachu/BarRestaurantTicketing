@@ -11,8 +11,8 @@ import {
   View
 } from 'react-native';
 import { apiService, storageService } from './src/native/services';
-import { TableZoneGroup } from './src/native/components';
-import { createTableManager } from './src/native/helpers';
+import { TableZoneGroup, MenuCategoryGroup } from './src/native/components';
+import { createTableManager, groupMenuItemsByCategory, flattenMenuItems } from './src/native/helpers';
 import { MenuItem, Order, PreOrderItem, TableDef, TableId, TableZone } from './src/native/types';
 
 function centsToCurrency(cents: number): string {
@@ -24,7 +24,7 @@ export default function App(): React.JSX.Element {
   const [selectedTable, setSelectedTable] = useState({zone: TableZone.OUTSIDE, number: 1});
   const [preorderItems, setPreorderItems] = useState<PreOrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuByCategory, setMenuByCategory] = useState<Map<string, MenuItem[]>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function App(): React.JSX.Element {
         setSelectedTable(initialTable);
         setPreorderItems(loadedPreorder);
         setOrders(loadedOrders);
-        setMenuItems(loadedMenu);
+        setMenuByCategory(groupMenuItemsByCategory(loadedMenu));
       } catch {
         if (mounted) {
           Alert.alert('Initialization failed', 'Unable to load app data.');
@@ -114,7 +114,8 @@ export default function App(): React.JSX.Element {
 
   function addMenuItem(menuId: number): void {
     setPreorderItems((current) => {
-      const menu = menuItems.find((item) => item.id === menuId);
+      const allMenuItems = flattenMenuItems(menuByCategory);
+      const menu = allMenuItems.find((item) => item.id === menuId);
       if (!menu) return current;
 
       const existing = current.find((item) => item.menuId === menuId);
@@ -156,9 +157,10 @@ export default function App(): React.JSX.Element {
   }
 
   async function confirmOrder(): Promise<void> {
+    const allMenuItems = flattenMenuItems(menuByCategory);
     const items = preorderItems
       .map((item) => {
-        const menu = menuItems.find((menuItem) => menuItem.id === item.menuId);
+        const menu = allMenuItems.find((menuItem) => menuItem.id === item.menuId);
         if (!menu) return null;
         return {
           name: menu.name,
@@ -238,22 +240,17 @@ export default function App(): React.JSX.Element {
 
           <View style={styles.column}>
             <Text style={styles.sectionTitle}>Menu</Text>
-            <FlatList
-              data={menuItems}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.menuRow}
-                  onPress={() => addMenuItem(item.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.flex1}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemPrice}>{centsToCurrency(item.priceCents)}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {Array.from(menuByCategory.entries()).map(([category, items]) => (
+                <MenuCategoryGroup
+                  key={category}
+                  category={category}
+                  items={items}
+                  onSelectItem={addMenuItem}
+                  formatPrice={centsToCurrency}
+                />
+              ))}
+            </ScrollView>
           </View>
 
           <View style={styles.column}>
@@ -265,7 +262,8 @@ export default function App(): React.JSX.Element {
               keyExtractor={(item) => String(item.menuId)}
               ListEmptyComponent={<Text style={styles.emptyText}>No pre-order items.</Text>}
               renderItem={({ item }) => {
-                const menu = menuItems.find((menuItem) => menuItem.id === item.menuId);
+                const allMenuItems = flattenMenuItems(menuByCategory);
+                const menu = allMenuItems.find((menuItem) => menuItem.id === item.menuId);
                 const title = menu?.name || `Menu ${item.menuId}`;
                 return (
                   <View style={styles.preorderRow}>
@@ -394,18 +392,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 6,
     marginBottom: 6
-  },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F9FAFB',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9'
   },
   preorderRow: {
     flexDirection: 'row',
