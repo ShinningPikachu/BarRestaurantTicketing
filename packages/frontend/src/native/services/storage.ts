@@ -1,4 +1,5 @@
-import type { TableDef, PreOrderItem } from '@shared';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { PreOrderItem, TableDef } from '../types';
 
 const TABLES_STORAGE_KEY = 'bar-ticketing-tables';
 const PREORDER_STORAGE_KEY = 'bar-ticketing-preorder';
@@ -17,9 +18,9 @@ export class StorageService {
     ];
   }
 
-  loadTables(): TableDef[] {
+  async loadTables(): Promise<TableDef[]> {
     try {
-      const raw = localStorage.getItem(TABLES_STORAGE_KEY);
+      const raw = await AsyncStorage.getItem(TABLES_STORAGE_KEY);
       if (!raw) return this.getDefaultTables();
       const parsed = JSON.parse(raw) as TableDef[];
       if (!Array.isArray(parsed) || parsed.length === 0) return this.getDefaultTables();
@@ -29,17 +30,17 @@ export class StorageService {
     }
   }
 
-  saveTables(tables: TableDef[]) {
+  async saveTables(tables: TableDef[]): Promise<void> {
     try {
-      localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(tables));
+      await AsyncStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(tables));
     } catch {
       // no-op
     }
   }
 
-  loadPreOrderItems(tableNum: number): PreOrderItem[] {
+  async loadPreOrderItems(tableNum: number): Promise<PreOrderItem[]> {
     try {
-      const raw = localStorage.getItem(`${PREORDER_STORAGE_KEY}-${tableNum}`);
+      const raw = await AsyncStorage.getItem(`${PREORDER_STORAGE_KEY}-${tableNum}`);
       if (!raw) return [];
       return JSON.parse(raw) as PreOrderItem[];
     } catch {
@@ -47,12 +48,12 @@ export class StorageService {
     }
   }
 
-  savePreOrderItems(tableNum: number, items: PreOrderItem[]) {
+  async savePreOrderItems(tableNum: number, items: PreOrderItem[]): Promise<void> {
     try {
       if (items.length === 0) {
-        localStorage.removeItem(`${PREORDER_STORAGE_KEY}-${tableNum}`);
+        await AsyncStorage.removeItem(`${PREORDER_STORAGE_KEY}-${tableNum}`);
       } else {
-        localStorage.setItem(`${PREORDER_STORAGE_KEY}-${tableNum}`, JSON.stringify(items));
+        await AsyncStorage.setItem(`${PREORDER_STORAGE_KEY}-${tableNum}`, JSON.stringify(items));
       }
     } catch {
       // no-op

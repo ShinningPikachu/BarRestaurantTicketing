@@ -2,13 +2,13 @@ import prisma from '../db';
 
 export class OrderService {
   async getAllOrders() {
-    return prisma.order.findMany({ include: { items: true } });
+    return prisma.order.findMany({ include: { items: true, table: true } });
   }
 
   async getOrdersByTable(tableId: number) {
     return prisma.order.findMany({
       where: { tableId },
-      include: { items: true }
+      include: { items: true, table: true }
     });
   }
 
@@ -30,7 +30,7 @@ export class OrderService {
           }))
         }
       },
-      include: { items: true }
+      include: { items: true, table: true }
     });
     return created;
   }

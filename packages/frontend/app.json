@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Bar Restaurant Ticketing",
+    "slug": "bar-restaurant-ticketing",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
+}

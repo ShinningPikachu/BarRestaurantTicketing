@@ -1,9 +1,13 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "rootDir": "src",
+    "strict": true,
     "composite": true,
-    "outDir": "dist"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@shared": ["../shared/src"]
+    }
   },
-  "include": ["src"]
+  "include": ["App.tsx", "src/native/**/*"]
 }

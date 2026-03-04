@@ -47,3 +47,11 @@ packages/*/build
 .next/
 tmp/
 .turbo/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+.expo-target/
+packages/frontend/.expo/
+packages/frontend/dist/
+packages/frontend/build/
