@@ -1,30 +1,32 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { PreOrderItem, TableDef } from '../types';
+import { PreOrderItem, TableDef, TableId, TableZone, tableKey } from '../types';
 
 const TABLES_STORAGE_KEY = 'bar-ticketing-tables';
 const PREORDER_STORAGE_KEY = 'bar-ticketing-preorder';
 
 export class StorageService {
-  getDefaultTables(): TableDef[] {
-    return [
-      { number: 1, zone: 'outside' },
-      { number: 2, zone: 'outside' },
-      { number: 3, zone: 'outside' },
-      { number: 4, zone: 'floor1' },
-      { number: 5, zone: 'floor1' },
-      { number: 6, zone: 'floor1' },
-      { number: 7, zone: 'floor2' },
-      { number: 8, zone: 'floor2' }
-    ];
+  getDefaultTables(): Map<TableZone, number[]> {
+    return new Map([
+      [TableZone.OUTSIDE, []],
+      [TableZone.FLOOR1, [1, 2, 3]],
+      [TableZone.FLOOR2, [1, 2, 3]]
+    ]);
   }
 
-  async loadTables(): Promise<TableDef[]> {
+  async loadTables(): Promise<Map<TableZone, number[]>> {
     try {
       const raw = await AsyncStorage.getItem(TABLES_STORAGE_KEY);
       if (!raw) return this.getDefaultTables();
       const parsed = JSON.parse(raw) as TableDef[];
       if (!Array.isArray(parsed) || parsed.length === 0) return this.getDefaultTables();
-      return parsed;
+      
+      // Convert TableDef[] to Map<TableZone, number[]>
+      const map = new Map<TableZone, number[]>();
+      for (const table of parsed) {
+        const existing = map.get(table.zone) || [];
+        map.set(table.zone, [...existing, table.number]);
+      }
+      return map;
     } catch {
       return this.getDefaultTables();
     }
@@ -38,9 +40,10 @@ export class StorageService {
     }
   }
 
-  async loadPreOrderItems(tableNum: number): Promise<PreOrderItem[]> {
+  async loadPreOrderItems(table: TableId): Promise<PreOrderItem[]> {
     try {
-      const raw = await AsyncStorage.getItem(`${PREORDER_STORAGE_KEY}-${tableNum}`);
+      const key = tableKey(table);
+      const raw = await AsyncStorage.getItem(`${PREORDER_STORAGE_KEY}-${key}`);
       if (!raw) return [];
       return JSON.parse(raw) as PreOrderItem[];
     } catch {
@@ -48,12 +51,13 @@ export class StorageService {
     }
   }
 
-  async savePreOrderItems(tableNum: number, items: PreOrderItem[]): Promise<void> {
+  async savePreOrderItems(table: TableId, items: PreOrderItem[]): Promise<void> {
     try {
+      const key = tableKey(table);
       if (items.length === 0) {
-        await AsyncStorage.removeItem(`${PREORDER_STORAGE_KEY}-${tableNum}`);
+        await AsyncStorage.removeItem(`${PREORDER_STORAGE_KEY}-${key}`);
       } else {
-        await AsyncStorage.setItem(`${PREORDER_STORAGE_KEY}-${tableNum}`, JSON.stringify(items));
+        await AsyncStorage.setItem(`${PREORDER_STORAGE_KEY}-${key}`, JSON.stringify(items));
       }
     } catch {
       // no-op

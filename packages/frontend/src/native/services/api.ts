@@ -8,7 +8,8 @@ function defaultApiBaseUrl(): string {
   return 'http://localhost:3000/api';
 }
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || defaultApiBaseUrl()).replace(/\/$/, '');
+// @ts-ignore - Expo injects environment variables at build time
+const API_BASE_URL = (process?.env?.EXPO_PUBLIC_API_BASE_URL || defaultApiBaseUrl()).replace(/\/$/, '');
 
 async function parseOrThrow<T>(response: Response, message: string): Promise<T> {
   if (!response.ok) {

@@ -11,15 +11,17 @@ import {
   View
 } from 'react-native';
 import { apiService, storageService } from './src/native/services';
-import type { MenuItem, Order, PreOrderItem, TableDef, TableZone } from './src/native/types';
+import { TableZoneGroup } from './src/native/components';
+import { createTableManager } from './src/native/helpers';
+import { MenuItem, Order, PreOrderItem, TableDef, TableId, TableZone } from './src/native/types';
 
 function centsToCurrency(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
 export default function App(): React.JSX.Element {
-  const [tables, setTables] = useState<TableDef[]>([]);
-  const [selectedTable, setSelectedTable] = useState(1);
+  const [tables, setTables] = useState<Map<TableZone, number[]>>(new Map());
+  const [selectedTable, setSelectedTable] = useState({zone: TableZone.OUTSIDE, number: 1});
   const [preorderItems, setPreorderItems] = useState<PreOrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -30,8 +32,13 @@ export default function App(): React.JSX.Element {
 
     async function init(): Promise<void> {
       try {
-        const loadedTables = await storageService.loadTables();
-        const initialTable = loadedTables[0]?.number ?? 1;
+        const loadedTables = new Map<TableZone, number[]>([
+          [TableZone.OUTSIDE, [1, 2, 3]],
+          [TableZone.FLOOR1, [1, 2, 3]],
+          [TableZone.FLOOR2, [1, 2, 3]]]
+        );
+        //await storageService.loadTables();
+        const initialTable = {zone: TableZone.OUTSIDE, number: 1};
         const [loadedPreorder, loadedOrders, loadedMenu] = await Promise.all([
           storageService.loadPreOrderItems(initialTable),
           apiService.fetchOrders(),
@@ -64,7 +71,10 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const tableOrders = useMemo(
-    () => orders.filter((order) => order.table?.number === selectedTable),
+    () => orders.filter((order) => 
+      order.table?.number === selectedTable.number && 
+      order.table?.zone === selectedTable.zone
+    ),
     [orders, selectedTable]
   );
 
@@ -77,24 +87,29 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  async function switchTable(tableNumber: number): Promise<void> {
+  async function switchTable(table: TableId): Promise<void> {
     await storageService.savePreOrderItems(selectedTable, preorderItems);
-    const nextItems = await storageService.loadPreOrderItems(tableNumber);
-    setSelectedTable(tableNumber);
+    const nextItems = await storageService.loadPreOrderItems(table);
+    setSelectedTable(table);
     setPreorderItems(nextItems);
   }
 
-  async function addTable(zone: TableZone): Promise<void> {
-    const maxNumber = tables.reduce((max, table) => Math.max(max, table.number), 0);
-    const newTable: TableDef = { number: maxNumber + 1, zone };
-    const updatedTables = [...tables, newTable];
+  function handleTableSelect(table: TableId): void {
+    switchTable(table).catch(() => Alert.alert('Error', 'Failed to switch table.'));
+  }
 
-    await storageService.savePreOrderItems(selectedTable, preorderItems);
-    await storageService.saveTables(updatedTables);
+  const tableManager = useMemo(() => createTableManager({
+    tables,
+    selectedTable,
+    preorderItems,
+    onTablesUpdate: setTables,
+    onSelectedTableUpdate: setSelectedTable,
+    onPreorderItemsUpdate: setPreorderItems,
+    storageService
+  }), [tables, selectedTable, preorderItems]);
 
-    setTables(updatedTables);
-    setSelectedTable(newTable.number);
-    setPreorderItems([]);
+  function handleAddTable(zone: TableZone): void {
+    tableManager.addTable(zone).catch(() => Alert.alert('Error', 'Failed to add table.'));
   }
 
   function addMenuItem(menuId: number): void {
@@ -159,7 +174,7 @@ export default function App(): React.JSX.Element {
     }
 
     try {
-      await apiService.createOrder(selectedTable, items);
+      await apiService.createOrder(selectedTable.number, items);
       setPreorderItems([]);
       await storageService.savePreOrderItems(selectedTable, []);
       await refreshOrders();
@@ -207,30 +222,18 @@ export default function App(): React.JSX.Element {
         <View style={styles.columns}>
           <View style={[styles.column, styles.tablesColumn]}>
             <Text style={styles.sectionTitle}>Tables</Text>
-            <FlatList
-              data={tables}
-              keyExtractor={(item) => String(item.number)}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.tableButton, selectedTable === item.number && styles.tableButtonSelected]}
-                  onPress={() => {
-                    switchTable(item.number).catch(() => Alert.alert('Error', 'Failed to switch table.'));
-                  }}
-                >
-                  <Text style={styles.tableButtonText}>{`Table ${item.number}`}</Text>
-                  <Text style={styles.tableZoneText}>{item.zone}</Text>
-                </TouchableOpacity>
-              )}
-            />
-
-            <View style={styles.addTableColumn}>
-              <Text style={styles.subTitle}>Add Table</Text>
-              {(['outside', 'floor1', 'floor2'] as TableZone[]).map((zone) => (
-                <TouchableOpacity key={zone} style={styles.secondaryButton} onPress={() => void addTable(zone)}>
-                  <Text style={styles.secondaryButtonText}>{`+ ${zone}`}</Text>
-                </TouchableOpacity>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {Array.from(tables.entries()).map(([zone, numbers]) => (
+                <TableZoneGroup
+                  key={zone}
+                  zone={zone}
+                  numbers={numbers}
+                  selectedTable={selectedTable}
+                  onSelectTable={handleTableSelect}
+                  onAddTable={handleAddTable}
+                />
               ))}
-            </View>
+            </ScrollView>
           </View>
 
           <View style={styles.column}>
@@ -254,7 +257,7 @@ export default function App(): React.JSX.Element {
           </View>
 
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>{`Table ${selectedTable} Orders`}</Text>
+            <Text style={styles.sectionTitle}>{`Table ${selectedTable.zone}-${selectedTable.number} Orders`}</Text>
 
             <Text style={styles.subTitle}>Pre-Order</Text>
             <FlatList
@@ -368,30 +371,6 @@ const styles = StyleSheet.create({
   tablesColumn: {
     width: 220,
     maxWidth: 220
-  },
-  tableButton: {
-    width: '100%',
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#E5E7EB',
-    alignItems: 'flex-start',
-    marginBottom: 8
-  },
-  tableButtonSelected: {
-    backgroundColor: '#1D4ED8'
-  },
-  tableButtonText: {
-    color: '#111827',
-    fontWeight: '700'
-  },
-  tableZoneText: {
-    marginTop: 2,
-    color: '#374151',
-    fontSize: 12
-  },
-  addTableColumn: {
-    marginTop: 8,
-    gap: 8
   },
   columns: {
     flex: 1,

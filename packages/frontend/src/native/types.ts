@@ -1,8 +1,21 @@
-export type TableZone = 'outside' | 'floor1' | 'floor2';
+export enum TableZone {
+  OUTSIDE = "outside",
+  FLOOR1 = "floor1",
+  FLOOR2 = "floor2",
+}
 
 export interface TableDef {
   number: number;
   zone: TableZone;
+}
+
+export interface TableId {
+  zone: TableZone;
+  number: number;
+}
+
+export function tableKey(table: TableId): string {
+  return `${table.zone}-${table.number}`;
 }
 
 export interface MenuItem {
