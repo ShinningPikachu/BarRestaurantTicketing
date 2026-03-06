@@ -4,7 +4,6 @@ import {
   FlatList,
   SafeAreaView,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -12,16 +11,24 @@ import {
 } from 'react-native';
 import { apiService, storageService } from './src/native/services';
 import { TableZoneGroup, MenuCategoryGroup } from './src/native/components';
-import { createTableManager, groupMenuItemsByCategory, flattenMenuItems } from './src/native/helpers';
+import { createTableManager, groupMenuItemsByCategory } from './src/native/helpers';
 import { MenuItem, Order, PreOrderItem, TableDef, TableId, TableZone } from './src/native/types';
-
-function centsToCurrency(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+import {
+  addMenuItemToPreOrder,
+  buildConfirmOrderItems,
+  centsToCurrency,
+  decrementPreOrderItem,
+  getMenuTitleById,
+  getPreOrderTotal,
+  incrementPreOrderItem,
+  updatePreOrderItemPrice
+} from './src/native/app/app.helpers';
+import { SelectedTable } from './src/native/app/app.types';
+import { styles } from './src/native/app/App.styles';
 
 export default function App(): React.JSX.Element {
   const [tables, setTables] = useState<Map<TableZone, number[]>>(new Map());
-  const [selectedTable, setSelectedTable] = useState({zone: TableZone.OUTSIDE, number: 1});
+  const [selectedTable, setSelectedTable] = useState<SelectedTable>({zone: TableZone.OUTSIDE, number: 1});
   const [preorderItems, setPreorderItems] = useState<PreOrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuByCategory, setMenuByCategory] = useState<Map<string, MenuItem[]>>(new Map());
@@ -113,62 +120,23 @@ export default function App(): React.JSX.Element {
   }
 
   function addMenuItem(menuId: number): void {
-    setPreorderItems((current) => {
-      const allMenuItems = flattenMenuItems(menuByCategory);
-      const menu = allMenuItems.find((item) => item.id === menuId);
-      if (!menu) return current;
-
-      const existing = current.find((item) => item.menuId === menuId);
-      if (existing) {
-        return current.map((item) =>
-          item.menuId === menuId ? { ...item, qty: item.qty + 1 } : item
-        );
-      }
-
-      return [...current, { menuId, qty: 1, priceCents: menu.priceCents }];
-    });
+    setPreorderItems((current) => addMenuItemToPreOrder(current, menuId, menuByCategory));
   }
 
   function addPendingItem(menuId: number): void {
-    setPreorderItems((current) =>
-      current.map((item) =>
-        item.menuId === menuId ? { ...item, qty: item.qty + 1 } : item
-      )
-    );
+    setPreorderItems((current) => incrementPreOrderItem(current, menuId));
   }
 
   function removePendingItem(menuId: number): void {
-    setPreorderItems((current) => {
-      const next = current
-        .map((item) =>
-          item.menuId === menuId ? { ...item, qty: item.qty - 1 } : item
-        )
-        .filter((item) => item.qty > 0);
-      return next;
-    });
+    setPreorderItems((current) => decrementPreOrderItem(current, menuId));
   }
 
   function setItemPrice(menuId: number, priceCents: number): void {
-    setPreorderItems((current) =>
-      current.map((item) =>
-        item.menuId === menuId ? { ...item, priceCents: Math.max(0, priceCents) } : item
-      )
-    );
+    setPreorderItems((current) => updatePreOrderItemPrice(current, menuId, priceCents));
   }
 
   async function confirmOrder(): Promise<void> {
-    const allMenuItems = flattenMenuItems(menuByCategory);
-    const items = preorderItems
-      .map((item) => {
-        const menu = allMenuItems.find((menuItem) => menuItem.id === item.menuId);
-        if (!menu) return null;
-        return {
-          name: menu.name,
-          qty: item.qty,
-          unitPriceCents: item.priceCents
-        };
-      })
-      .filter((item): item is { name: string; qty: number; unitPriceCents: number } => item !== null);
+    const items = buildConfirmOrderItems(preorderItems, menuByCategory);
 
     if (items.length === 0) {
       Alert.alert('No items', 'Add at least one item before confirming the order.');
@@ -204,7 +172,7 @@ export default function App(): React.JSX.Element {
     }
   }, [preorderItems, selectedTable, loading]);
 
-  const preorderTotal = preorderItems.reduce((sum, item) => sum + item.qty * item.priceCents, 0);
+  const preorderTotal = getPreOrderTotal(preorderItems);
 
   if (loading) {
     return (
@@ -262,9 +230,7 @@ export default function App(): React.JSX.Element {
               keyExtractor={(item) => String(item.menuId)}
               ListEmptyComponent={<Text style={styles.emptyText}>No pre-order items.</Text>}
               renderItem={({ item }) => {
-                const allMenuItems = flattenMenuItems(menuByCategory);
-                const menu = allMenuItems.find((menuItem) => menuItem.id === item.menuId);
-                const title = menu?.name || `Menu ${item.menuId}`;
+                const title = getMenuTitleById(menuByCategory, item.menuId);
                 return (
                   <View style={styles.preorderRow}>
                     <View style={styles.flex1}>
@@ -340,158 +306,3 @@ export default function App(): React.JSX.Element {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F4F6F8',
-    paddingHorizontal: 12,
-    paddingTop: 12
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 10
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600'
-  },
-  columnsContent: {
-    flexGrow: 1,
-    paddingBottom: 12
-  },
-  tablesColumn: {
-    width: 220,
-    maxWidth: 220
-  },
-  columns: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 10,
-    minWidth: 1080
-  },
-  column: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 10
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 8
-  },
-  subTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 6,
-    marginBottom: 6
-  },
-  preorderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8
-  },
-  flex1: {
-    flex: 1
-  },
-  itemName: {
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  itemPrice: {
-    fontSize: 12,
-    color: '#4B5563'
-  },
-  primaryButton: {
-    backgroundColor: '#1D4ED8',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700'
-  },
-  secondaryButton: {
-    backgroundColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  secondaryButtonText: {
-    color: '#111827',
-    fontWeight: '600'
-  },
-  qtyGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4
-  },
-  qtyButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  qtyButtonText: {
-    fontSize: 16,
-    fontWeight: '700'
-  },
-  qtyText: {
-    minWidth: 18,
-    textAlign: 'center'
-  },
-  priceInput: {
-    width: 76,
-    borderColor: '#D1D5DB',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    backgroundColor: '#FFFFFF'
-  },
-  footerRow: {
-    marginTop: 8,
-    marginBottom: 6
-  },
-  totalText: {
-    fontWeight: '700',
-    marginBottom: 6
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 6
-  },
-  confirmedCard: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-    backgroundColor: '#FFFFFF'
-  },
-  orderId: {
-    fontWeight: '700',
-    marginBottom: 4
-  },
-  orderItemText: {
-    fontSize: 13,
-    marginBottom: 2
-  },
-  emptyText: {
-    color: '#6B7280',
-    fontStyle: 'italic',
-    marginBottom: 8
-  }
-});

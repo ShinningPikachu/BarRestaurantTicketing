@@ -1,16 +1,17 @@
 import { StyleSheet } from 'react-native';
+import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   categoryGroup: {
     marginBottom: 16,
     borderRadius: 12,
     padding: 10,
-    backgroundColor: '#00A100',
+    backgroundColor: colors.zoneMenu,
   },
   categoryHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.textBlack,
     marginBottom: 8,
     paddingLeft: 4
   },
@@ -26,9 +27,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceAlt,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: colors.borderLight,
 
     // spacing between chips
     marginRight: 8,
@@ -41,7 +42,7 @@ export const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 12,
-    color: "#4B5563",
+    color: colors.textSecondary,
     marginLeft: 8, // spacing between name and price
   },
 });

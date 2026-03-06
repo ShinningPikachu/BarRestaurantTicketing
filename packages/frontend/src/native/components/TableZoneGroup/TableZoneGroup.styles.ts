@@ -1,16 +1,17 @@
 import { StyleSheet } from 'react-native';
+import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   zoneGroup: {
     marginBottom: 16,
-    backgroundColor: '#4869F7',
+    backgroundColor: colors.zoneTable,
     borderRadius: 12,
     padding: 10
   },
   zoneHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.textBlack,
     marginBottom: 6,
     paddingLeft: 4
   },
@@ -18,18 +19,18 @@ export const styles = StyleSheet.create({
     width: '100%',
     padding: 10,
     borderRadius: 10,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.buttonSecondary,
     alignItems: 'flex-start',
     marginBottom: 8
   },
   tableButtonSelected: {
-    backgroundColor: '#1D4ED8'
+    backgroundColor: colors.buttonPrimary
   },
   tableButtonText: {
-    color: '#111827',
+    color: colors.buttonSecondaryText,
     fontWeight: '700'
   },
   tableButtonTextSelected: {
-    color: '#FFFFFF'
+    color: colors.buttonPrimaryText
   }
 });
