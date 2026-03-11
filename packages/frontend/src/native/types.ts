@@ -54,7 +54,9 @@ export interface Order {
 }
 
 export interface PreOrderItem {
+  id: string; // Unique identifier for this specific preorder item
   menuId: number;
   qty: number;
   priceCents: number;
+  originalPriceCents: number; // Original menu price for reference
 }

@@ -12,22 +12,32 @@ export class OrderService {
     });
   }
 
-  async createOrder(tableId: number, items: any[]) {
+  async createOrder(tableNumber: number, tableZone: string | undefined, items: any[]) {
+    const normalizedItems = items.map((it: any) => ({
+      name: it.name,
+      qty: it.qty || 1,
+      unitPriceCents: it.unitPriceCents || 0,
+      totalPriceCents: (it.unitPriceCents || 0) * (it.qty || 1)
+    }));
+
+    const totalCents = normalizedItems.reduce((sum: number, item: any) => sum + item.totalPriceCents, 0);
+    
+    const whereClause = tableZone 
+      ? { number_zone: { number: tableNumber, zone: tableZone } }
+      : { number_zone: { number: tableNumber, zone: null } };
+
     const created = await prisma.order.create({
       data: {
+        status: 'confirmed',
+        totalCents,
         table: {
           connectOrCreate: {
-            where: { number: tableId },
-            create: { number: tableId }
+            where: whereClause as any,
+            create: { number: tableNumber, zone: tableZone }
           }
         },
         items: {
-          create: items.map((it: any) => ({
-            name: it.name,
-            qty: it.qty,
-            unitPriceCents: it.unitPriceCents || 0,
-            totalPriceCents: (it.unitPriceCents || 0) * (it.qty || 1)
-          }))
+          create: normalizedItems
         }
       },
       include: { items: true, table: true }

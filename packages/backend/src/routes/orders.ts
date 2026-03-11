@@ -14,8 +14,8 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { tableId, items } = req.body;
-    const created = await orderService.createOrder(tableId, items);
+    const { tableNumber, tableZone, items } = req.body;
+    const created = await orderService.createOrder(tableNumber, tableZone, items);
     res.json(created);
   } catch (e) {
     res.status(500).json({ error: String(e) });

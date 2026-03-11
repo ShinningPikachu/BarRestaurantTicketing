@@ -4,10 +4,40 @@ import { PreOrderItem, TableDef, TableId, TableZone, tableKey } from '../types';
 const TABLES_STORAGE_KEY = 'bar-ticketing-tables';
 const PREORDER_STORAGE_KEY = 'bar-ticketing-preorder';
 
+function normalizePreOrderItems(items: unknown): PreOrderItem[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((raw, index) => {
+      if (!raw || typeof raw !== 'object') {
+        return null;
+      }
+
+      const item = raw as Partial<PreOrderItem>;
+      if (typeof item.menuId !== 'number' || typeof item.qty !== 'number') {
+        return null;
+      }
+
+      const fallbackPrice = typeof item.priceCents === 'number' ? item.priceCents : 0;
+
+      return {
+        id: typeof item.id === 'string' && item.id.length > 0 ? item.id : `legacy-${item.menuId}-${Date.now()}-${index}`,
+        menuId: item.menuId,
+        qty: Math.max(1, item.qty),
+        priceCents: fallbackPrice,
+        originalPriceCents:
+          typeof item.originalPriceCents === 'number' ? item.originalPriceCents : fallbackPrice
+      };
+    })
+    .filter((item): item is PreOrderItem => item !== null);
+}
+
 export class StorageService {
   getDefaultTables(): Map<TableZone, number[]> {
     return new Map([
-      [TableZone.OUTSIDE, []],
+      [TableZone.OUTSIDE, [1, 2, 3]],
       [TableZone.FLOOR1, [1, 2, 3]],
       [TableZone.FLOOR2, [1, 2, 3]]
     ]);
@@ -45,7 +75,7 @@ export class StorageService {
       const key = tableKey(table);
       const raw = await AsyncStorage.getItem(`${PREORDER_STORAGE_KEY}-${key}`);
       if (!raw) return [];
-      return JSON.parse(raw) as PreOrderItem[];
+      return normalizePreOrderItems(JSON.parse(raw));
     } catch {
       return [];
     }

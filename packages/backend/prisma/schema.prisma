@@ -9,10 +9,13 @@ datasource db {
 
 model Table {
   id     Int     @id @default(autoincrement())
-  number Int     @unique
+  number Int
+  zone   String?
   seats  Int?    @default(4)
   name   String?
   orders Order[]
+  
+  @@unique([number, zone])
 }
 
 model Order {

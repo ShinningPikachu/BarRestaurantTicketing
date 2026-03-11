@@ -24,11 +24,11 @@ export class ApiService {
     return parseOrThrow<Order[]>(response, 'Failed to fetch orders');
   }
 
-  async createOrder(tableNumber: number, items: Array<{ name: string; qty: number; unitPriceCents: number }>): Promise<Order> {
+  async createOrder(tableNumber: number, tableZone: string, items: Array<{ name: string; qty: number; unitPriceCents: number }>): Promise<Order> {
     const response = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableId: tableNumber, items })
+      body: JSON.stringify({ tableNumber, tableZone, items })
     });
     return parseOrThrow<Order>(response, 'Failed to create order');
   }

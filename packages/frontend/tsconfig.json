@@ -5,5 +5,5 @@
     "composite": true,
     "jsx": "react-jsx"
   },
-  "include": ["App.tsx", "src/native/**/*"]
+  "include": ["App.tsx", "src/native/**/*", "src/native/components/OrderZone/**/*"]
 }

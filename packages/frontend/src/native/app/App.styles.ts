@@ -66,9 +66,20 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600'
   },
+  modifiedLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.warning,
+    fontStyle: 'italic'
+  },
   itemPrice: {
     fontSize: 12,
     color: colors.textSecondary
+  },
+  originalPrice: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    textDecorationLine: 'line-through'
   },
   primaryButton: {
     backgroundColor: colors.buttonPrimary,
@@ -112,13 +123,29 @@ export const styles = StyleSheet.create({
     textAlign: 'center'
   },
   priceInput: {
-    width: 76,
+    width: 88,
     borderColor: colors.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    backgroundColor: colors.inputBackground
+    backgroundColor: colors.inputBackground,
+    textAlign: 'center'
+  },
+  priceQuickActions: {
+    flexDirection: 'row',
+    gap: 4
+  },
+  priceQuickButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5
+  },
+  priceQuickButtonText: {
+    color: colors.buttonSecondaryText,
+    fontWeight: '600',
+    fontSize: 12
   },
   footerRow: {
     marginTop: 8,
