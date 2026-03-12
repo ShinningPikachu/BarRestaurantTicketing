@@ -38,6 +38,11 @@ export class ApiService {
     return parseOrThrow<{ ok: boolean }>(response, 'Failed to delete order');
   }
 
+  async deleteOrderItem(orderId: string, itemId: number): Promise<{ ok: boolean; orderDeleted?: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/orders/${orderId}/items/${itemId}`, { method: 'DELETE' });
+    return parseOrThrow<{ ok: boolean; orderDeleted?: boolean }>(response, 'Failed to delete order item');
+  }
+
   async fetchMenu(): Promise<MenuItem[]> {
     const response = await fetch(`${API_BASE_URL}/menu`);
     return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu');

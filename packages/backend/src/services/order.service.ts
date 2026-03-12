@@ -49,6 +49,39 @@ export class OrderService {
     await prisma.orderItem.deleteMany({ where: { orderId } });
     return prisma.order.delete({ where: { id: orderId } });
   }
+
+  async deleteOrderItem(orderId: string, orderItemId: number) {
+    return prisma.$transaction(async (tx) => {
+      const deleted = await tx.orderItem.deleteMany({
+        where: {
+          id: orderItemId,
+          orderId
+        }
+      });
+
+      if (deleted.count === 0) {
+        throw new Error('Order item not found');
+      }
+
+      const remainingItems = await tx.orderItem.findMany({
+        where: { orderId },
+        select: { totalPriceCents: true }
+      });
+
+      if (remainingItems.length === 0) {
+        await tx.order.delete({ where: { id: orderId } });
+        return { ok: true, orderDeleted: true };
+      }
+
+      const totalCents = remainingItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+      await tx.order.update({
+        where: { id: orderId },
+        data: { totalCents }
+      });
+
+      return { ok: true, orderDeleted: false };
+    });
+  }
 }
 
 export const orderService = new OrderService();

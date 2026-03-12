@@ -59,6 +59,14 @@ export const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8
   },
+  confirmedPreorderRow: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.success,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8
+  },
   flex1: {
     flex: 1
   },
@@ -121,6 +129,12 @@ export const styles = StyleSheet.create({
   qtyText: {
     minWidth: 18,
     textAlign: 'center'
+  },
+  confirmedQtyText: {
+    minWidth: 30,
+    textAlign: 'center',
+    fontWeight: '700',
+    color: colors.success
   },
   priceInput: {
     width: 88,

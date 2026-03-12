@@ -10,7 +10,7 @@ import { apiService, storageService } from './src/native/services';
 import { TableZoneGroup, MenuCategoryGroup } from './src/native/components';
 import { OrderSection } from './src/native/components/OrderZone/OrderSection';
 import { createTableManager, groupMenuItemsByCategory } from './src/native/helpers';
-import { MenuItem, Order, PreOrderItem, TableDef, TableId, TableZone } from './src/native/types';
+import { MenuItem, Order, OrderItem, PreOrderItem, TableDef, TableId, TableZone } from './src/native/types';
 import {
   addMenuItemToPreOrder,
   buildConfirmOrderItems,
@@ -217,7 +217,44 @@ export default function App(): React.JSX.Element {
   }
 
   function printTicket(): void {
-    Alert.alert('Not supported', 'Printing is not available in this React Native version yet.');
+    Alert.alert('Not supported', 'Printing the full kitchen ticket is not available in this React Native version yet.');
+  }
+
+  async function moveConfirmedItemToPreOrder(orderId: string, orderItem: OrderItem): Promise<void> {
+    const normalizedName = orderItem.name.trim().toLowerCase();
+    const allMenuItems = Array.from(menuByCategory.values()).flat();
+    const matchedMenu = allMenuItems.find((menuItem) => menuItem.name.trim().toLowerCase() === normalizedName);
+
+    if (!matchedMenu) {
+      Alert.alert('Unable to edit', `No matching menu item found for "${orderItem.name}".`);
+      return;
+    }
+
+    const qty = Math.max(1, orderItem.qty || 1);
+    const unitPriceCents = orderItem.unitPriceCents ?? matchedMenu.priceCents;
+
+    setPreorderItems((current) => [
+      ...current,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        menuId: matchedMenu.id,
+        qty,
+        priceCents: unitPriceCents,
+        originalPriceCents: matchedMenu.priceCents
+      }
+    ]);
+
+    if (orderItem.id === undefined) {
+      Alert.alert('Unable to edit', 'This kitchen item cannot be updated because it has no item id.');
+      return;
+    }
+
+    try {
+      await apiService.deleteOrderItem(orderId, orderItem.id);
+      await refreshOrders();
+    } catch {
+      Alert.alert('Error', 'Failed to update kitchen order while editing item.');
+    }
   }
 
   useEffect(() => {
@@ -295,6 +332,9 @@ export default function App(): React.JSX.Element {
               onPrintTicket={printTicket}
               onRemoveOrder={(orderId) => {
                 void removeOrder(orderId);
+              }}
+              onMoveConfirmedItemToPreOrder={(orderId, item) => {
+                void moveConfirmedItemToPreOrder(orderId, item);
               }}
             />
           </View>

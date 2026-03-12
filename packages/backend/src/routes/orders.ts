@@ -32,4 +32,21 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.delete('/:id/items/:itemId', async (req: Request, res: Response) => {
+  try {
+    const { id, itemId } = req.params;
+    const parsedItemId = Number(itemId);
+
+    if (!Number.isInteger(parsedItemId)) {
+      res.status(400).json({ error: 'Invalid item id' });
+      return;
+    }
+
+    const result = await orderService.deleteOrderItem(id, parsedItemId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 export default router;
