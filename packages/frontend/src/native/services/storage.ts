@@ -9,29 +9,51 @@ function normalizePreOrderItems(items: unknown): PreOrderItem[] {
     return [];
   }
 
-  return items
-    .map((raw, index) => {
+  const normalizedItems: PreOrderItem[] = [];
+
+  items.forEach((raw, index) => {
       if (!raw || typeof raw !== 'object') {
-        return null;
+        return;
       }
 
-      const item = raw as Partial<PreOrderItem>;
-      if (typeof item.menuId !== 'number' || typeof item.qty !== 'number') {
-        return null;
-      }
-
-      const fallbackPrice = typeof item.priceCents === 'number' ? item.priceCents : 0;
-
-      return {
-        id: typeof item.id === 'string' && item.id.length > 0 ? item.id : `legacy-${item.menuId}-${Date.now()}-${index}`,
-        menuId: item.menuId,
-        qty: Math.max(1, item.qty),
-        priceCents: fallbackPrice,
-        originalPriceCents:
-          typeof item.originalPriceCents === 'number' ? item.originalPriceCents : fallbackPrice
+      const item = raw as Partial<PreOrderItem> & {
+        menuId?: number;
+        priceCents?: number;
+        originalPriceCents?: number;
       };
-    })
-    .filter((item): item is PreOrderItem => item !== null);
+      if (typeof item.qty !== 'number') {
+        return;
+      }
+
+      const fallbackUnitPrice =
+        typeof item.unitPriceCents === 'number'
+          ? item.unitPriceCents
+          : typeof item.priceCents === 'number'
+            ? item.priceCents
+            : 0;
+
+      const normalizedQty = Math.max(1, item.qty);
+
+      normalizedItems.push({
+        id: typeof item.id === 'number' ? item.id : Date.now() + index,
+        menuItemId: typeof item.menuItemId === 'number'
+          ? item.menuItemId
+          : typeof item.menuId === 'number'
+            ? item.menuId
+            : null,
+        name: typeof item.name === 'string' && item.name.trim().length > 0
+          ? item.name
+          : 'Pre-order item',
+        qty: normalizedQty,
+        unitPriceCents: fallbackUnitPrice,
+        totalPriceCents:
+          typeof item.totalPriceCents === 'number'
+            ? item.totalPriceCents
+            : fallbackUnitPrice * normalizedQty
+      });
+    });
+
+  return normalizedItems;
 }
 
 export class StorageService {

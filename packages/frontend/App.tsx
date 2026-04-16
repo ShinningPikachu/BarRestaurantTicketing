@@ -1,269 +1,32 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
-  Alert,
   SafeAreaView,
   ScrollView,
   Text,
   View
 } from 'react-native';
-import { apiService, storageService } from './src/native/services';
+import { useTicketingController } from './src/native/controllers';
 import { TableZoneGroup, MenuCategoryGroup } from './src/native/components';
 import { OrderSection } from './src/native/components/OrderZone/OrderSection';
-import { createTableManager, groupMenuItemsByCategory } from './src/native/helpers';
-import { MenuItem, Order, OrderItem, PreOrderItem, TableDef, TableId, TableZone } from './src/native/types';
+import { MenuItem, TableZone } from './src/native/types';
 import {
-  addMenuItemToPreOrder,
-  buildConfirmOrderItems,
   centsToCurrency,
-  decrementPreOrderItem,
-  getMenuTitleById,
-  getPreOrderTotal,
-  incrementPreOrderItem,
-  updatePreOrderItemPrice
+  getMenuTitleById
 } from './src/native/app/app.helpers';
-import { SelectedTable } from './src/native/app/app.types';
 import { styles } from './src/native/app/App.styles';
 
-function getInitialTable(tables: Map<TableZone, number[]>): SelectedTable {
-  for (const [zone, numbers] of tables.entries()) {
-    const firstNumber = numbers[0];
-    if (firstNumber !== undefined) {
-      return { zone, number: firstNumber };
-    }
-  }
-
-  return { zone: TableZone.OUTSIDE, number: 1 };
-}
-
 export default function App(): React.JSX.Element {
-  const [tables, setTables] = useState<Map<TableZone, number[]>>(new Map());
-  const [selectedTable, setSelectedTable] = useState<SelectedTable>({zone: TableZone.OUTSIDE, number: 1});
-  const [preorderItems, setPreorderItems] = useState<PreOrderItem[]>([]);
-  const [priceDraftByItemId, setPriceDraftByItemId] = useState<Record<string, string>>({});
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [menuByCategory, setMenuByCategory] = useState<Map<string, MenuItem[]>>(new Map());
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function init(): Promise<void> {
-      try {
-        const loadedTables = await storageService.loadTables();
-        const initialTable = getInitialTable(loadedTables);
-        const [loadedPreorder, loadedOrders, loadedMenu] = await Promise.all([
-          storageService.loadPreOrderItems(initialTable),
-          apiService.fetchOrders().catch(() => []),
-          apiService.fetchMenu().catch(() => [])
-        ]);
-
-        if (!mounted) return;
-
-        setTables(loadedTables);
-        setSelectedTable(initialTable);
-        setPreorderItems(loadedPreorder);
-        setOrders(loadedOrders);
-        setMenuByCategory(groupMenuItemsByCategory(loadedMenu));
-      } catch {
-        if (mounted) {
-          Alert.alert('Initialization failed', 'Unable to load app data.');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    init();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const tableOrders = useMemo(
-    () => orders.filter((order) => 
-      order.table?.number === selectedTable.number && 
-      order.table?.zone === selectedTable.zone
-    ),
-    [orders, selectedTable]
-  );
-
-  const tableConfirmedOrders = useMemo(
-    () => tableOrders.filter((order) => (order.status || '').toLowerCase() === 'confirmed'),
-    [tableOrders]
-  );
-
-  async function refreshOrders(): Promise<void> {
-    try {
-      const loadedOrders = await apiService.fetchOrders();
-      setOrders(loadedOrders);
-    } catch {
-      Alert.alert('Error', 'Failed to fetch orders.');
-    }
-  }
-
-  async function switchTable(table: TableId): Promise<void> {
-    await storageService.savePreOrderItems(selectedTable, preorderItems);
-    const nextItems = await storageService.loadPreOrderItems(table);
-    setSelectedTable(table);
-    setPreorderItems(nextItems);
-  }
-
-  function handleTableSelect(table: TableId): void {
-    switchTable(table).catch(() => Alert.alert('Error', 'Failed to switch table.'));
-  }
-
-  const tableManager = useMemo(() => createTableManager({
+  const { state, actions } = useTicketingController();
+  const {
+    loading,
     tables,
     selectedTable,
+    menuByCategory,
     preorderItems,
-    onTablesUpdate: setTables,
-    onSelectedTableUpdate: setSelectedTable,
-    onPreorderItemsUpdate: setPreorderItems,
-    storageService
-  }), [tables, selectedTable, preorderItems]);
-
-  function handleAddTable(zone: TableZone): void {
-    tableManager.addTable(zone).catch(() => Alert.alert('Error', 'Failed to add table.'));
-  }
-
-  function addMenuItem(menuId: number): void {
-    setPreorderItems((current) => addMenuItemToPreOrder(current, menuId, menuByCategory));
-  }
-
-  function addPendingItem(itemId: string): void {
-    setPreorderItems((current) => incrementPreOrderItem(current, itemId));
-  }
-
-  function removePendingItem(itemId: string): void {
-    setPreorderItems((current) => decrementPreOrderItem(current, itemId));
-  }
-
-  function setItemPrice(itemId: string, priceCents: number): void {
-    setPreorderItems((current) => updatePreOrderItemPrice(current, itemId, priceCents));
-    setPriceDraftByItemId((current) => {
-      const next = { ...current };
-      delete next[itemId];
-      return next;
-    });
-  }
-
-  function adjustItemPrice(itemId: string, deltaCents: number): void {
-    setPreorderItems((current) =>
-      current.map((item) =>
-        item.id === itemId
-          ? { ...item, priceCents: Math.max(0, item.priceCents + deltaCents) }
-          : item
-      )
-    );
-    setPriceDraftByItemId((current) => {
-      const next = { ...current };
-      delete next[itemId];
-      return next;
-    });
-  }
-
-  function updatePriceDraft(itemId: string, value: string): void {
-    setPriceDraftByItemId((current) => ({ ...current, [itemId]: value }));
-  }
-
-  function commitPriceDraft(itemId: string): void {
-    const rawValue = priceDraftByItemId[itemId];
-    if (rawValue === undefined) {
-      return;
-    }
-
-    const parsed = Number(rawValue.replace(',', '.').trim());
-    if (!Number.isNaN(parsed)) {
-      setItemPrice(itemId, Math.round(parsed * 100));
-      return;
-    }
-
-    setPriceDraftByItemId((current) => {
-      const next = { ...current };
-      delete next[itemId];
-      return next;
-    });
-  }
-
-  async function confirmOrder(): Promise<void> {
-    const items = buildConfirmOrderItems(preorderItems, menuByCategory);
-
-    if (items.length === 0) {
-      Alert.alert('No items', 'Add at least one item before sending to kitchen.');
-      return;
-    }
-
-    try {
-      await apiService.createOrder(selectedTable.number, selectedTable.zone, items);
-      setPreorderItems([]);
-      await storageService.savePreOrderItems(selectedTable, []);
-      await refreshOrders();
-      Alert.alert('Sent to kitchen', 'Pre-order items are now confirmed and ready to cook.');
-    } catch {
-      Alert.alert('Error', 'Failed to send order to kitchen.');
-    }
-  }
-
-  async function removeOrder(orderId: string): Promise<void> {
-    try {
-      await apiService.deleteOrder(orderId);
-      await refreshOrders();
-    } catch {
-      Alert.alert('Error', 'Failed to remove order.');
-    }
-  }
-
-  function printTicket(): void {
-    Alert.alert('Not supported', 'Printing the full kitchen ticket is not available in this React Native version yet.');
-  }
-
-  async function moveConfirmedItemToPreOrder(orderId: string, orderItem: OrderItem): Promise<void> {
-    const normalizedName = orderItem.name.trim().toLowerCase();
-    const allMenuItems = Array.from(menuByCategory.values()).flat();
-    const matchedMenu = allMenuItems.find((menuItem) => menuItem.name.trim().toLowerCase() === normalizedName);
-
-    if (!matchedMenu) {
-      Alert.alert('Unable to edit', `No matching menu item found for "${orderItem.name}".`);
-      return;
-    }
-
-    const qty = Math.max(1, orderItem.qty || 1);
-    const unitPriceCents = orderItem.unitPriceCents ?? matchedMenu.priceCents;
-
-    setPreorderItems((current) => [
-      ...current,
-      {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-        menuId: matchedMenu.id,
-        qty,
-        priceCents: unitPriceCents,
-        originalPriceCents: matchedMenu.priceCents
-      }
-    ]);
-
-    if (orderItem.id === undefined) {
-      Alert.alert('Unable to edit', 'This kitchen item cannot be updated because it has no item id.');
-      return;
-    }
-
-    try {
-      await apiService.deleteOrderItem(orderId, orderItem.id);
-      await refreshOrders();
-    } catch {
-      Alert.alert('Error', 'Failed to update kitchen order while editing item.');
-    }
-  }
-
-  useEffect(() => {
-    if (!loading) {
-      storageService.savePreOrderItems(selectedTable, preorderItems).catch(() => undefined);
-    }
-  }, [preorderItems, selectedTable, loading]);
-
-  const preorderTotal = getPreOrderTotal(preorderItems);
+    tableConfirmedOrders,
+    preorderTotal,
+    priceDraftByItemId
+  } = state;
 
   if (loading) {
     return (
@@ -284,14 +47,18 @@ export default function App(): React.JSX.Element {
           <View style={[styles.column, styles.tablesColumn]}>
             <Text style={styles.sectionTitle}>Tables</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {Array.from(tables.entries()).map(([zone, numbers]) => (
+              {Array.from(tables.entries()).map(([zone, numbers]: [TableZone, number[]]) => (
                 <TableZoneGroup
                   key={zone}
                   zone={zone}
                   numbers={numbers}
                   selectedTable={selectedTable}
-                  onSelectTable={handleTableSelect}
-                  onAddTable={handleAddTable}
+                  onSelectTable={(table) => {
+                    void actions.selectTable(table);
+                  }}
+                  onAddTable={(zoneValue) => {
+                    void actions.addTable(zoneValue);
+                  }}
                 />
               ))}
             </ScrollView>
@@ -300,12 +67,14 @@ export default function App(): React.JSX.Element {
           <View style={styles.column}>
             <Text style={styles.sectionTitle}>Menu</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {Array.from(menuByCategory.entries()).map(([category, items]) => (
+              {Array.from(menuByCategory.entries()).map(([category, items]: [string, MenuItem[]]) => (
                 <MenuCategoryGroup
                   key={category}
                   category={category}
                   items={items}
-                  onSelectItem={addMenuItem}
+                  onSelectItem={(menuId) => {
+                    void actions.addMenuItem(menuId);
+                  }}
                   formatPrice={centsToCurrency}
                 />
               ))}
@@ -322,19 +91,33 @@ export default function App(): React.JSX.Element {
               priceDraftByItemId={priceDraftByItemId}
               getMenuTitleById={getMenuTitleById}
               formatPrice={centsToCurrency}
-              onRemovePendingItem={removePendingItem}
-              onAddPendingItem={addPendingItem}
-              onUpdatePriceDraft={updatePriceDraft}
-              onCommitPriceDraft={commitPriceDraft}
-              onAdjustItemPrice={adjustItemPrice}
-              onConfirmOrder={() => void confirmOrder()}
-              onClearPreOrder={() => setPreorderItems([])}
-              onPrintTicket={printTicket}
+              onRemovePendingItem={(itemId) => {
+                void actions.decrementPendingItem(itemId);
+              }}
+              onAddPendingItem={(itemId) => {
+                void actions.incrementPendingItem(itemId);
+              }}
+              onUpdatePriceDraft={actions.updatePriceDraft}
+              onCommitPriceDraft={(itemId) => {
+                void actions.commitPriceDraft(itemId);
+              }}
+              onAdjustItemPrice={(itemId, deltaCents) => {
+                void actions.adjustItemPrice(itemId, deltaCents);
+              }}
+              onConfirmOrder={() => {
+                void actions.sendToKitchen();
+              }}
+              onClearPreOrder={() => {
+                void actions.clearPreOrder();
+              }}
+              onPrintTicket={() => {
+                void actions.printTicket();
+              }}
               onRemoveOrder={(orderId) => {
-                void removeOrder(orderId);
+                void actions.removeOrder(orderId);
               }}
               onMoveConfirmedItemToPreOrder={(orderId, item) => {
-                void moveConfirmedItemToPreOrder(orderId, item);
+                void actions.moveConfirmedItemToPreOrder(orderId, item);
               }}
             />
           </View>

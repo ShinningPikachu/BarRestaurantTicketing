@@ -30,6 +30,7 @@ export interface MenuItem {
 
 export interface OrderItem {
   id?: number;
+  menuItemId?: number | null;
   name: string;
   qty: number;
   unitPriceCents?: number;
@@ -54,9 +55,24 @@ export interface Order {
 }
 
 export interface PreOrderItem {
-  id: string; // Unique identifier for this specific preorder item
-  menuId: number;
+  id: number;
+  menuItemId?: number | null;
+  name: string;
   qty: number;
-  priceCents: number;
-  originalPriceCents: number; // Original menu price for reference
+  unitPriceCents: number;
+  totalPriceCents: number;
+}
+
+export interface BackendTable {
+  id: number;
+  number: number;
+  zone?: string | null;
+  seats?: number | null;
+  name?: string | null;
+}
+
+export interface TableWorkflow {
+  table: BackendTable;
+  preOrderItems: PreOrderItem[];
+  orders: Order[];
 }

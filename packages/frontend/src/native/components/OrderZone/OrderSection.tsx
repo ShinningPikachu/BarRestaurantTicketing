@@ -10,14 +10,14 @@ interface OrderSectionProps {
   tableOrders: Order[];
   menuByCategory: Map<string, MenuItem[]>;
   preorderTotal: number;
-  priceDraftByItemId: Record<string, string>;
+  priceDraftByItemId: Record<number, string>;
   getMenuTitleById: (menuByCategory: Map<string, MenuItem[]>, menuId: number) => string;
   formatPrice: (cents: number) => string;
-  onRemovePendingItem: (itemId: string) => void;
-  onAddPendingItem: (itemId: string) => void;
-  onUpdatePriceDraft: (itemId: string, value: string) => void;
-  onCommitPriceDraft: (itemId: string) => void;
-  onAdjustItemPrice: (itemId: string, deltaCents: number) => void;
+  onRemovePendingItem: (itemId: number) => void;
+  onAddPendingItem: (itemId: number) => void;
+  onUpdatePriceDraft: (itemId: number, value: string) => void;
+  onCommitPriceDraft: (itemId: number) => void;
+  onAdjustItemPrice: (itemId: number, deltaCents: number) => void;
   onConfirmOrder: () => void;
   onClearPreOrder: () => void;
   onPrintTicket: () => void;
@@ -60,25 +60,20 @@ export function OrderSection({
       <Text style={styles.subTitle}>Pre-Order</Text>
       <FlatList
         data={preorderItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         ListEmptyComponent={<Text style={styles.emptyText}>No pre-order items.</Text>}
         renderItem={({ item }) => {
-          const title = getMenuTitleById(menuByCategory, item.menuId);
-          const isPriceModified = item.priceCents !== item.originalPriceCents;
+          const title = item.menuItemId
+            ? getMenuTitleById(menuByCategory, item.menuItemId)
+            : item.name;
           return (
             <View style={styles.preorderRow}>
               <View style={styles.flex1}>
                 <Text style={styles.itemName}>
                   {title}
-                  {isPriceModified && <Text style={styles.modifiedLabel}> (Modified)</Text>}
                 </Text>
                 <Text style={styles.itemPrice}>
-                  {formatPrice(item.priceCents * item.qty)}
-                  {isPriceModified && (
-                    <Text style={styles.originalPrice}>
-                      {' '}(was {formatPrice(item.originalPriceCents * item.qty)})
-                    </Text>
-                  )}
+                  {formatPrice(item.unitPriceCents * item.qty)}
                 </Text>
               </View>
 
@@ -95,7 +90,7 @@ export function OrderSection({
               <TextInput
                 style={styles.priceInput}
                 keyboardType="decimal-pad"
-                value={priceDraftByItemId[item.id] ?? (item.priceCents / 100).toFixed(2)}
+                value={priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
                 selectTextOnFocus
                 placeholder="0.00"
                 onChangeText={(value) => onUpdatePriceDraft(item.id, value)}
