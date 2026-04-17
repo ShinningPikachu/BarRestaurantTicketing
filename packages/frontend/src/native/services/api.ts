@@ -1,5 +1,23 @@
 import { Platform } from 'react-native';
 import type { BackendTable, MenuItem, Order, TableWorkflow } from '../types';
+import { logger } from '../utils/logger';
+
+interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+interface ExpoLikeGlobal {
+  process?: {
+    env?: {
+      EXPO_PUBLIC_API_BASE_URL?: string;
+    };
+  };
+}
 
 function defaultApiBaseUrl(): string {
   if (Platform.OS === 'android') {
@@ -8,14 +26,33 @@ function defaultApiBaseUrl(): string {
   return 'http://localhost:3000/api';
 }
 
-// @ts-ignore - Expo injects environment variables at build time
-const API_BASE_URL = (process?.env?.EXPO_PUBLIC_API_BASE_URL || defaultApiBaseUrl()).replace(/\/$/, '');
+const envBaseUrl = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL = (envBaseUrl || defaultApiBaseUrl()).replace(/\/$/, '');
 
 async function parseOrThrow<T>(response: Response, message: string): Promise<T> {
   if (!response.ok) {
-    throw new Error(message);
+    const error = `${message} (${response.status})`;
+    logger.error({ status: response.status }, error);
+    throw new Error(error);
   }
-  return response.json() as Promise<T>;
+
+  const json = await response.json();
+
+  // Handle new ApiResponse format from backend
+  if (json && typeof json === 'object' && 'success' in json) {
+    const apiResponse = json as ApiResponse<T>;
+    if (apiResponse.success && apiResponse.data) {
+      return apiResponse.data;
+    }
+    if (!apiResponse.success && apiResponse.error) {
+      const error = `${message}: ${apiResponse.error.message}`;
+      logger.error({ error: apiResponse.error }, error);
+      throw new Error(error);
+    }
+  }
+
+  // Fallback for direct data response (backward compatibility)
+  return json as T;
 }
 
 export class ApiService {
@@ -78,6 +115,15 @@ export class ApiService {
   async fetchOrders(): Promise<Order[]> {
     const response = await fetch(`${API_BASE_URL}/orders`);
     return parseOrThrow<Order[]>(response, 'Failed to fetch orders');
+  }
+
+  async createOrder(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
+    const response = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableNumber, tableZone })
+    });
+    return parseOrThrow<TableWorkflow>(response, 'Failed to create order');
   }
 
   async moveConfirmedItemToPreOrder(orderId: string, itemId: number): Promise<TableWorkflow> {

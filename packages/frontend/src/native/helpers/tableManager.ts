@@ -1,14 +1,14 @@
-import { TableDef, TableId, TableZone } from '../types';
+import { TableDef, TableId, TableZone, PreOrderItem } from '../types';
 
 export interface TableManagerConfig {
   tables: Map<TableZone, number[]>;
   selectedTable: TableId;
-  preorderItems: any[];
+  preorderItems: PreOrderItem[];
   onTablesUpdate: (tables: Map<TableZone, number[]>) => void;
   onSelectedTableUpdate: (table: TableId) => void;
-  onPreorderItemsUpdate: (items: any[]) => void;
+  onPreorderItemsUpdate: (items: PreOrderItem[]) => void;
   storageService: {
-    savePreOrderItems: (table: TableId, items: any[]) => Promise<void>;
+    savePreOrderItems: (table: TableId, items: PreOrderItem[]) => Promise<void>;
     saveTables: (tables: TableDef[]) => Promise<void>;
   };
 }

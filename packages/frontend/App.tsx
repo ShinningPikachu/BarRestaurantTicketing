@@ -8,7 +8,7 @@ import {
 import { useTicketingController } from './src/native/controllers';
 import { TableZoneGroup, MenuCategoryGroup } from './src/native/components';
 import { OrderSection } from './src/native/components/OrderZone/OrderSection';
-import { MenuItem, TableZone } from './src/native/types';
+import { MenuItem, TABLE_ZONES, TableZone } from './src/native/types';
 import {
   centsToCurrency,
   getMenuTitleById
@@ -47,20 +47,27 @@ export default function App(): React.JSX.Element {
           <View style={[styles.column, styles.tablesColumn]}>
             <Text style={styles.sectionTitle}>Tables</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {Array.from(tables.entries()).map(([zone, numbers]: [TableZone, number[]]) => (
-                <TableZoneGroup
-                  key={zone}
-                  zone={zone}
-                  numbers={numbers}
-                  selectedTable={selectedTable}
-                  onSelectTable={(table) => {
-                    void actions.selectTable(table);
-                  }}
-                  onAddTable={(zoneValue) => {
-                    void actions.addTable(zoneValue);
-                  }}
-                />
-              ))}
+              {TABLE_ZONES.map((zone: TableZone) => {
+                const numbers = tables.get(zone) ?? [];
+                if (numbers.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <TableZoneGroup
+                    key={zone}
+                    zone={zone}
+                    numbers={numbers}
+                    selectedTable={selectedTable}
+                    onSelectTable={(table) => {
+                      void actions.selectTable(table);
+                    }}
+                    onAddTable={(zoneValue) => {
+                      void actions.addTable(zoneValue);
+                    }}
+                  />
+                );
+              })}
             </ScrollView>
           </View>
 

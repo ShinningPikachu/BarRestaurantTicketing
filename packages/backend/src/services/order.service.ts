@@ -1,5 +1,13 @@
 import prisma from '../db';
 
+interface CreateOrderItem {
+  name: string;
+  qty: number;
+  unitPriceCents: number;
+  totalPriceCents: number;
+  menuItemId?: number | null;
+}
+
 export class OrderService {
   async getAllOrders() {
     return prisma.order.findMany({ include: { items: true, table: true } });
@@ -12,19 +20,28 @@ export class OrderService {
     });
   }
 
-  async createOrder(tableNumber: number, tableZone: string | undefined, items: any[]) {
-    const normalizedItems = items.map((it: any) => ({
-      name: it.name,
-      qty: it.qty || 1,
-      unitPriceCents: it.unitPriceCents || 0,
-      totalPriceCents: (it.unitPriceCents || 0) * (it.qty || 1)
+  async createOrder(
+    tableNumber: number,
+    tableZone: string | undefined,
+    items: Array<{
+      name?: string;
+      qty?: number;
+      unitPriceCents?: number;
+      totalPriceCents?: number;
+      menuItemId?: number | null;
+    }>
+  ) {
+    const normalizedZone = tableZone ?? 'outside';
+
+    const normalizedItems: CreateOrderItem[] = items.map((it) => ({
+      name: it.name ?? 'Item',
+      qty: Math.max(1, it.qty ?? 1),
+      unitPriceCents: Math.max(0, it.unitPriceCents ?? 0),
+      totalPriceCents: Math.max(0, it.totalPriceCents ?? 0),
+      menuItemId: it.menuItemId ?? null,
     }));
 
-    const totalCents = normalizedItems.reduce((sum: number, item: any) => sum + item.totalPriceCents, 0);
-    
-    const whereClause = tableZone 
-      ? { number_zone: { number: tableNumber, zone: tableZone } }
-      : { number_zone: { number: tableNumber, zone: null } };
+    const totalCents = normalizedItems.reduce((sum: number, item) => sum + item.totalPriceCents, 0);
 
     const created = await prisma.order.create({
       data: {
@@ -32,8 +49,8 @@ export class OrderService {
         totalCents,
         table: {
           connectOrCreate: {
-            where: whereClause as any,
-            create: { number: tableNumber, zone: tableZone }
+            where: { number_zone: { number: tableNumber, zone: normalizedZone } },
+            create: { number: tableNumber, zone: normalizedZone }
           }
         },
         items: {
@@ -46,8 +63,25 @@ export class OrderService {
   }
 
   async deleteOrder(orderId: string) {
-    await prisma.orderItem.deleteMany({ where: { orderId } });
-    return prisma.order.delete({ where: { id: orderId } });
+    return prisma.$transaction(async (tx) => {
+      const tickets = await tx.kitchenTicket.findMany({
+        where: { orderId },
+        select: { id: true },
+      });
+
+      const ticketIds = tickets.map((ticket) => ticket.id);
+      if (ticketIds.length > 0) {
+        await tx.kitchenTicketItem.deleteMany({
+          where: { ticketId: { in: ticketIds } },
+        });
+      }
+
+      await tx.kitchenTicket.deleteMany({ where: { orderId } });
+      await tx.payment.deleteMany({ where: { orderId } });
+      await tx.orderItem.deleteMany({ where: { orderId } });
+
+      return tx.order.delete({ where: { id: orderId } });
+    });
   }
 
   async deleteOrderItem(orderId: string, orderItemId: number) {

@@ -27,8 +27,8 @@ export const styles = StyleSheet.create({
     paddingBottom: 12
   },
   tablesColumn: {
-    width: 220,
-    maxWidth: 220
+    width: 360,
+    maxWidth: 360
   },
   columns: {
     flex: 1,

@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import routes from './routes';
-import { DEFAULT_PORT } from './utils/constants';
+import { errorHandler } from './middleware/errorHandler';
+import { config } from './config';
+import { logger } from './utils/logger';
 
 const app = express();
 
@@ -12,9 +14,10 @@ app.use(express.json());
 // Routes
 app.use(routes);
 
+// Error handler must be last middleware
+app.use(errorHandler);
+
 // Start server
-const port = process.env.PORT || DEFAULT_PORT;
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Backend listening on http://localhost:${port}`);
+app.listen(config.port, () => {
+  logger.info({ port: config.port }, `Backend listening on http://localhost:${config.port}`);
 });

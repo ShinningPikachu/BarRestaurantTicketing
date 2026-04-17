@@ -1,6 +1,5 @@
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { MenuItem, Order, PreOrderItem } from '../types';
+import { Order, PreOrderItem } from '../types';
 import { SelectedTable } from '../app/app.types';
 
 function centsToCurrency(cents: number): string {
@@ -26,16 +25,12 @@ function buildTicketHtml(params: {
   selectedTable: SelectedTable;
   confirmedOrders: Order[];
   preorderItems: PreOrderItem[];
-  menuByCategory: Map<string, MenuItem[]>;
   now: Date;
 }): string {
-  const { selectedTable, confirmedOrders, preorderItems, menuByCategory, now } = params;
+  const { selectedTable, confirmedOrders, preorderItems, now } = params;
 
   // Flatten all confirmed items
   const confirmedItems = confirmedOrders.flatMap((order) => order.items);
-
-  // Flatten menu items for name lookup
-  const allMenuItems = Array.from(menuByCategory.values()).flat();
 
   // Confirmed section rows
   const confirmedRows = confirmedItems.map((item) => {
@@ -52,13 +47,11 @@ function buildTicketHtml(params: {
 
   // Pre-order section rows
   const preorderRows = preorderItems.map((item) => {
-    const menuItem = item.menuItemId ? allMenuItems.find((m) => m.id === item.menuItemId) : undefined;
-    const name = menuItem?.name ?? item.name;
     const unit = centsToCurrency(item.unitPriceCents);
     const total = centsToCurrency(item.unitPriceCents * item.qty);
     return `
       <tr>
-        <td class="item-name">${escapeHtml(name)}</td>
+        <td class="item-name">${escapeHtml(item.name)}</td>
         <td class="qty">${item.qty}</td>
         <td class="price">${unit}</td>
         <td class="price">${total}</td>
@@ -289,24 +282,11 @@ export async function generateAndShareTicketPdf(params: {
   selectedTable: SelectedTable;
   confirmedOrders: Order[];
   preorderItems: PreOrderItem[];
-  menuByCategory: Map<string, MenuItem[]>;
 }): Promise<void> {
   const now = new Date();
   const html = buildTicketHtml({ ...params, now });
 
-  const { uri } = await Print.printToFileAsync({
-    html,
-    base64: false,
-  });
-
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (isAvailable) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `Ticket — Table ${params.selectedTable.zone}-${params.selectedTable.number}`,
-      UTI: 'com.adobe.pdf',
-    });
-  } else {
-    await Print.printAsync({ uri });
-  }
+  // Always print the generated ticket HTML directly so "Print Kitchen Ticket"
+  // opens a print flow for ticket content.
+  await Print.printAsync({ html });
 }

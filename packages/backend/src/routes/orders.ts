@@ -1,59 +1,87 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service';
+import { validateBody, validateParams } from '../middleware/validation';
+import { successResponse } from '../types/api';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+// Validation schemas
+const sendToKitchenSchema = z.object({
+  tableNumber: z.number().positive('Table number must be positive'),
+  tableZone: z.string().min(1, 'Table zone is required'),
+});
+
+const itemIdParamSchema = z.object({
+  itemId: z.coerce.number().positive('Item ID must be positive'),
+});
+
+export const moveToPreorderParamSchema = z.object({
+  id: z.string().min(1, 'Order ID is required'),
+  itemId: z.coerce.number().positive('Item ID must be positive'),
+});
+
+router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    logger.info({}, 'Fetching all orders');
     const orders = await workflowService.getAllOrders();
-    res.json(orders);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
+    logger.debug({ count: orders.length }, 'Orders fetched');
+    res.json(successResponse(orders));
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch orders');
+    next(error);
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { tableNumber, tableZone } = req.body as { tableNumber?: number; tableZone?: string };
-    if (tableNumber === undefined || !tableZone) {
-      res.status(400).json({ error: 'tableNumber and tableZone are required' });
-      return;
+router.post(
+  '/',
+  validateBody(sendToKitchenSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tableNumber, tableZone } = req.body;
+      logger.info({ tableNumber, tableZone }, 'Sending order to kitchen');
+
+      await workflowService.sendToKitchen(tableNumber, tableZone);
+      const workflow = await workflowService.getTableWorkflow(tableNumber, tableZone);
+      res.status(201).json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to send order to kitchen');
+      next(error);
     }
-
-    await workflowService.sendToKitchen(tableNumber, tableZone);
-    const workflow = await workflowService.getTableWorkflow(tableNumber, tableZone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    logger.info({ orderId: id }, 'Deleting order');
     await workflowService.deleteOrder(id);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
+    res.json(successResponse({ ok: true }));
+  } catch (error) {
+    logger.error({ error }, 'Failed to delete order');
+    next(error);
   }
 });
 
-router.post('/:id/items/:itemId/move-to-preorder', async (req: Request, res: Response) => {
-  try {
-    const { id, itemId } = req.params;
-    const parsedItemId = Number(itemId);
+router.post(
+  '/:id/items/:itemId/move-to-preorder',
+  validateParams(moveToPreorderParamSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, itemId } = req.params;
+      const parsedItemId = Number(itemId);
 
-    if (!Number.isInteger(parsedItemId)) {
-      res.status(400).json({ error: 'Invalid item id' });
-      return;
+      logger.info({ orderId: id, itemId: parsedItemId }, 'Moving order item to pre-order');
+
+      const targetTable = await workflowService.moveConfirmedOrderItemToPreOrder(id, parsedItemId);
+      const workflow = await workflowService.getTableWorkflow(targetTable.tableNumber, targetTable.tableZone);
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to move item to pre-order');
+      next(error);
     }
-
-    const targetTable = await workflowService.moveConfirmedOrderItemToPreOrder(id, parsedItemId);
-    const workflow = await workflowService.getTableWorkflow(targetTable.tableNumber, targetTable.tableZone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
 export default router;

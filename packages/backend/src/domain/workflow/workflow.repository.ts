@@ -71,20 +71,24 @@ export class WorkflowRepository {
 
   async createPreOrderItem(
     sessionId: string,
-    payload: { menuItemId?: number; name: string; qty: number; unitPriceCents: number },
+    payload: { menuItemId?: number | null; name: string; qty: number; unitPriceCents: number },
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
-    return db.preOrderItem.create({
-      data: {
-        sessionId,
-        menuItemId: payload.menuItemId,
-        name: payload.name,
-        qty: payload.qty,
-        unitPriceCents: payload.unitPriceCents,
-        totalPriceCents: payload.unitPriceCents * payload.qty
-      }
-    });
+    
+    const data: any = {
+      sessionId,
+      name: payload.name,
+      qty: payload.qty,
+      unitPriceCents: payload.unitPriceCents,
+      totalPriceCents: payload.unitPriceCents * payload.qty
+    };
+    
+    if (payload.menuItemId !== undefined && payload.menuItemId !== null) {
+      data.menuItemId = payload.menuItemId;
+    }
+    
+    return db.preOrderItem.create({ data });
   }
 
   async updatePreOrderItem(
@@ -244,7 +248,23 @@ export class WorkflowRepository {
 
   async deleteOrder(orderId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
+
+    const tickets = await db.kitchenTicket.findMany({
+      where: { orderId },
+      select: { id: true },
+    });
+
+    const ticketIds = tickets.map((ticket) => ticket.id);
+    if (ticketIds.length > 0) {
+      await db.kitchenTicketItem.deleteMany({
+        where: { ticketId: { in: ticketIds } },
+      });
+    }
+
+    await db.kitchenTicket.deleteMany({ where: { orderId } });
+    await db.payment.deleteMany({ where: { orderId } });
     await db.orderItem.deleteMany({ where: { orderId } });
+
     return db.order.delete({ where: { id: orderId } });
   }
 

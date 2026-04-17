@@ -205,7 +205,7 @@ export class WorkflowService {
         }, tx);
       } else {
         await workflowRepository.createPreOrderItem(draftSession.id, {
-          menuItemId: orderItem.menuItemId ?? undefined,
+          menuItemId: orderItem.menuItemId ?? null,
           name: orderItem.name,
           qty: orderItem.qty,
           unitPriceCents: orderItem.unitPriceCents

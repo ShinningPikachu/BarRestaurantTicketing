@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import { SelectedTable } from '../app/app.types';
-import { apiService } from '../services';
-import { BackendTable, TableId, TableZone } from '../types';
+import { apiService, logger } from '../services';
+import { BackendTable, TableId, TableZone, normalizeTableZone } from '../types';
 
 function getInitialTable(tables: Map<TableZone, number[]>): SelectedTable {
   for (const [zone, numbers] of tables.entries()) {
@@ -19,7 +19,7 @@ function mapTablesByZone(tables: BackendTable[]): Map<TableZone, number[]> {
   const grouped = new Map<TableZone, number[]>();
 
   for (const table of tables) {
-    const zone = (table.zone ?? TableZone.OUTSIDE) as TableZone;
+    const zone = normalizeTableZone(table.zone);
     const numbers = grouped.get(zone) ?? [];
     grouped.set(zone, [...numbers, table.number]);
   }
@@ -32,7 +32,13 @@ export function useTableController() {
   const [selectedTable, setSelectedTable] = useState<SelectedTable>({ zone: TableZone.OUTSIDE, number: 1 });
 
   async function loadTables(): Promise<SelectedTable> {
-    const loadedTablesRaw = await apiService.fetchTables().catch(() => []);
+    let loadedTablesRaw: BackendTable[] = [];
+    try {
+      loadedTablesRaw = await apiService.fetchTables();
+    } catch (error) {
+      logger.warn({ error }, 'Failed to load tables, will create default');
+    }
+
     const ensuredTablesRaw = loadedTablesRaw.length > 0
       ? loadedTablesRaw
       : [await apiService.addTable(TableZone.OUTSIDE)];
@@ -62,7 +68,7 @@ export function useTableController() {
       setTables(mapTablesByZone(loadedTables));
 
       const nextTable: TableId = {
-        zone: (newTable.zone ?? zone) as TableZone,
+        zone: normalizeTableZone(newTable.zone ?? zone),
         number: newTable.number
       };
 

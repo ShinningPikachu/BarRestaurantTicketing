@@ -1,130 +1,166 @@
-import { Request, Response, Router } from 'express';
+import { Request, Response, Router, NextFunction } from 'express';
+import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service';
+import { validateParams, validateBody } from '../middleware/validation';
+import { successResponse } from '../types/api';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+// Validation schemas
+const tableParamsSchema = z.object({
+  zone: z.string().min(1, 'Zone is required'),
+  number: z.coerce.number().positive('Table number must be positive'),
+});
+
+const tableNumberParamSchema = z.object({
+  number: z.coerce.number().positive('Table number must be positive'),
+});
+
+const createTableSchema = z.object({
+  zone: z.string().min(1, 'Zone is required'),
+});
+
+const addPreOrderItemSchema = z.object({
+  menuItemId: z.number().positive('Menu item ID must be positive'),
+});
+
+const updatePreOrderItemSchema = z.object({
+  qty: z.number().int().min(0, 'Qty must be >= 0').optional(),
+  unitPriceCents: z.number().int().min(0, 'Unit price must be >= 0').optional(),
+});
+
+// Routes
+router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    logger.info({}, 'Fetching all tables');
     const tables = await workflowService.listTables();
-    res.json(tables);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
+    logger.debug({ count: tables.length }, 'Tables fetched');
+    res.json(successResponse(tables));
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch tables');
+    next(error);
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { zone } = req.body as { zone?: string };
-    if (!zone) {
-      res.status(400).json({ error: 'zone is required' });
-      return;
-    }
+router.post(
+  '/',
+  validateBody(createTableSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { zone } = req.body;
+      logger.info({ zone }, 'Creating new table in zone');
 
-    const table = await workflowService.addTable(zone);
-    res.json(table);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
+      const table = await workflowService.addTable(zone);
+      res.status(201).json(successResponse(table));
+    } catch (error) {
+      logger.error({ error }, 'Failed to create table');
+      next(error);
+    }
   }
-});
+);
 
-router.get('/:zone/:number/workflow', async (req: Request, res: Response) => {
-  try {
-    const zone = req.params.zone;
-    const number = Number(req.params.number);
+router.get(
+  '/:zone/:number/workflow',
+  validateParams(tableParamsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+      logger.info({ zone, number }, 'Fetching table workflow');
 
-    if (!Number.isInteger(number)) {
-      res.status(400).json({ error: 'invalid table number' });
-      return;
+      const workflow = await workflowService.getTableWorkflow(number, zone);
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to fetch table workflow');
+      next(error);
     }
-
-    const workflow = await workflowService.getTableWorkflow(number, zone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
-router.post('/:zone/:number/preorder/items', async (req: Request, res: Response) => {
-  try {
-    const zone = req.params.zone;
-    const number = Number(req.params.number);
-    const { menuItemId } = req.body as { menuItemId?: number };
+router.post(
+  '/:zone/:number/preorder/items',
+  validateParams(tableParamsSchema),
+  validateBody(addPreOrderItemSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+      const { menuItemId } = req.body;
 
-    if (!Number.isInteger(number) || menuItemId === undefined || !Number.isInteger(menuItemId)) {
-      res.status(400).json({ error: 'invalid payload' });
-      return;
+      logger.info({ zone, number, menuItemId }, 'Adding menu item to pre-order');
+
+      await workflowService.addPreOrderMenuItem(number, zone, menuItemId);
+      const workflow = await workflowService.getTableWorkflow(number, zone);
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to add pre-order item');
+      next(error);
     }
-
-    await workflowService.addPreOrderMenuItem(number, zone, menuItemId);
-    const workflow = await workflowService.getTableWorkflow(number, zone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
-router.patch('/:zone/:number/preorder/items/:itemId', async (req: Request, res: Response) => {
-  try {
-    const zone = req.params.zone;
-    const number = Number(req.params.number);
-    const itemId = Number(req.params.itemId);
-    const { qty, unitPriceCents } = req.body as { qty?: number; unitPriceCents?: number };
+router.patch(
+  '/:zone/:number/preorder/items/:itemId',
+  validateParams(tableParamsSchema.extend({ itemId: z.coerce.number().positive() })),
+  validateBody(updatePreOrderItemSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+      const itemId = Number(req.params.itemId);
+      const { qty, unitPriceCents } = req.body;
 
-    if (!Number.isInteger(number) || !Number.isInteger(itemId)) {
-      res.status(400).json({ error: 'invalid path params' });
-      return;
+      logger.info({ zone, number, itemId, qty, unitPriceCents }, 'Updating pre-order item');
+
+      await workflowService.updatePreOrderItem(number, zone, itemId, { qty, unitPriceCents });
+      const workflow = await workflowService.getTableWorkflow(number, zone);
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to update pre-order item');
+      next(error);
     }
-
-    if (qty !== undefined && (!Number.isInteger(qty) || qty < 0)) {
-      res.status(400).json({ error: 'qty must be an integer >= 0' });
-      return;
-    }
-
-    if (unitPriceCents !== undefined && (!Number.isInteger(unitPriceCents) || unitPriceCents < 0)) {
-      res.status(400).json({ error: 'unitPriceCents must be an integer >= 0' });
-      return;
-    }
-
-    await workflowService.updatePreOrderItem(number, zone, itemId, { qty, unitPriceCents });
-    const workflow = await workflowService.getTableWorkflow(number, zone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
-router.post('/:zone/:number/preorder/clear', async (req: Request, res: Response) => {
-  try {
-    const zone = req.params.zone;
-    const number = Number(req.params.number);
-    if (!Number.isInteger(number)) {
-      res.status(400).json({ error: 'invalid table number' });
-      return;
+router.post(
+  '/:zone/:number/preorder/clear',
+  validateParams(tableParamsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+
+      logger.info({ zone, number }, 'Clearing pre-order');
+
+      await workflowService.clearPreOrder(number, zone);
+      const workflow = await workflowService.getTableWorkflow(number, zone);
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to clear pre-order');
+      next(error);
     }
-
-    await workflowService.clearPreOrder(number, zone);
-    const workflow = await workflowService.getTableWorkflow(number, zone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
-router.post('/:zone/:number/send-to-kitchen', async (req: Request, res: Response) => {
-  try {
-    const zone = req.params.zone;
-    const number = Number(req.params.number);
-    if (!Number.isInteger(number)) {
-      res.status(400).json({ error: 'invalid table number' });
-      return;
+router.post(
+  '/:zone/:number/send-to-kitchen',
+  validateParams(tableParamsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+
+      logger.info({ zone, number }, 'Sending pre-order to kitchen');
+
+      await workflowService.sendToKitchen(number, zone);
+      const workflow = await workflowService.getTableWorkflow(number, zone);
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to send to kitchen');
+      next(error);
     }
-
-    await workflowService.sendToKitchen(number, zone);
-    const workflow = await workflowService.getTableWorkflow(number, zone);
-    res.json(workflow);
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
   }
-});
+);
 
 export default router;

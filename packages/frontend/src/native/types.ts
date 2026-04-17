@@ -4,6 +4,33 @@ export enum TableZone {
   FLOOR2 = "floor2",
 }
 
+export const TABLE_ZONES: TableZone[] = [
+  TableZone.OUTSIDE,
+  TableZone.FLOOR1,
+  TableZone.FLOOR2,
+];
+
+export function normalizeTableZone(zone: string | null | undefined): TableZone {
+  const normalized = (zone ?? TableZone.OUTSIDE).trim().toLowerCase();
+  if (normalized === TableZone.FLOOR1) {
+    return TableZone.FLOOR1;
+  }
+  if (normalized === TableZone.FLOOR2) {
+    return TableZone.FLOOR2;
+  }
+  return TableZone.OUTSIDE;
+}
+
+export function tableZoneLabel(zone: TableZone): string {
+  if (zone === TableZone.FLOOR1) {
+    return 'Floor 1';
+  }
+  if (zone === TableZone.FLOOR2) {
+    return 'Floor 2';
+  }
+  return 'Outside';
+}
+
 export interface TableDef {
   number: number;
   zone: TableZone;
