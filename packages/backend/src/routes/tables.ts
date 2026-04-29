@@ -60,6 +60,25 @@ router.post(
   }
 );
 
+router.delete(
+  '/:zone/:number',
+  validateParams(tableParamsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+
+      logger.info({ zone, number }, 'Deleting table');
+
+      await workflowService.deleteTable(number, zone);
+      res.json(successResponse({ ok: true }));
+    } catch (error) {
+      logger.error({ error }, 'Failed to delete table');
+      next(error);
+    }
+  }
+);
+
 router.get(
   '/:zone/:number/workflow',
   validateParams(tableParamsSchema),

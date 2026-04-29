@@ -1,8 +1,22 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import { SelectedTable } from '../app/app.types';
-import { apiService, logger } from '../services';
-import { BackendTable, TableId, TableZone, normalizeTableZone } from '../types';
+import { ApiRequestError, apiService, logger } from '../services';
+import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone } from '../types';
+
+function toKnownZone(zone: string | null | undefined): TableZone | null {
+  const normalized = (zone ?? '').trim().toLowerCase();
+  if (normalized === TableZone.OUTSIDE) {
+    return TableZone.OUTSIDE;
+  }
+  if (normalized === TableZone.FLOOR1) {
+    return TableZone.FLOOR1;
+  }
+  if (normalized === TableZone.FLOOR2) {
+    return TableZone.FLOOR2;
+  }
+  return null;
+}
 
 function getInitialTable(tables: Map<TableZone, number[]>): SelectedTable {
   for (const [zone, numbers] of tables.entries()) {
@@ -15,13 +29,33 @@ function getInitialTable(tables: Map<TableZone, number[]>): SelectedTable {
   return { zone: TableZone.OUTSIDE, number: 1 };
 }
 
+function getFirstTableInZone(tables: Map<TableZone, number[]>, zone: TableZone): SelectedTable | null {
+  const numbers = tables.get(zone) ?? [];
+  const firstNumber = numbers[0];
+  if (firstNumber === undefined) {
+    return null;
+  }
+
+  return { zone, number: firstNumber };
+}
+
 function mapTablesByZone(tables: BackendTable[]): Map<TableZone, number[]> {
   const grouped = new Map<TableZone, number[]>();
 
   for (const table of tables) {
-    const zone = normalizeTableZone(table.zone);
+    const zone = toKnownZone(table.zone);
+    if (!zone) {
+      logger.warn({ table }, 'Ignoring table with unknown zone');
+      continue;
+    }
+
     const numbers = grouped.get(zone) ?? [];
     grouped.set(zone, [...numbers, table.number]);
+  }
+
+  for (const [zone, numbers] of grouped.entries()) {
+    const uniqueSortedNumbers = Array.from(new Set(numbers)).sort((a, b) => a - b);
+    grouped.set(zone, uniqueSortedNumbers);
   }
 
   return grouped;
@@ -39,9 +73,15 @@ export function useTableController() {
       logger.warn({ error }, 'Failed to load tables, will create default');
     }
 
-    const ensuredTablesRaw = loadedTablesRaw.length > 0
-      ? loadedTablesRaw
-      : [await apiService.addTable(TableZone.OUTSIDE)];
+    const groupedLoaded = mapTablesByZone(loadedTablesRaw);
+    const missingZones = TABLE_ZONES.filter((zone) => !(groupedLoaded.get(zone)?.length));
+
+    const createdTables: BackendTable[] = [];
+    for (const zone of missingZones) {
+      createdTables.push(await apiService.addTable(zone));
+    }
+
+    const ensuredTablesRaw = [...loadedTablesRaw, ...createdTables];
 
     const loadedTables = mapTablesByZone(ensuredTablesRaw);
     const initialTable = getInitialTable(loadedTables);
@@ -79,6 +119,45 @@ export function useTableController() {
     }
   }
 
+  async function removeTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
+    try {
+      await apiService.deleteTable(table.zone, table.number);
+      const loadedTables = await apiService.fetchTables();
+      const groupedTables = mapTablesByZone(loadedTables);
+      setTables(groupedTables);
+
+      const nextTable = getFirstTableInZone(groupedTables, table.zone) ?? getInitialTable(groupedTables);
+      setSelectedTable(nextTable);
+      await onSelected(nextTable);
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        if (error.code === 'LAST_TABLE_IN_ZONE') {
+          Alert.alert('Cannot remove table', 'Each zone must keep at least one table.');
+          return;
+        }
+
+        if (error.code === 'TABLE_NOT_FOUND') {
+          const loadedTables = await apiService.fetchTables();
+          const groupedTables = mapTablesByZone(loadedTables);
+          setTables(groupedTables);
+
+          const zoneHasSelectedTable = groupedTables.get(selectedTable.zone)?.includes(selectedTable.number) ?? false;
+          const nextTable = zoneHasSelectedTable
+            ? selectedTable
+            : (getFirstTableInZone(groupedTables, table.zone) ?? getInitialTable(groupedTables));
+
+          setSelectedTable(nextTable);
+          await onSelected(nextTable);
+          Alert.alert('Table already removed', `T${table.number} in ${table.zone} no longer exists.`);
+          return;
+        }
+      }
+
+      logger.error({ error, table }, 'Failed to remove table');
+      Alert.alert('Error', 'Failed to remove table.');
+    }
+  }
+
   return {
     state: {
       tables,
@@ -88,6 +167,7 @@ export function useTableController() {
       loadTables,
       selectTable,
       addTable,
+      removeTable,
     }
   };
 }

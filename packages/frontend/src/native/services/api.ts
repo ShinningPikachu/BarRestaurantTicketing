@@ -11,6 +11,18 @@ interface ApiResponse<T = unknown> {
   };
 }
 
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 interface ExpoLikeGlobal {
   process?: {
     env?: {
@@ -30,13 +42,16 @@ const envBaseUrl = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_API_
 const API_BASE_URL = (envBaseUrl || defaultApiBaseUrl()).replace(/\/$/, '');
 
 async function parseOrThrow<T>(response: Response, message: string): Promise<T> {
-  if (!response.ok) {
-    const error = `${message} (${response.status})`;
-    logger.error({ status: response.status }, error);
-    throw new Error(error);
-  }
+  const json = await response.json().catch(() => undefined);
 
-  const json = await response.json();
+  if (!response.ok) {
+    const apiResponse = json as ApiResponse<T> | undefined;
+    const apiError = apiResponse?.error;
+    const errorMessage = apiError?.message ? `${message}: ${apiError.message}` : `${message} (${response.status})`;
+
+    logger.error({ status: response.status, error: apiError }, errorMessage);
+    throw new ApiRequestError(errorMessage, response.status, apiError?.code);
+  }
 
   // Handle new ApiResponse format from backend
   if (json && typeof json === 'object' && 'success' in json) {
@@ -47,7 +62,7 @@ async function parseOrThrow<T>(response: Response, message: string): Promise<T> 
     if (!apiResponse.success && apiResponse.error) {
       const error = `${message}: ${apiResponse.error.message}`;
       logger.error({ error: apiResponse.error }, error);
-      throw new Error(error);
+      throw new ApiRequestError(error, response.status, apiResponse.error.code);
     }
   }
 
@@ -68,6 +83,13 @@ export class ApiService {
       body: JSON.stringify({ zone })
     });
     return parseOrThrow<BackendTable>(response, 'Failed to add table');
+  }
+
+  async deleteTable(zone: string, number: number): Promise<{ ok: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(zone)}/${number}`, {
+      method: 'DELETE'
+    });
+    return parseOrThrow<{ ok: boolean }>(response, 'Failed to delete table');
   }
 
   async fetchTableWorkflow(tableNumber: number, tableZone: string): Promise<TableWorkflow> {

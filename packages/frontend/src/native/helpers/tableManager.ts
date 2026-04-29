@@ -46,6 +46,11 @@ export function createTableManager(config: TableManagerConfig) {
   async function removeTable(table: TableId): Promise<void> {
     const updatedTables = new Map(tables);
     const zoneTables = updatedTables.get(table.zone) || [];
+
+    if (zoneTables.length <= 1) {
+      throw new Error('Cannot remove the only table in a zone');
+    }
+
     const filteredTables = zoneTables.filter(num => num !== table.number);
     
     if (filteredTables.length === 0) {

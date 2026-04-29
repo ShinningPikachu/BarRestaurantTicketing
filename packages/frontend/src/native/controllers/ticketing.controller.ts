@@ -81,6 +81,16 @@ export function useTicketingController() {
     }
   }
 
+  async function removeTable(table: TableId): Promise<void> {
+    try {
+      logger.debug({ table }, 'Removing table');
+      await tableController.actions.removeTable(table, workflowController.actions.refreshWorkflow);
+    } catch (error) {
+      logger.error({ error, table }, 'Failed to remove table');
+      Alert.alert('Error', 'Failed to remove table');
+    }
+  }
+
   // Menu item management
   async function addMenuItem(menuId: number): Promise<void> {
     try {
@@ -193,6 +203,7 @@ export function useTicketingController() {
     actions: {
       selectTable,
       addTable,
+      removeTable,
       addMenuItem,
       incrementPendingItem,
       decrementPendingItem,

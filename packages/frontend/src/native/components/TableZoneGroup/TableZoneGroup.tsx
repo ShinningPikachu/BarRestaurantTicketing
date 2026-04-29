@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GestureResponderEvent, PanResponder, PanResponderGestureState, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, PanResponder, PanResponderGestureState, Text, TouchableOpacity, View } from 'react-native';
 import { TableId, TableZone, tableKey, tableZoneLabel } from '../../types';
 import { styles } from './TableZoneGroup.styles';
 
@@ -34,8 +34,26 @@ function DraggableTable({
   onSelectTable,
   onDragMove,
 }: DraggableTableProps): React.JSX.Element {
-  const dragStartRef = useRef<TablePosition>({ x: 0, y: 0 });
+  const livePosition = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
+  const currentPositionRef = useRef<TablePosition>(position);
+  const dragStartRef = useRef<TablePosition>(position);
+  const isDraggingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (isDraggingRef.current) {
+      return;
+    }
+
+    livePosition.setValue({
+      x: clamp(position.x, 0, maxX),
+      y: clamp(position.y, 0, maxY),
+    });
+    currentPositionRef.current = {
+      x: clamp(position.x, 0, maxX),
+      y: clamp(position.y, 0, maxY),
+    };
+  }, [livePosition, maxX, maxY, position.x, position.y]);
 
   const panResponder = useMemo(
     () => PanResponder.create({
@@ -44,43 +62,57 @@ function DraggableTable({
       onMoveShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderGrant: () => {
-        dragStartRef.current = position;
+        dragStartRef.current = currentPositionRef.current;
+        isDraggingRef.current = true;
         setIsDragging(true);
       },
-      onPanResponderMove: (_event: GestureResponderEvent, gesture: PanResponderGestureState) => {
+      onPanResponderMove: (_event: unknown, gesture: PanResponderGestureState) => {
         const nextX = clamp(dragStartRef.current.x + gesture.dx, 0, maxX);
         const nextY = clamp(dragStartRef.current.y + gesture.dy, 0, maxY);
-        onDragMove(table, { x: nextX, y: nextY });
+        livePosition.setValue({ x: nextX, y: nextY });
+        currentPositionRef.current = { x: nextX, y: nextY };
       },
-      onPanResponderRelease: (_event: GestureResponderEvent, gesture: PanResponderGestureState) => {
+      onPanResponderRelease: (_event: unknown, gesture: PanResponderGestureState) => {
+        const nextX = clamp(dragStartRef.current.x + gesture.dx, 0, maxX);
+        const nextY = clamp(dragStartRef.current.y + gesture.dy, 0, maxY);
+
+        livePosition.setValue({ x: nextX, y: nextY });
+        currentPositionRef.current = { x: nextX, y: nextY };
+        onDragMove(table, { x: nextX, y: nextY });
+
+        isDraggingRef.current = false;
         setIsDragging(false);
+
         if (Math.abs(gesture.dx) < 3 && Math.abs(gesture.dy) < 3) {
           onSelectTable(table);
         }
       },
       onPanResponderTerminate: () => {
+        isDraggingRef.current = false;
         setIsDragging(false);
       },
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
     }),
-    [maxX, maxY, onDragMove, onSelectTable, position, table]
+    [livePosition, maxX, maxY, onDragMove, onSelectTable, table]
   );
 
   return (
-    <View
+    <Animated.View
       {...panResponder.panHandlers}
       style={[
         styles.tableNode,
         isDragging && styles.tableNodeDragging,
         isSelected && styles.tableNodeSelected,
-        { left: position.x, top: position.y },
+        {
+          transform: [{ translateX: livePosition.x }, { translateY: livePosition.y }],
+        },
       ]}
     >
       <Text selectable={false} style={[styles.tableNodeText, isSelected && styles.tableNodeTextSelected]}>
         {`T${table.number}`}
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -90,14 +122,17 @@ interface TableZoneGroupProps {
   selectedTable: TableId;
   onSelectTable: (table: TableId) => void;
   onAddTable: (zone: TableZone) => void;
+  onRemoveTable: (table: TableId) => void;
 }
 
-export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, onAddTable }: TableZoneGroupProps): React.JSX.Element {
+export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, onAddTable, onRemoveTable }: TableZoneGroupProps): React.JSX.Element {
   const [boardWidth, setBoardWidth] = useState(300);
   const [tablePositions, setTablePositions] = useState<Record<string, TablePosition>>({});
 
   const maxX = Math.max(0, boardWidth - TABLE_WIDTH);
   const maxY = 300 - TABLE_HEIGHT;
+  const isSelectedInZone = selectedTable.zone === zone;
+  const canRemoveSelected = isSelectedInZone && numbers.length > 1;
 
   useEffect(() => {
     setTablePositions((previous) => {
@@ -127,10 +162,6 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
     });
   }, [maxX, maxY, numbers, zone]);
 
-  if (numbers.length === 0) {
-    return <></>;
-  }
-
   function handleDragMove(table: TableId, nextPosition: TablePosition): void {
     setTablePositions((previous) => ({
       ...previous,
@@ -140,7 +171,7 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
 
   return (
     <View style={styles.zoneGroup}>
-      <Text style={styles.zoneHeader}>{tableZoneLabel(zone)}</Text>
+      <Text style={styles.zoneHeader}>{`${tableZoneLabel(zone)} (${numbers.length})`}</Text>
       <Text style={styles.hintText}>Click and hold a table, then drag to move it.</Text>
       <View
         style={styles.zoneBoard}
@@ -171,6 +202,16 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
       <TouchableOpacity key={`add-${zone}`} style={styles.addTableButton} onPress={() => onAddTable(zone)}>
         <Text style={styles.addTableButtonText}>{`+ Add Table`}</Text>
       </TouchableOpacity>
+      {isSelectedInZone ? (
+        <TouchableOpacity
+          key={`remove-selected-${zone}`}
+          style={[styles.removeSelectedButton, !canRemoveSelected && styles.removeSelectedButtonDisabled]}
+          onPress={() => onRemoveTable(selectedTable)}
+          disabled={!canRemoveSelected}
+        >
+          <Text style={styles.removeSelectedButtonText}>{`Remove Selected T${selectedTable.number}`}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

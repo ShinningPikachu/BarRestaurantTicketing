@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { generateAndShareTicketPdf } from '../helpers';
+import { printSpainSimplifiedTicket } from '../helpers';
 import { SelectedTable } from '../app/app.types';
 import { Order, PreOrderItem } from '../types';
 
@@ -10,7 +10,7 @@ export function useTicketController() {
     preorderItems: PreOrderItem[];
   }): Promise<void> {
     try {
-      await generateAndShareTicketPdf(params);
+      await printSpainSimplifiedTicket(params);
     } catch {
       Alert.alert('Error', 'Failed to generate the ticket PDF.');
     }

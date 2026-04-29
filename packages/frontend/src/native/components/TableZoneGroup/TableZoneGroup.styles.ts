@@ -70,5 +70,20 @@ export const styles = StyleSheet.create({
   addTableButtonText: {
     color: colors.buttonSecondaryText,
     fontWeight: '700',
-  }
+  },
+  removeSelectedButton: {
+    width: '100%',
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  removeSelectedButtonDisabled: {
+    opacity: 0.45,
+  },
+  removeSelectedButtonText: {
+    color: colors.textLight,
+    fontWeight: '700',
+  },
 });

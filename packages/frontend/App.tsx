@@ -49,10 +49,6 @@ export default function App(): React.JSX.Element {
             <ScrollView showsVerticalScrollIndicator={false}>
               {TABLE_ZONES.map((zone: TableZone) => {
                 const numbers = tables.get(zone) ?? [];
-                if (numbers.length === 0) {
-                  return null;
-                }
-
                 return (
                   <TableZoneGroup
                     key={zone}
@@ -64,6 +60,9 @@ export default function App(): React.JSX.Element {
                     }}
                     onAddTable={(zoneValue) => {
                       void actions.addTable(zoneValue);
+                    }}
+                    onRemoveTable={(table) => {
+                      void actions.removeTable(table);
                     }}
                   />
                 );

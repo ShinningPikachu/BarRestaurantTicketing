@@ -12,8 +12,9 @@ export class WorkflowRepository {
     return this.client.table.findMany({ orderBy: [{ zone: 'asc' }, { number: 'asc' }] });
   }
 
-  async getTableByNumberAndZone(number: number, zone: string) {
-    return this.client.table.findUnique({
+  async getTableByNumberAndZone(number: number, zone: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.table.findUnique({
       where: {
         number_zone: {
           number,
@@ -23,13 +24,14 @@ export class WorkflowRepository {
     });
   }
 
-  async getHighestTableNumberInZone(zone: string): Promise<number> {
-    const table = await this.client.table.findFirst({
+  async getTableNumbersInZone(zone: string): Promise<number[]> {
+    const tables = await this.client.table.findMany({
       where: { zone },
-      orderBy: { number: 'desc' },
+      orderBy: { number: 'asc' },
       select: { number: true }
     });
-    return table?.number ?? 0;
+
+    return tables.map((table) => table.number);
   }
 
   async createTable(zone: string, number: number) {
@@ -39,6 +41,28 @@ export class WorkflowRepository {
         number
       }
     });
+  }
+
+  async countTablesInZone(zone: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.table.count({ where: { zone } });
+  }
+
+  async countTableDependencies(tableId: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+
+    const [orders, preOrderSessions, kitchenTickets] = await Promise.all([
+      db.order.count({ where: { tableId } }),
+      db.preOrderSession.count({ where: { tableId } }),
+      db.kitchenTicket.count({ where: { tableId } }),
+    ]);
+
+    return { orders, preOrderSessions, kitchenTickets };
+  }
+
+  async deleteTable(tableId: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.table.delete({ where: { id: tableId } });
   }
 
   async getDraftPreOrderSession(tableId: number, tx?: Prisma.TransactionClient) {
