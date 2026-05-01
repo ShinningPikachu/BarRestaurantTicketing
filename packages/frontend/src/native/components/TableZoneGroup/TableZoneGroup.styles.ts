@@ -3,87 +3,95 @@ import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   zoneGroup: {
-    marginBottom: 16,
-    backgroundColor: colors.zoneTable,
-    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
     padding: 10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border
   },
   zoneHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.textBlack,
-    marginBottom: 6,
-    paddingLeft: 4
+    color: colors.text,
+    marginBottom: 4,
+    paddingLeft: 2
   },
   hintText: {
     fontSize: 11,
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     marginBottom: 8,
-    paddingLeft: 4,
+    paddingLeft: 2
   },
   zoneBoard: {
     position: 'relative',
     width: '100%',
-    height: 300,
-    borderRadius: 10,
+    height: 220,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.inputBorder,
-    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.zoneTable,
     marginBottom: 10,
-    overflow: 'hidden',
+    overflow: 'hidden'
+  },
+  zoneBoardContent: {
+    position: 'relative',
+    width: '100%'
   },
   tableNode: {
     position: 'absolute',
     width: 92,
     height: 56,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.inputBorder,
-    backgroundColor: colors.buttonSecondary,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    userSelect: 'none',
+    userSelect: 'none'
   },
-  tableNodeDragging: {},
+  tableNodeDragging: {
+    opacity: 0.82
+  },
   tableNodeSelected: {
-    backgroundColor: colors.buttonPrimary,
-    borderColor: colors.buttonPrimary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark
   },
   tableNodeText: {
-    color: colors.buttonSecondaryText,
+    color: colors.text,
     fontWeight: '700',
     fontSize: 16,
-    userSelect: 'none',
+    userSelect: 'none'
   },
   tableNodeTextSelected: {
-    color: colors.buttonPrimaryText,
+    color: colors.textLight
   },
   addTableButton: {
     width: '100%',
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.buttonSecondary,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   addTableButtonText: {
     color: colors.buttonSecondaryText,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   removeSelectedButton: {
     width: '100%',
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: colors.error,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 8
   },
   removeSelectedButtonDisabled: {
-    opacity: 0.45,
+    opacity: 0.45
   },
   removeSelectedButtonText: {
     color: colors.textLight,
-    fontWeight: '700',
-  },
+    fontWeight: '700'
+  }
 });

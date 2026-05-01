@@ -238,6 +238,7 @@ export function useTicketingController() {
       printTicket,
       payTable,
       paySelectedItems,
+      reloadMenu: menuController.actions.loadMenu,
       removeOrder,
       moveConfirmedItemToPreOrder: workflowController.actions.moveConfirmedItemToPreOrder,
     }

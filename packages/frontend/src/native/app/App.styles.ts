@@ -5,7 +5,7 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingTop: 12
   },
   centered: {
@@ -13,38 +13,141 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
+  headerBar: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: 12
+  },
+  headerButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
   header: {
-    fontSize: 22,
+    color: colors.text,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 10
+    letterSpacing: 0
   },
   title: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600'
   },
   columnsContent: {
     flexGrow: 1,
-    paddingBottom: 12
+    paddingBottom: 16
   },
   columnsScroll: {
     flex: 1
   },
   tablesColumn: {
-    width: 360,
-    maxWidth: 360
+    width: 460,
+    maxWidth: 460
   },
   columns: {
     flex: 1,
     flexDirection: 'row',
-    gap: 10,
-    minWidth: 1080
+    gap: 12,
+    minWidth: 1180
   },
   column: {
     flex: 1,
     minHeight: 0,
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 10
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12
+  },
+  homeGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'stretch'
+  },
+  homeButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    padding: 18,
+    justifyContent: 'center'
+  },
+  homeButtonTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8
+  },
+  homeButtonText: {
+    color: colors.textSecondary,
+    fontSize: 14
+  },
+  fullPanel: {
+    flex: 1,
+    minHeight: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    padding: 12
+  },
+  panelHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    padding: 10,
+    marginBottom: 8
+  },
+  productForm: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10
+  },
+  formInput: {
+    minWidth: 150,
+    borderColor: colors.inputBorder,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: colors.inputBackground,
+    color: colors.inputText
+  },
+  formInputWide: {
+    minWidth: 260,
+    flex: 1
+  },
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    padding: 10,
+    marginBottom: 8
   },
   columnScroll: {
     flex: 1
@@ -53,11 +156,12 @@ export const styles = StyleSheet.create({
     borderColor: colors.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: colors.inputBackground,
     color: colors.inputText,
-    marginBottom: 10
+    marginBottom: 10,
+    fontSize: 14
   },
   menuTypeSelector: {
     flexDirection: 'row',
@@ -71,11 +175,11 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: colors.surfaceAlt
+    backgroundColor: colors.surface
   },
   menuTypeButtonSelected: {
-    borderColor: colors.buttonPrimary,
-    backgroundColor: colors.buttonPrimary
+    borderColor: colors.primary,
+    backgroundColor: colors.zoneMenu
   },
   menuTypeButtonText: {
     color: colors.text,
@@ -83,18 +187,20 @@ export const styles = StyleSheet.create({
     fontSize: 12
   },
   menuTypeButtonTextSelected: {
-    color: colors.buttonPrimaryText
+    color: colors.primaryDark
   },
   orderSection: {
     flex: 1,
     minHeight: 0
   },
   sectionTitle: {
+    color: colors.text,
     fontSize: 17,
     fontWeight: '700',
-    marginBottom: 8
+    marginBottom: 10
   },
   subTitle: {
+    color: colors.text,
     fontSize: 14,
     fontWeight: '700',
     marginTop: 6,
@@ -104,12 +210,17 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: 8,
+    padding: 8,
+    backgroundColor: colors.surfaceAlt
   },
   confirmedPreorderRow: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.success,
+    borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 8
@@ -118,6 +229,7 @@ export const styles = StyleSheet.create({
     flex: 1
   },
   itemName: {
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600'
   },
@@ -139,22 +251,30 @@ export const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: colors.buttonPrimary,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   primaryButtonText: {
     color: colors.buttonPrimaryText,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontSize: 13
   },
   secondaryButton: {
     backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   secondaryButtonText: {
     color: colors.buttonSecondaryText,
-    fontWeight: '600'
+    fontWeight: '700',
+    fontSize: 13
   },
   qtyGroup: {
     flexDirection: 'row',
@@ -165,17 +285,22 @@ export const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center'
   },
   qtyButtonText: {
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700'
   },
   qtyText: {
     minWidth: 18,
-    textAlign: 'center'
+    textAlign: 'center',
+    color: colors.text,
+    fontWeight: '700'
   },
   confirmedQtyText: {
     minWidth: 30,
@@ -191,6 +316,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     backgroundColor: colors.inputBackground,
+    color: colors.inputText,
     textAlign: 'center'
   },
   priceQuickActions: {
@@ -198,14 +324,16 @@ export const styles = StyleSheet.create({
     gap: 4
   },
   priceQuickButton: {
-    backgroundColor: colors.buttonSecondary,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 5
   },
   priceQuickButtonText: {
     color: colors.buttonSecondaryText,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 12
   },
   footerRow: {
@@ -223,23 +351,56 @@ export const styles = StyleSheet.create({
     paddingBottom: 8
   },
   totalText: {
+    color: colors.text,
     fontWeight: '700',
     marginBottom: 6
   },
   actionsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 6
+    marginTop: 6,
+    flexWrap: 'wrap'
+  },
+  confirmedActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap'
+  },
+  compactPrimaryButton: {
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  compactSecondaryButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  compactLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4
   },
   ticketModule: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    padding: 8,
+    padding: 10,
     marginBottom: 8,
-    backgroundColor: colors.surfaceAlt
+    backgroundColor: colors.zoneMenu
   },
   moduleTitle: {
+    color: colors.primaryDark,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 4
@@ -263,11 +424,12 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     backgroundColor: colors.inputBackground,
+    color: colors.inputText,
     textAlign: 'center'
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(15,23,42,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16
@@ -276,9 +438,11 @@ export const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 560,
     maxHeight: '86%',
-    borderRadius: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.surface,
-    padding: 12
+    padding: 14
   },
   modalHeader: {
     flexDirection: 'row',
@@ -287,6 +451,7 @@ export const styles = StyleSheet.create({
     marginBottom: 8
   },
   modalTitle: {
+    color: colors.text,
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 4
@@ -295,32 +460,35 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
-    marginTop: 10
+    marginTop: 10,
+    flexWrap: 'wrap'
   },
   aaSelectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.border,
     borderRadius: 8,
-    padding: 8,
+    padding: 10,
     marginBottom: 8,
     backgroundColor: colors.surfaceAlt
   },
   confirmedCard: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: 8,
     padding: 10,
     marginBottom: 8,
     backgroundColor: colors.surface
   },
   orderId: {
+    color: colors.text,
     fontWeight: '700',
     marginBottom: 4
   },
   orderItemText: {
+    color: colors.textSecondary,
     fontSize: 13,
     marginBottom: 2
   },

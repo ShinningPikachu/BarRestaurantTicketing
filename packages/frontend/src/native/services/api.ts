@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { BackendTable, MenuItem, Order, PaymentMethod, PaymentResult, TableWorkflow } from '../types';
+import type { BackendTable, MenuItem, Order, PaidTicket, PaymentMethod, PaymentResult, TableWorkflow } from '../types';
 import { logger } from '../utils/logger';
 
 interface ApiResponse<T = unknown> {
@@ -191,6 +191,51 @@ export class ApiService {
   async fetchMenu(): Promise<MenuItem[]> {
     const response = await fetch(`${API_BASE_URL}/menu`);
     return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu');
+  }
+
+  async fetchManageMenu(): Promise<MenuItem[]> {
+    const response = await fetch(`${API_BASE_URL}/menu/manage/all`);
+    return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu for management');
+  }
+
+  async createMenuItem(payload: {
+    name: string;
+    priceCents: number;
+    category: string;
+    sku?: string | null;
+    description?: string | null;
+    available?: boolean;
+  }): Promise<MenuItem> {
+    const response = await fetch(`${API_BASE_URL}/menu`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return parseOrThrow<MenuItem>(response, 'Failed to create menu item');
+  }
+
+  async updateMenuItem(
+    id: number,
+    payload: {
+      name?: string;
+      priceCents?: number;
+      category?: string;
+      sku?: string | null;
+      description?: string | null;
+      available?: boolean;
+    }
+  ): Promise<MenuItem> {
+    const response = await fetch(`${API_BASE_URL}/menu/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return parseOrThrow<MenuItem>(response, 'Failed to update menu item');
+  }
+
+  async fetchPaidTickets(): Promise<PaidTicket[]> {
+    const response = await fetch(`${API_BASE_URL}/tickets`);
+    return parseOrThrow<PaidTicket[]>(response, 'Failed to fetch paid tickets');
   }
 }
 

@@ -263,28 +263,20 @@ export function OrderSection({
 
       <View style={styles.footerRow}>
         <Text style={styles.subTitle}>Pedidos confirmados</Text>
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => onPrintTicket()}>
+        <View style={styles.confirmedActionBar}>
+          <TouchableOpacity style={styles.compactPrimaryButton} onPress={() => onPrintTicket()}>
             <Text style={styles.primaryButtonText}>Imprimir ticket</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleOpenAaModal}>
+          <TouchableOpacity style={styles.compactSecondaryButton} onPress={handleOpenAaModal}>
             <Text style={styles.secondaryButtonText}>AA</Text>
           </TouchableOpacity>
-        </View>
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => onPayTicket('cash')}>
+          <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => onPayTicket('cash')}>
             <Text style={styles.secondaryButtonText}>Pagar efectivo</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => onPayTicket('card')}>
+          <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => onPayTicket('card')}>
             <Text style={styles.secondaryButtonText}>Pagar tarjeta</Text>
           </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.ticketModule}>
-        <Text style={styles.moduleTitle}>Dividir cuenta</Text>
-        <View style={styles.inlineControls}>
-          <Text style={styles.helperText}>Comensales</Text>
+          <Text style={styles.compactLabel}>Comensales</Text>
           <TextInput
             style={styles.smallNumberInput}
             keyboardType="number-pad"
@@ -292,7 +284,7 @@ export function OrderSection({
             onChangeText={setSplitPeopleText}
             placeholder="2"
           />
-          <TouchableOpacity style={styles.secondaryButton} onPress={handlePrintDividedTicket}>
+          <TouchableOpacity style={styles.compactSecondaryButton} onPress={handlePrintDividedTicket}>
             <Text style={styles.secondaryButtonText}>Imprimir dividido</Text>
           </TouchableOpacity>
         </View>

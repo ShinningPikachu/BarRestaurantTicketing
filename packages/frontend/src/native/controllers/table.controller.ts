@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { SelectedTable } from '../app/app.types';
 import { ApiRequestError, apiService, logger } from '../services';
 import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone, tableZoneLabel } from '../types';
@@ -61,6 +61,31 @@ function mapTablesByZone(tables: BackendTable[]): Map<TableZone, number[]> {
   return grouped;
 }
 
+function confirmDeleteTable(table: TableId, onConfirm: () => void): void {
+  const message = `Se eliminará la mesa M${table.number} en ${tableZoneLabel(table.zone)} y todos sus pedidos pendientes. Esta acción no se puede deshacer.`;
+
+  if (Platform.OS === 'web') {
+    const webConfirm = (globalThis as typeof globalThis & { confirm?: (message: string) => boolean }).confirm;
+    if (!webConfirm || webConfirm(message)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(
+    'Eliminar mesa',
+    message,
+    [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: onConfirm,
+      },
+    ]
+  );
+}
+
 export function useTableController() {
   const [tables, setTables] = useState<Map<TableZone, number[]>>(new Map());
   const [selectedTable, setSelectedTable] = useState<SelectedTable>({ zone: TableZone.OUTSIDE, number: 1 });
@@ -82,7 +107,6 @@ export function useTableController() {
     }
 
     const ensuredTablesRaw = [...loadedTablesRaw, ...createdTables];
-
     const loadedTables = mapTablesByZone(ensuredTablesRaw);
     const initialTable = getInitialTable(loadedTables);
 
@@ -120,20 +144,9 @@ export function useTableController() {
   }
 
   async function removeTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
-    Alert.alert(
-      'Eliminar mesa',
-      `Se eliminará la mesa M${table.number} en ${tableZoneLabel(table.zone)} y todos sus pedidos pendientes. Esta acción no se puede deshacer.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            void deleteTable(table, onSelected);
-          },
-        },
-      ]
-    );
+    confirmDeleteTable(table, () => {
+      void deleteTable(table, onSelected);
+    });
   }
 
   async function deleteTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
