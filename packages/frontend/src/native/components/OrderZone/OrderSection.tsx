@@ -124,10 +124,10 @@ export function OrderSection({
       </View>
 
       <View style={styles.footerRow}>
-        <Text style={styles.subTitle}>Kitchen Confirmed Orders</Text>
+        <Text style={styles.subTitle}>Confirmed Orders</Text>
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.primaryButton} onPress={onPrintTicket}>
-            <Text style={styles.primaryButtonText}>Print Kitchen Ticket</Text>
+            <Text style={styles.primaryButtonText}>Print Customer Ticket</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { printSpainSimplifiedTicket } from '../helpers';
+import { printKitchenTicket } from '../helpers';
 import { SelectedTable } from '../app/app.types';
 import { Order, PreOrderItem } from '../types';
 
@@ -10,7 +10,15 @@ export function useTicketController() {
     preorderItems: PreOrderItem[];
   }): Promise<void> {
     try {
-      await printSpainSimplifiedTicket(params);
+      if (params.confirmedOrders.length === 0) {
+        Alert.alert('No ticket', 'Send items to the kitchen before printing the customer ticket.');
+        return;
+      }
+
+      await printKitchenTicket({
+        selectedTable: params.selectedTable,
+        confirmedOrders: params.confirmedOrders,
+      });
     } catch {
       Alert.alert('Error', 'Failed to generate the ticket PDF.');
     }

@@ -1,0 +1,403 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Print from 'expo-print';
+import { Platform } from 'react-native';
+import { Order } from '../types';
+import { SelectedTable } from '../app/app.types';
+
+const SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY = 'bar-ticketing-simplified-invoice-sequence';
+
+type ExpoLikeGlobal = typeof globalThis & {
+  process?: {
+    env?: {
+      EXPO_PUBLIC_TICKET_BUSINESS_NAME?: string;
+      EXPO_PUBLIC_TICKET_TRADE_NAME?: string;
+      EXPO_PUBLIC_TICKET_BUSINESS_NIF?: string;
+      EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS?: string;
+      EXPO_PUBLIC_TICKET_BUSINESS_CITY?: string;
+      EXPO_PUBLIC_TICKET_BUSINESS_PHONE?: string;
+      EXPO_PUBLIC_TICKET_ISSUER_NAME?: string;
+      EXPO_PUBLIC_TICKET_ISSUER_NIF?: string;
+      EXPO_PUBLIC_TICKET_ISSUER_ADDRESS?: string;
+      EXPO_PUBLIC_TICKET_SERIES?: string;
+      EXPO_PUBLIC_TICKET_VAT_RATE?: string;
+    };
+  };
+};
+
+interface SimplifiedInvoiceConfig {
+  businessName: string;
+  tradeName: string;
+  nif: string;
+  address: string;
+  city: string;
+  phone: string;
+  series: string;
+  vatRatePercent: number;
+}
+
+function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
+  const env = (globalThis as ExpoLikeGlobal).process?.env;
+  const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
+
+  return {
+    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'BUSINESS LEGAL NAME',
+    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'BAR / RESTAURANT NAME',
+    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'NIF PENDING',
+    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'ADDRESS PENDING',
+    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '',
+    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '',
+    series: env?.EXPO_PUBLIC_TICKET_SERIES ?? 'FS',
+    vatRatePercent: Number.isFinite(vatRateRaw) && vatRateRaw > 0 ? vatRateRaw : 10,
+  };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function centsToEuro(cents: number): number {
+  return cents / 100;
+}
+
+function formatEuroFromCents(cents: number): string {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(centsToEuro(cents));
+}
+
+function formatDateTime(date: Date): string {
+  return date.toLocaleString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+async function nextInvoiceNumber(series: string): Promise<string> {
+  const currentRaw = await AsyncStorage.getItem(SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY);
+  const currentNumber = Number(currentRaw ?? '0');
+  const nextNumber = Number.isFinite(currentNumber) && currentNumber >= 0 ? currentNumber + 1 : 1;
+  await AsyncStorage.setItem(SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY, String(nextNumber));
+  return `${series}-${String(nextNumber).padStart(6, '0')}`;
+}
+
+function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; totalPriceCents?: number }): number {
+  if (typeof item.totalPriceCents === 'number') {
+    return item.totalPriceCents;
+  }
+
+  return (item.unitPriceCents ?? 0) * item.qty;
+}
+
+function getCombinedOrderLines(orders: Order[]): Array<{ name: string; qty: number; unitPriceCents: number; totalPriceCents: number }> {
+  const lineByKey = new Map<string, { name: string; qty: number; unitPriceCents: number; totalPriceCents: number }>();
+
+  for (const item of orders.flatMap((order) => order.items)) {
+    const unitPriceCents = item.unitPriceCents ?? 0;
+    const key = `${item.name.trim().toLowerCase()}|${unitPriceCents}`;
+    const existing = lineByKey.get(key);
+
+    if (existing) {
+      existing.qty += item.qty;
+      existing.totalPriceCents += getOrderLineTotalCents(item);
+    } else {
+      lineByKey.set(key, {
+        name: item.name,
+        qty: item.qty,
+        unitPriceCents,
+        totalPriceCents: getOrderLineTotalCents(item),
+      });
+    }
+  }
+
+  return Array.from(lineByKey.values());
+}
+
+function buildLineRows(orders: Order[]): string {
+  return getCombinedOrderLines(orders)
+    .map((item) => {
+      return `
+        <tr>
+          <td class="qty">${item.qty}</td>
+          <td class="name">${escapeHtml(item.name)}</td>
+          <td class="money">${formatEuroFromCents(item.unitPriceCents)}</td>
+          <td class="money">${formatEuroFromCents(item.totalPriceCents)}</td>
+        </tr>`;
+    })
+    .join('');
+}
+
+function buildSimplifiedInvoiceHtml(params: {
+  selectedTable: SelectedTable;
+  confirmedOrders: Order[];
+  invoiceNumber: string;
+  issuedAt: Date;
+  config: SimplifiedInvoiceConfig;
+}): string {
+  const { selectedTable, confirmedOrders, invoiceNumber, issuedAt, config } = params;
+  const combinedLines = getCombinedOrderLines(confirmedOrders);
+  const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
+  const vatRate = config.vatRatePercent / 100;
+  const taxableBaseCents = Math.round(totalCents / (1 + vatRate));
+  const vatCents = totalCents - taxableBaseCents;
+  const itemCount = combinedLines.reduce((sum, item) => sum + item.qty, 0);
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factura simplificada ${escapeHtml(invoiceNumber)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    @page { margin: 8mm; }
+    body {
+      margin: 0;
+      color: #111;
+      background: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+    }
+    .ticket {
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+    }
+    .center { text-align: center; }
+    .business-name {
+      font-size: 18px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 0 0 4px;
+      overflow-wrap: anywhere;
+    }
+    .trade-name {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 0 0 4px;
+      overflow-wrap: anywhere;
+    }
+    .small {
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .divider {
+      border-top: 1px dashed #555;
+      margin: 10px 0;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 0 0 8px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 12px;
+      font-size: 11px;
+    }
+    .meta strong {
+      display: block;
+      font-size: 10px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 1px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th {
+      padding: 5px 0;
+      border-bottom: 1px solid #111;
+      font-size: 10px;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    td {
+      padding: 6px 0;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+    .qty {
+      width: 28px;
+      text-align: center;
+      font-weight: 800;
+    }
+    .name {
+      width: auto;
+      padding-right: 8px;
+      overflow-wrap: anywhere;
+    }
+    .money {
+      width: 66px;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .summary {
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 3px 0;
+    }
+    .total {
+      border-top: 2px solid #111;
+      margin-top: 5px;
+      padding-top: 7px;
+      font-size: 16px;
+      font-weight: 900;
+    }
+    .legal {
+      margin-top: 10px;
+      font-size: 10px;
+      line-height: 1.35;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <main class="ticket">
+    <header class="center">
+      <p class="business-name">${escapeHtml(config.tradeName)}</p>
+      <p class="trade-name">${escapeHtml(config.businessName)}</p>
+      <div class="small">NIF: ${escapeHtml(config.nif)}</div>
+      <div class="small">${escapeHtml(config.address)}</div>
+      ${config.city ? `<div class="small">${escapeHtml(config.city)}</div>` : ''}
+      ${config.phone ? `<div class="small">Tel: ${escapeHtml(config.phone)}</div>` : ''}
+    </header>
+
+    <div class="divider"></div>
+
+    <section>
+      <p class="title center">Factura simplificada</p>
+      <div class="meta">
+        <div><strong>Numero / serie</strong>${escapeHtml(invoiceNumber)}</div>
+        <div><strong>Fecha expedicion</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
+        <div><strong>Fecha operacion</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
+        <div><strong>Mesa</strong>${escapeHtml(selectedTable.zone)} ${selectedTable.number}</div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="qty">Ud</th>
+          <th>Concepto</th>
+          <th class="money">Precio</th>
+          <th class="money">Importe</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${buildLineRows(confirmedOrders)}
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div class="summary-row">
+        <span>Articulos</span>
+        <strong>${itemCount}</strong>
+      </div>
+      <div class="summary-row">
+        <span>Base imponible IVA ${config.vatRatePercent.toFixed(0)}%</span>
+        <strong>${formatEuroFromCents(taxableBaseCents)}</strong>
+      </div>
+      <div class="summary-row">
+        <span>IVA ${config.vatRatePercent.toFixed(0)}%</span>
+        <strong>${formatEuroFromCents(vatCents)}</strong>
+      </div>
+      <div class="summary-row total">
+        <span>Total IVA incluido</span>
+        <strong>${formatEuroFromCents(totalCents)}</strong>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <footer class="legal center">
+      <div>IVA incluido. Documento emitido como factura simplificada.</div>
+      <div>Gracias por su visita.</div>
+    </footer>
+  </main>
+</body>
+</html>`;
+}
+
+async function printHtmlInBrowser(html: string): Promise<void> {
+  const documentRef = globalThis.document;
+  if (!documentRef?.body) {
+    throw new Error('Browser document is not available for printing');
+  }
+
+  const iframe = documentRef.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  documentRef.body.appendChild(iframe);
+
+  const iframeWindow = iframe.contentWindow;
+  const iframeDocument = iframe.contentDocument ?? iframeWindow?.document;
+  if (!iframeWindow || !iframeDocument) {
+    iframe.remove();
+    throw new Error('Unable to create print frame');
+  }
+
+  iframeDocument.open();
+  iframeDocument.write(html);
+  iframeDocument.close();
+
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 100);
+  });
+
+  iframeWindow.focus();
+  iframeWindow.print();
+
+  window.setTimeout(() => {
+    iframe.remove();
+  }, 1000);
+}
+
+export async function printKitchenTicket(params: {
+  selectedTable: SelectedTable;
+  confirmedOrders: Order[];
+}): Promise<void> {
+  const config = getSimplifiedInvoiceConfig();
+  const invoiceNumber = await nextInvoiceNumber(config.series);
+
+  const html = buildSimplifiedInvoiceHtml({
+    selectedTable: params.selectedTable,
+    confirmedOrders: params.confirmedOrders,
+    invoiceNumber,
+    issuedAt: new Date(),
+    config,
+  });
+
+  if (Platform.OS === 'web') {
+    await printHtmlInBrowser(html);
+    return;
+  }
+
+  await Print.printAsync({ html });
+}

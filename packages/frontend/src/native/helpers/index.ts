@@ -1,2 +1,2 @@
 export { groupMenuItemsByCategory, flattenMenuItems } from './menuHelpers';
-export { printSpainSimplifiedTicket } from './spainTicketPrinter';
+export { printKitchenTicket } from './kitchenTicketPrinter';
