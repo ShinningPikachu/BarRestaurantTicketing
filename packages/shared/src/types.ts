@@ -1,20 +1,71 @@
-/**
- * Shared types for Bar Restaurant Ticketing system
- */
+export enum TableZone {
+  OUTSIDE = 'outside',
+  FLOOR1 = 'floor1',
+  FLOOR2 = 'floor2',
+}
 
-// ===== Menu & Items =====
+export const TABLE_ZONES: TableZone[] = [
+  TableZone.OUTSIDE,
+  TableZone.FLOOR1,
+  TableZone.FLOOR2,
+];
+
+export function normalizeTableZone(zone: string | null | undefined): TableZone {
+  const normalized = (zone ?? TableZone.OUTSIDE).trim().toLowerCase();
+  if (normalized === TableZone.FLOOR1) {
+    return TableZone.FLOOR1;
+  }
+  if (normalized === TableZone.FLOOR2) {
+    return TableZone.FLOOR2;
+  }
+  return TableZone.OUTSIDE;
+}
+
+export function tableZoneLabel(zone: TableZone): string {
+  if (zone === TableZone.FLOOR1) {
+    return 'Floor 1';
+  }
+  if (zone === TableZone.FLOOR2) {
+    return 'Floor 2';
+  }
+  return 'Outside';
+}
+
+export interface Table {
+  id?: number;
+  number: number;
+  zone?: TableZone;
+  seats?: number | null;
+  name?: string | null;
+}
+
+export interface TableDef {
+  number: number;
+  zone: TableZone;
+}
+
+export interface TableId {
+  zone: TableZone;
+  number: number;
+}
+
+export function tableKey(table: TableId): string {
+  return `${table.zone}-${table.number}`;
+}
+
 export interface MenuItem {
   id: number;
   name: string;
   priceCents: number;
   sku?: string;
-  category?: string;
+  category: string;
   description?: string;
   available?: boolean;
 }
 
-// ===== Order-related =====
 export interface OrderItem {
+  id?: number;
+  menuItemId?: number | null;
   name: string;
   qty: number;
   unitPriceCents?: number;
@@ -33,23 +84,24 @@ export interface Order {
 }
 
 export interface PreOrderItem {
-  menuId: number;
+  id: number;
+  menuItemId?: number | null;
+  name: string;
   qty: number;
-  priceCents: number;
+  unitPriceCents: number;
+  totalPriceCents: number;
 }
 
-// ===== Table Management =====
-export type TableZone = 'outside' | 'floor1' | 'floor2';
-
-export interface Table {
+export interface BackendTable {
+  id: number;
   number: number;
-  zone: TableZone;
-  id?: number;
-  name?: string;
-  seats?: number;
+  zone?: string | null;
+  seats?: number | null;
+  name?: string | null;
 }
 
-export interface TableDef {
-  number: number;
-  zone: TableZone;
+export interface TableWorkflow {
+  table: BackendTable;
+  preOrderItems: PreOrderItem[];
+  orders: Order[];
 }

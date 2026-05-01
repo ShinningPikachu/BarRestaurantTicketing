@@ -56,8 +56,8 @@ async function parseOrThrow<T>(response: Response, message: string): Promise<T> 
   // Handle new ApiResponse format from backend
   if (json && typeof json === 'object' && 'success' in json) {
     const apiResponse = json as ApiResponse<T>;
-    if (apiResponse.success && apiResponse.data) {
-      return apiResponse.data;
+    if (apiResponse.success && 'data' in apiResponse) {
+      return apiResponse.data as T;
     }
     if (!apiResponse.success && apiResponse.error) {
       const error = `${message}: ${apiResponse.error.message}`;

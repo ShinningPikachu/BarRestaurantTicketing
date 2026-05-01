@@ -14,7 +14,7 @@ function normalizeZone(zone: string): string {
 
 function normalizeNumber(number: number): number {
   if (!Number.isInteger(number) || number <= 0) {
-    throw new Error('Invalid table number');
+    throw new ApiError(400, 'Invalid table number', 'INVALID_TABLE_NUMBER');
   }
   return number;
 }
@@ -39,10 +39,13 @@ export class WorkflowService {
 
   async addTable(zone: string) {
     const normalizedZone = normalizeZone(zone);
-    const existingNumbers = await workflowRepository.getTableNumbersInZone(normalizedZone);
-    const nextNumber = getSmallestAvailableTableNumber(existingNumbers);
 
-    return workflowRepository.createTable(normalizedZone, nextNumber);
+    return workflowRepository.runInTransaction(async (tx) => {
+      const existingNumbers = await workflowRepository.getTableNumbersInZone(normalizedZone, tx);
+      const nextNumber = getSmallestAvailableTableNumber(existingNumbers);
+
+      return workflowRepository.createTable(normalizedZone, nextNumber, tx);
+    });
   }
 
   async deleteTable(tableNumber: number, tableZone: string) {
@@ -93,14 +96,14 @@ export class WorkflowService {
     const normalizedZone = normalizeZone(tableZone);
 
     return workflowRepository.runInTransaction(async (tx) => {
-      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone);
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
       }
 
       const menu = await workflowRepository.getMenuItem(menuItemId, tx);
       if (!menu || !menu.available) {
-        throw new Error('Menu item not found');
+        throw new ApiError(404, 'Menu item not found', 'MENU_ITEM_NOT_FOUND');
       }
 
       const draftSession = (await workflowRepository.getDraftPreOrderSession(table.id, tx))
@@ -138,14 +141,14 @@ export class WorkflowService {
     const normalizedZone = normalizeZone(tableZone);
 
     return workflowRepository.runInTransaction(async (tx) => {
-      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone);
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
       }
 
       const item = await workflowRepository.getPreOrderItemById(preOrderItemId, tx);
       if (!item || item.session.tableId !== table.id || item.session.status !== 'draft') {
-        throw new Error('Pre-order item not found');
+        throw new ApiError(404, 'Pre-order item not found', 'PREORDER_ITEM_NOT_FOUND');
       }
 
       const nextQty = payload.qty ?? item.qty;
@@ -172,7 +175,7 @@ export class WorkflowService {
     const normalizedZone = normalizeZone(tableZone);
 
     return workflowRepository.runInTransaction(async (tx) => {
-      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone);
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
       }
@@ -194,7 +197,7 @@ export class WorkflowService {
     const normalizedZone = normalizeZone(tableZone);
 
     return workflowRepository.runInTransaction(async (tx) => {
-      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone);
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
       }
@@ -203,7 +206,7 @@ export class WorkflowService {
       const items = draftSession?.items ?? [];
 
       if (items.length === 0) {
-        throw new Error('No pre-order items to send');
+        throw new ApiError(409, 'No pre-order items to send', 'EMPTY_PREORDER');
       }
 
       const normalizedItems = items.map((item) => ({
@@ -228,7 +231,7 @@ export class WorkflowService {
     return workflowRepository.runInTransaction(async (tx) => {
       const orderItem = await workflowRepository.getOrderItemWithOrder(orderId, orderItemId, tx);
       if (!orderItem) {
-        throw new Error('Order item not found');
+        throw new ApiError(404, 'Order item not found', 'ORDER_ITEM_NOT_FOUND');
       }
 
       const table = orderItem.order.table;
@@ -280,7 +283,7 @@ export class WorkflowService {
     return workflowRepository.runInTransaction(async (tx) => {
       const order = await workflowRepository.getOrderById(orderId, tx);
       if (!order) {
-        throw new Error('Order not found');
+        throw new ApiError(404, 'Order not found', 'ORDER_NOT_FOUND');
       }
 
       await workflowRepository.deleteOrder(orderId, tx);

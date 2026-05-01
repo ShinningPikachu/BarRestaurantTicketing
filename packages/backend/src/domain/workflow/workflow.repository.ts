@@ -24,8 +24,9 @@ export class WorkflowRepository {
     });
   }
 
-  async getTableNumbersInZone(zone: string): Promise<number[]> {
-    const tables = await this.client.table.findMany({
+  async getTableNumbersInZone(zone: string, tx?: Prisma.TransactionClient): Promise<number[]> {
+    const db = tx ?? this.client;
+    const tables = await db.table.findMany({
       where: { zone },
       orderBy: { number: 'asc' },
       select: { number: true }
@@ -34,8 +35,9 @@ export class WorkflowRepository {
     return tables.map((table) => table.number);
   }
 
-  async createTable(zone: string, number: number) {
-    return this.client.table.create({
+  async createTable(zone: string, number: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.table.create({
       data: {
         zone,
         number
@@ -99,19 +101,19 @@ export class WorkflowRepository {
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
-    
-    const data: any = {
+
+    const data: Prisma.PreOrderItemUncheckedCreateInput = {
       sessionId,
       name: payload.name,
       qty: payload.qty,
       unitPriceCents: payload.unitPriceCents,
       totalPriceCents: payload.unitPriceCents * payload.qty
     };
-    
+
     if (payload.menuItemId !== undefined && payload.menuItemId !== null) {
       data.menuItemId = payload.menuItemId;
     }
-    
+
     return db.preOrderItem.create({ data });
   }
 
@@ -149,8 +151,9 @@ export class WorkflowRepository {
     });
   }
 
-  async getOrdersForTable(tableId: number) {
-    return this.client.order.findMany({
+  async getOrdersForTable(tableId: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.order.findMany({
       where: {
         tableId,
         status: 'confirmed'
@@ -160,10 +163,10 @@ export class WorkflowRepository {
     });
   }
 
-  async getTableWorkflow(tableId: number) {
+  async getTableWorkflow(tableId: number, tx?: Prisma.TransactionClient) {
     const [session, orders] = await Promise.all([
-      this.getDraftPreOrderSession(tableId),
-      this.getOrdersForTable(tableId)
+      this.getDraftPreOrderSession(tableId, tx),
+      this.getOrdersForTable(tableId, tx)
     ]);
 
     return {
