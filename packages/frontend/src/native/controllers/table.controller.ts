@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import { SelectedTable } from '../app/app.types';
 import { ApiRequestError, apiService, logger } from '../services';
-import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone } from '../types';
+import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone, tableZoneLabel } from '../types';
 
 function toKnownZone(zone: string | null | undefined): TableZone | null {
   const normalized = (zone ?? '').trim().toLowerCase();
@@ -97,7 +97,7 @@ export function useTableController() {
       await onSelected(table);
       setSelectedTable(table);
     } catch {
-      Alert.alert('Error', 'Failed to switch table.');
+      Alert.alert('Error', 'No se pudo cambiar de mesa.');
     }
   }
 
@@ -115,7 +115,7 @@ export function useTableController() {
       setSelectedTable(nextTable);
       await onSelected(nextTable);
     } catch {
-      Alert.alert('Error', 'Failed to add table.');
+      Alert.alert('Error', 'No se pudo añadir la mesa.');
     }
   }
 
@@ -132,7 +132,7 @@ export function useTableController() {
     } catch (error) {
       if (error instanceof ApiRequestError) {
         if (error.code === 'LAST_TABLE_IN_ZONE') {
-          Alert.alert('Cannot remove table', 'Each zone must keep at least one table.');
+          Alert.alert('No se puede eliminar la mesa', 'Cada zona debe conservar al menos una mesa.');
           return;
         }
 
@@ -148,13 +148,13 @@ export function useTableController() {
 
           setSelectedTable(nextTable);
           await onSelected(nextTable);
-          Alert.alert('Table already removed', `T${table.number} in ${table.zone} no longer exists.`);
+          Alert.alert('Mesa ya eliminada', `La mesa M${table.number} en ${tableZoneLabel(table.zone)} ya no existe.`);
           return;
         }
       }
 
       logger.error({ error, table }, 'Failed to remove table');
-      Alert.alert('Error', 'Failed to remove table.');
+      Alert.alert('Error', 'No se pudo eliminar la mesa.');
     }
   }
 

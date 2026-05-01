@@ -2,7 +2,7 @@ import React from 'react';
 import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SelectedTable } from '../../app/app.types';
 import { styles } from '../../app/App.styles';
-import { MenuItem, Order, OrderItem, PreOrderItem } from '../../types';
+import { MenuItem, Order, OrderItem, PreOrderItem, tableZoneLabel } from '../../types';
 
 interface OrderSectionProps {
   selectedTable: SelectedTable;
@@ -55,13 +55,13 @@ export function OrderSection({
 
   return (
     <>
-      <Text style={styles.sectionTitle}>{`Table ${selectedTable.zone}-${selectedTable.number} Orders`}</Text>
+      <Text style={styles.sectionTitle}>{`Pedidos mesa ${tableZoneLabel(selectedTable.zone)}-${selectedTable.number}`}</Text>
 
-      <Text style={styles.subTitle}>Pre-Order</Text>
+      <Text style={styles.subTitle}>Prepedido</Text>
       <FlatList
         data={preorderItems}
         keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={<Text style={styles.emptyText}>No pre-order items.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No hay artículos en el prepedido.</Text>}
         renderItem={({ item }) => {
           const title = item.menuItemId
             ? getMenuTitleById(menuByCategory, item.menuItemId)
@@ -115,26 +115,26 @@ export function OrderSection({
         <Text style={styles.totalText}>{`Total: ${formatPrice(preorderTotal)}`}</Text>
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.primaryButton} onPress={onConfirmOrder}>
-            <Text style={styles.primaryButtonText}>Send to Kitchen</Text>
+            <Text style={styles.primaryButtonText}>Enviar a cocina</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={onClearPreOrder}>
-            <Text style={styles.secondaryButtonText}>Clear</Text>
+            <Text style={styles.secondaryButtonText}>Limpiar</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.footerRow}>
-        <Text style={styles.subTitle}>Confirmed Orders</Text>
+        <Text style={styles.subTitle}>Pedidos confirmados</Text>
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.primaryButton} onPress={onPrintTicket}>
-            <Text style={styles.primaryButtonText}>Print Customer Ticket</Text>
+            <Text style={styles.primaryButtonText}>Imprimir ticket</Text>
           </TouchableOpacity>
         </View>
       </View>
       <FlatList
         data={confirmedItems}
         keyExtractor={(item) => item.key}
-        ListEmptyComponent={<Text style={styles.emptyText}>No confirmed orders.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No hay pedidos confirmados.</Text>}
         renderItem={({ item }) => (
           <View style={[styles.preorderRow, styles.confirmedPreorderRow]}>
             <View style={styles.flex1}>
@@ -146,10 +146,10 @@ export function OrderSection({
 
             <View style={styles.actionsRow}>
               <TouchableOpacity style={styles.primaryButton} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)}>
-                <Text style={styles.primaryButtonText}>Edit</Text>
+                <Text style={styles.primaryButtonText}>Editar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.secondaryButton} onPress={() => onRemoveOrder(item.orderId)}>
-                <Text style={styles.secondaryButtonText}>Remove</Text>
+                <Text style={styles.secondaryButtonText}>Eliminar</Text>
               </TouchableOpacity>
             </View>
           </View>

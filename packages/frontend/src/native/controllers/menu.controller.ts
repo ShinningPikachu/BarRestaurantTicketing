@@ -12,7 +12,7 @@ export function useMenuController() {
       const loadedMenu = await apiService.fetchMenu();
       setMenuByCategory(groupMenuItemsByCategory(loadedMenu));
     } catch {
-      Alert.alert('Error', 'Failed to load menu.');
+      Alert.alert('Error', 'No se pudo cargar el menú.');
     }
   }
 

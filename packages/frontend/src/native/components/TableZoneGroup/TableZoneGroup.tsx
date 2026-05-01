@@ -110,7 +110,7 @@ function DraggableTable({
       ]}
     >
       <Text selectable={false} style={[styles.tableNodeText, isSelected && styles.tableNodeTextSelected]}>
-        {`T${table.number}`}
+        {`M${table.number}`}
       </Text>
     </Animated.View>
   );
@@ -172,7 +172,7 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
   return (
     <View style={styles.zoneGroup}>
       <Text style={styles.zoneHeader}>{`${tableZoneLabel(zone)} (${numbers.length})`}</Text>
-      <Text style={styles.hintText}>Click and hold a table, then drag to move it.</Text>
+      <Text style={styles.hintText}>Mantén pulsada una mesa y arrástrala para moverla.</Text>
       <View
         style={styles.zoneBoard}
         onLayout={(event) => {
@@ -200,7 +200,7 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
         })}
       </View>
       <TouchableOpacity key={`add-${zone}`} style={styles.addTableButton} onPress={() => onAddTable(zone)}>
-        <Text style={styles.addTableButtonText}>{`+ Add Table`}</Text>
+        <Text style={styles.addTableButtonText}>{`+ Añadir mesa`}</Text>
       </TouchableOpacity>
       {isSelectedInZone ? (
         <TouchableOpacity
@@ -209,7 +209,7 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
           onPress={() => onRemoveTable(selectedTable)}
           disabled={!canRemoveSelected}
         >
-          <Text style={styles.removeSelectedButtonText}>{`Remove Selected T${selectedTable.number}`}</Text>
+          <Text style={styles.removeSelectedButtonText}>{`Eliminar mesa seleccionada M${selectedTable.number}`}</Text>
         </TouchableOpacity>
       ) : null}
     </View>

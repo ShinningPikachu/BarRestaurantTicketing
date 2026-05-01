@@ -11,7 +11,7 @@ export function useTicketController() {
   }): Promise<void> {
     try {
       if (params.confirmedOrders.length === 0) {
-        Alert.alert('No ticket', 'Send items to the kitchen before printing the customer ticket.');
+        Alert.alert('Sin ticket', 'Envía artículos a cocina antes de imprimir el ticket de cliente.');
         return;
       }
 
@@ -20,7 +20,7 @@ export function useTicketController() {
         confirmedOrders: params.confirmedOrders,
       });
     } catch {
-      Alert.alert('Error', 'Failed to generate the ticket PDF.');
+      Alert.alert('Error', 'No se pudo generar el PDF del ticket.');
     }
   }
 

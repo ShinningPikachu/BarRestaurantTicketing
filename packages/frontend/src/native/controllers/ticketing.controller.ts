@@ -43,7 +43,7 @@ export function useTicketingController() {
       } catch (error) {
         logger.error({ error }, 'Initialization failed');
         if (mountedRef.current) {
-          Alert.alert('Initialization failed', 'Unable to load app data.');
+          Alert.alert('Error de inicialización', 'No se pudieron cargar los datos de la aplicación.');
         }
       } finally {
         if (mountedRef.current) {
@@ -66,7 +66,7 @@ export function useTicketingController() {
       await tableController.actions.selectTable(table, workflowController.actions.refreshWorkflow);
     } catch (error) {
       logger.error({ error, table }, 'Failed to select table');
-      Alert.alert('Error', 'Failed to select table');
+      Alert.alert('Error', 'No se pudo seleccionar la mesa');
     }
   }
 
@@ -77,7 +77,7 @@ export function useTicketingController() {
       await tableController.actions.addTable(zone, workflowController.actions.refreshWorkflow);
     } catch (error) {
       logger.error({ error, zone }, 'Failed to add table');
-      Alert.alert('Error', 'Failed to add table');
+      Alert.alert('Error', 'No se pudo añadir la mesa');
     }
   }
 
@@ -87,7 +87,7 @@ export function useTicketingController() {
       await tableController.actions.removeTable(table, workflowController.actions.refreshWorkflow);
     } catch (error) {
       logger.error({ error, table }, 'Failed to remove table');
-      Alert.alert('Error', 'Failed to remove table');
+      Alert.alert('Error', 'No se pudo eliminar la mesa');
     }
   }
 
@@ -98,7 +98,7 @@ export function useTicketingController() {
       await workflowController.actions.addMenuItem(selectedTable, menuId);
     } catch (error) {
       logger.error({ error, menuId }, 'Failed to add menu item');
-      Alert.alert('Error', 'Failed to add menu item');
+      Alert.alert('Error', 'No se pudo añadir el artículo del menú');
     }
   }
 
@@ -144,7 +144,7 @@ export function useTicketingController() {
       await workflowController.actions.sendToKitchen(selectedTable);
     } catch (error) {
       logger.error({ error, selectedTable }, 'Failed to send to kitchen');
-      Alert.alert('Error', 'Failed to send order to kitchen');
+      Alert.alert('Error', 'No se pudo enviar el pedido a cocina');
     }
   }
 
@@ -164,7 +164,7 @@ export function useTicketingController() {
       await workflowController.actions.removeOrder(selectedTable, orderId);
     } catch (error) {
       logger.error({ error, orderId }, 'Failed to remove order');
-      Alert.alert('Error', 'Failed to remove order');
+      Alert.alert('Error', 'No se pudo eliminar el pedido');
     }
   }
 
@@ -179,7 +179,7 @@ export function useTicketingController() {
       });
     } catch (error) {
       logger.error({ error }, 'Failed to print ticket');
-      Alert.alert('Error', 'Failed to generate ticket');
+      Alert.alert('Error', 'No se pudo generar el ticket');
     }
   }
 

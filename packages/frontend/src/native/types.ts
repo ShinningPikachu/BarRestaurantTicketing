@@ -23,12 +23,12 @@ export function normalizeTableZone(zone: string | null | undefined): TableZone {
 
 export function tableZoneLabel(zone: TableZone): string {
   if (zone === TableZone.FLOOR1) {
-    return 'Floor 1';
+    return 'Planta 1';
   }
   if (zone === TableZone.FLOOR2) {
-    return 'Floor 2';
+    return 'Planta 2';
   }
-  return 'Outside';
+  return 'Terraza';
 }
 
 export interface TableDef {

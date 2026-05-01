@@ -35,7 +35,7 @@ export function useWorkflowController() {
       const workflow = await apiService.addPreOrderMenuItem(table.number, table.zone, menuId);
       applyWorkflow(workflow.preOrderItems, workflow.orders);
     } catch {
-      Alert.alert('Error', 'Failed to add pre-order item.');
+      Alert.alert('Error', 'No se pudo añadir el artículo al prepedido.');
     }
   }
 
@@ -47,7 +47,7 @@ export function useWorkflowController() {
       const workflow = await apiService.updatePreOrderItem(table.number, table.zone, itemId, { qty: item.qty + 1 });
       applyWorkflow(workflow.preOrderItems, workflow.orders);
     } catch {
-      Alert.alert('Error', 'Failed to update pre-order item.');
+      Alert.alert('Error', 'No se pudo actualizar el artículo del prepedido.');
     }
   }
 
@@ -59,7 +59,7 @@ export function useWorkflowController() {
       const workflow = await apiService.updatePreOrderItem(table.number, table.zone, itemId, { qty: Math.max(0, item.qty - 1) });
       applyWorkflow(workflow.preOrderItems, workflow.orders);
     } catch {
-      Alert.alert('Error', 'Failed to update pre-order item.');
+      Alert.alert('Error', 'No se pudo actualizar el artículo del prepedido.');
     }
   }
 
@@ -70,7 +70,7 @@ export function useWorkflowController() {
       });
       applyWorkflow(workflow.preOrderItems, workflow.orders);
     } catch {
-      Alert.alert('Error', 'Failed to update pre-order price.');
+      Alert.alert('Error', 'No se pudo actualizar el precio del prepedido.');
     }
 
     setPriceDraftByItemId((current) => {
@@ -112,16 +112,16 @@ export function useWorkflowController() {
 
   async function sendToKitchen(table: TableId): Promise<void> {
     if (preorderItems.length === 0) {
-      Alert.alert('No items', 'Add at least one item before sending to kitchen.');
+      Alert.alert('Sin artículos', 'Añade al menos un artículo antes de enviar a cocina.');
       return;
     }
 
     try {
       const workflow = await apiService.sendTablePreOrderToKitchen(table.number, table.zone);
       applyWorkflow(workflow.preOrderItems, workflow.orders);
-      Alert.alert('Sent to kitchen', 'Pre-order items are now confirmed and ready to cook.');
+      Alert.alert('Enviado a cocina', 'Los artículos del prepedido están confirmados y listos para preparar.');
     } catch {
-      Alert.alert('Error', 'Failed to send order to kitchen.');
+      Alert.alert('Error', 'No se pudo enviar el pedido a cocina.');
     }
   }
 
@@ -130,7 +130,7 @@ export function useWorkflowController() {
       const workflow = await apiService.clearPreOrder(table.number, table.zone);
       applyWorkflow(workflow.preOrderItems, workflow.orders);
     } catch {
-      Alert.alert('Error', 'Failed to clear pre-order.');
+      Alert.alert('Error', 'No se pudo limpiar el prepedido.');
     }
   }
 
@@ -139,13 +139,13 @@ export function useWorkflowController() {
       await apiService.deleteOrder(orderId);
       await refreshWorkflow(table);
     } catch {
-      Alert.alert('Error', 'Failed to remove order.');
+      Alert.alert('Error', 'No se pudo eliminar el pedido.');
     }
   }
 
   async function moveConfirmedItemToPreOrder(orderId: string, orderItem: OrderItem): Promise<void> {
     if (orderItem.id === undefined) {
-      Alert.alert('Unable to edit', 'This kitchen item cannot be updated because it has no item id.');
+      Alert.alert('No se puede editar', 'Este artículo de cocina no se puede actualizar porque no tiene identificador.');
       return;
     }
 
@@ -153,7 +153,7 @@ export function useWorkflowController() {
       const workflow = await apiService.moveConfirmedItemToPreOrder(orderId, orderItem.id);
       applyWorkflow(workflow.preOrderItems, workflow.orders);
     } catch {
-      Alert.alert('Error', 'Failed to update kitchen order while editing item.');
+      Alert.alert('Error', 'No se pudo actualizar el pedido de cocina al editar el artículo.');
     }
   }
 

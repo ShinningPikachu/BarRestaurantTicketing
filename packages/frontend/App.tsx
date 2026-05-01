@@ -32,7 +32,7 @@ export default function App(): React.JSX.Element {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
-          <Text style={styles.title}>Loading...</Text>
+          <Text style={styles.title}>Cargando...</Text>
         </View>
       </SafeAreaView>
     );
@@ -40,12 +40,12 @@ export default function App(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Bar Ticketing — React Native</Text>
+      <Text style={styles.header}>Bar Ticketing</Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.columnsContent}>
         <View style={styles.columns}>
           <View style={[styles.column, styles.tablesColumn]}>
-            <Text style={styles.sectionTitle}>Tables</Text>
+            <Text style={styles.sectionTitle}>Mesas</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {TABLE_ZONES.map((zone: TableZone) => {
                 const numbers = tables.get(zone) ?? [];
@@ -71,7 +71,7 @@ export default function App(): React.JSX.Element {
           </View>
 
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Menu</Text>
+            <Text style={styles.sectionTitle}>Menú</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {Array.from(menuByCategory.entries()).map(([category, items]: [string, MenuItem[]]) => (
                 <MenuCategoryGroup

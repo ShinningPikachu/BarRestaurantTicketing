@@ -2,7 +2,12 @@ import { flattenMenuItems } from '../helpers';
 import { MenuItem, PreOrderItem } from '../types';
 
 export function centsToCurrency(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
 }
 
 export function getMenuTitleById(
@@ -11,7 +16,7 @@ export function getMenuTitleById(
 ): string {
   const allMenuItems = flattenMenuItems(menuByCategory);
   const menu = allMenuItems.find((menuItem) => menuItem.id === menuId);
-  return menu?.name || `Menu ${menuId}`;
+  return menu?.name || `Menú ${menuId}`;
 }
 
 export function getPreOrderTotal(preorderItems: PreOrderItem[]): number {

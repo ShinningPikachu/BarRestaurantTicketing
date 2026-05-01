@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import { Platform } from 'react-native';
-import { Order } from '../types';
+import { Order, tableZoneLabel } from '../types';
 import { SelectedTable } from '../app/app.types';
 
 const SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY = 'bar-ticketing-simplified-invoice-sequence';
@@ -40,10 +40,10 @@ function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
   const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
 
   return {
-    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'BUSINESS LEGAL NAME',
-    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'BAR / RESTAURANT NAME',
-    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'NIF PENDING',
-    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'ADDRESS PENDING',
+    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'NOMBRE FISCAL PENDIENTE',
+    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'NOMBRE DEL BAR / RESTAURANTE',
+    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'NIF PENDIENTE',
+    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'DIRECCIÓN PENDIENTE',
     city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '',
     phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '',
     series: env?.EXPO_PUBLIC_TICKET_SERIES ?? 'FS',
@@ -290,7 +290,7 @@ function buildSimplifiedInvoiceHtml(params: {
         <div><strong>Numero / serie</strong>${escapeHtml(invoiceNumber)}</div>
         <div><strong>Fecha expedicion</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
         <div><strong>Fecha operacion</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
-        <div><strong>Mesa</strong>${escapeHtml(selectedTable.zone)} ${selectedTable.number}</div>
+        <div><strong>Mesa</strong>${escapeHtml(tableZoneLabel(selectedTable.zone))} ${selectedTable.number}</div>
       </div>
     </section>
 
