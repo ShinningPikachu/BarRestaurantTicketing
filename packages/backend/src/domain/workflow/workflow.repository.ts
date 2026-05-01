@@ -67,6 +67,40 @@ export class WorkflowRepository {
     return db.table.delete({ where: { id: tableId } });
   }
 
+  async deleteTableWorkflowData(tableId: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+
+    const [orders, preOrderSessions, kitchenTickets] = await Promise.all([
+      db.order.findMany({ where: { tableId }, select: { id: true } }),
+      db.preOrderSession.findMany({ where: { tableId }, select: { id: true } }),
+      db.kitchenTicket.findMany({ where: { tableId }, select: { id: true } }),
+    ]);
+
+    const orderIds = orders.map((order) => order.id);
+    const preOrderSessionIds = preOrderSessions.map((session) => session.id);
+    const kitchenTicketIds = kitchenTickets.map((ticket) => ticket.id);
+
+    if (kitchenTicketIds.length > 0) {
+      await db.kitchenTicketItem.deleteMany({
+        where: { ticketId: { in: kitchenTicketIds } },
+      });
+      await db.kitchenTicket.deleteMany({ where: { id: { in: kitchenTicketIds } } });
+    }
+
+    if (orderIds.length > 0) {
+      await db.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+      await db.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+      await db.order.deleteMany({ where: { id: { in: orderIds } } });
+    }
+
+    if (preOrderSessionIds.length > 0) {
+      await db.preOrderItem.deleteMany({
+        where: { sessionId: { in: preOrderSessionIds } },
+      });
+      await db.preOrderSession.deleteMany({ where: { id: { in: preOrderSessionIds } } });
+    }
+  }
+
   async getDraftPreOrderSession(tableId: number, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
     return db.preOrderSession.findFirst({

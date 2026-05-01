@@ -63,11 +63,7 @@ export class WorkflowService {
         throw new ApiError(409, 'Cannot remove the last table in a zone', 'LAST_TABLE_IN_ZONE');
       }
 
-      const dependencies = await workflowRepository.countTableDependencies(table.id, tx);
-      if (dependencies.orders > 0 || dependencies.preOrderSessions > 0 || dependencies.kitchenTickets > 0) {
-        throw new ApiError(409, 'Table has active orders or workflow data and cannot be removed', 'TABLE_IN_USE');
-      }
-
+      await workflowRepository.deleteTableWorkflowData(table.id, tx);
       await workflowRepository.deleteTable(table.id, tx);
       return { ok: true };
     });

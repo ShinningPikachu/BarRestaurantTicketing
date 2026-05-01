@@ -88,3 +88,59 @@ test('deleteOrder removes ticket children before parent rows', async () => {
     'order.delete',
   ]);
 });
+
+test('deleteTableWorkflowData removes table workflow rows before parent table', async () => {
+  const calls: string[] = [];
+  const repository = new WorkflowRepository({
+    order: {
+      findMany: async () => [{ id: 'order-a' }, { id: 'order-b' }],
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`order.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+    preOrderSession: {
+      findMany: async () => [{ id: 'session-a' }],
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`preOrderSession.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+    kitchenTicket: {
+      findMany: async () => [{ id: 'ticket-a' }],
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`kitchenTicket.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+    kitchenTicketItem: {
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`kitchenTicketItem.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+    payment: {
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`payment.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+    orderItem: {
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`orderItem.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+    preOrderItem: {
+      deleteMany: async ({ where }: { where: unknown }) => {
+        calls.push(`preOrderItem.deleteMany:${JSON.stringify(where)}`);
+      },
+    },
+  } as any);
+
+  await repository.deleteTableWorkflowData(3);
+
+  assert.deepEqual(calls, [
+    'kitchenTicketItem.deleteMany:{"ticketId":{"in":["ticket-a"]}}',
+    'kitchenTicket.deleteMany:{"id":{"in":["ticket-a"]}}',
+    'payment.deleteMany:{"orderId":{"in":["order-a","order-b"]}}',
+    'orderItem.deleteMany:{"orderId":{"in":["order-a","order-b"]}}',
+    'order.deleteMany:{"id":{"in":["order-a","order-b"]}}',
+    'preOrderItem.deleteMany:{"sessionId":{"in":["session-a"]}}',
+    'preOrderSession.deleteMany:{"id":{"in":["session-a"]}}',
+  ]);
+});

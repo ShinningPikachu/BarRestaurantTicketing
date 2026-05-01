@@ -10,10 +10,10 @@ const prisma = new PrismaClient();
 
 function parseCSV(content: string): any[] {
   const lines = content.trim().split('\n');
-  const headers = lines[0].split(',');
+  const headers = lines[0].split(',').map(header => header.trim());
   
   return lines.slice(1).map(line => {
-    const values = line.split(',');
+    const values = line.split(',').map(value => value.trim());
     const obj: any = {};
     
     headers.forEach((header, index) => {
