@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { MenuItem } from '../../types';
 import { styles } from './MenuCategoryGroup.styles';
 
@@ -10,7 +10,7 @@ interface MenuCategoryGroupProps {
   formatPrice: (cents: number) => string;
 }
 
-function translateCategory(category: string): string {
+export function translateCategory(category: string): string {
   const normalized = category.trim().toLowerCase();
   const translations: Record<string, string> = {
     appetizer: 'Entrantes',

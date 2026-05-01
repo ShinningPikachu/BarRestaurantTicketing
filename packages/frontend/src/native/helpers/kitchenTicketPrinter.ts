@@ -143,8 +143,10 @@ function buildSimplifiedInvoiceHtml(params: {
   invoiceNumber: string;
   issuedAt: Date;
   config: SimplifiedInvoiceConfig;
+  splitPeople?: number;
+  ticketNote?: string;
 }): string {
-  const { selectedTable, confirmedOrders, invoiceNumber, issuedAt, config } = params;
+  const { selectedTable, confirmedOrders, invoiceNumber, issuedAt, config, splitPeople, ticketNote } = params;
   const combinedLines = getCombinedOrderLines(confirmedOrders);
   const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
   const vatRate = config.vatRatePercent / 100;
@@ -315,6 +317,11 @@ function buildSimplifiedInvoiceHtml(params: {
         <span>Articulos</span>
         <strong>${itemCount}</strong>
       </div>
+      ${ticketNote ? `
+      <div class="summary-row">
+        <span>Modalidad</span>
+        <strong>${escapeHtml(ticketNote)}</strong>
+      </div>` : ''}
       <div class="summary-row">
         <span>Base imponible IVA ${config.vatRatePercent.toFixed(0)}%</span>
         <strong>${formatEuroFromCents(taxableBaseCents)}</strong>
@@ -327,6 +334,15 @@ function buildSimplifiedInvoiceHtml(params: {
         <span>Total IVA incluido</span>
         <strong>${formatEuroFromCents(totalCents)}</strong>
       </div>
+      ${splitPeople && splitPeople > 1 ? `
+      <div class="summary-row">
+        <span>Comensales</span>
+        <strong>${splitPeople}</strong>
+      </div>
+      <div class="summary-row">
+        <span>Importe por persona</span>
+        <strong>${formatEuroFromCents(Math.trunc(totalCents / splitPeople))}</strong>
+      </div>` : ''}
     </section>
 
     <div class="divider"></div>
@@ -382,6 +398,8 @@ async function printHtmlInBrowser(html: string): Promise<void> {
 export async function printKitchenTicket(params: {
   selectedTable: SelectedTable;
   confirmedOrders: Order[];
+  splitPeople?: number;
+  ticketNote?: string;
 }): Promise<void> {
   const config = getSimplifiedInvoiceConfig();
   const invoiceNumber = await nextInvoiceNumber(config.series);
@@ -392,6 +410,8 @@ export async function printKitchenTicket(params: {
     invoiceNumber,
     issuedAt: new Date(),
     config,
+    splitPeople: params.splitPeople,
+    ticketNote: params.ticketNote,
   });
 
   if (Platform.OS === 'web') {

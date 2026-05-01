@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { getPreOrderTotal } from '../app/app.helpers';
 import { apiService } from '../services';
-import { Order, OrderItem, PreOrderItem, TableId } from '../types';
+import { Order, OrderItem, PaymentMethod, PreOrderItem, TableId } from '../types';
 
 export function useWorkflowController() {
   const [preorderItems, setPreorderItems] = useState<PreOrderItem[]>([]);
@@ -157,6 +157,30 @@ export function useWorkflowController() {
     }
   }
 
+  async function payTable(table: TableId, method: PaymentMethod, splitPeople?: number): Promise<void> {
+    try {
+      const result = await apiService.payTable(table.number, table.zone, method, splitPeople);
+      applyWorkflow(result.workflow.preOrderItems, result.workflow.orders);
+      Alert.alert('Ticket pagado', `Pago registrado: ${result.paidTicket.ticketNumber}`);
+    } catch {
+      Alert.alert('Error', 'No se pudo registrar el pago del ticket.');
+    }
+  }
+
+  async function paySelectedItems(
+    table: TableId,
+    method: PaymentMethod,
+    items: Array<{ orderId: string; itemId: number; qty: number }>
+  ): Promise<void> {
+    try {
+      const result = await apiService.paySelectedItems(table.number, table.zone, method, items);
+      applyWorkflow(result.workflow.preOrderItems, result.workflow.orders);
+      Alert.alert('Ticket AA pagado', `Pago registrado: ${result.paidTicket.ticketNumber}`);
+    } catch {
+      Alert.alert('Error', 'No se pudo registrar el pago AA.');
+    }
+  }
+
   return {
     state: {
       preorderItems,
@@ -179,6 +203,8 @@ export function useWorkflowController() {
       clearPreOrder,
       removeOrder,
       moveConfirmedItemToPreOrder,
+      payTable,
+      paySelectedItems,
     }
   };
 }

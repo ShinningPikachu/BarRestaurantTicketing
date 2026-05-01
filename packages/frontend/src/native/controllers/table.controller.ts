@@ -120,6 +120,23 @@ export function useTableController() {
   }
 
   async function removeTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
+    Alert.alert(
+      'Eliminar mesa',
+      `Se eliminará la mesa M${table.number} en ${tableZoneLabel(table.zone)} y todos sus pedidos pendientes. Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            void deleteTable(table, onSelected);
+          },
+        },
+      ]
+    );
+  }
+
+  async function deleteTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
     try {
       await apiService.deleteTable(table.zone, table.number);
       const loadedTables = await apiService.fetchTables();

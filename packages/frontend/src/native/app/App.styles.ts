@@ -26,6 +26,9 @@ export const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 12
   },
+  columnsScroll: {
+    flex: 1
+  },
   tablesColumn: {
     width: 360,
     maxWidth: 360
@@ -38,9 +41,53 @@ export const styles = StyleSheet.create({
   },
   column: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 10
+  },
+  columnScroll: {
+    flex: 1
+  },
+  menuSearchInput: {
+    borderColor: colors.inputBorder,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: colors.inputBackground,
+    color: colors.inputText,
+    marginBottom: 10
+  },
+  menuTypeSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10
+  },
+  menuTypeButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: colors.surfaceAlt
+  },
+  menuTypeButtonSelected: {
+    borderColor: colors.buttonPrimary,
+    backgroundColor: colors.buttonPrimary
+  },
+  menuTypeButtonText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 12
+  },
+  menuTypeButtonTextSelected: {
+    color: colors.buttonPrimaryText
+  },
+  orderSection: {
+    flex: 1,
+    minHeight: 0
   },
   sectionTitle: {
     fontSize: 17,
@@ -165,6 +212,16 @@ export const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 6
   },
+  preorderList: {
+    maxHeight: 220
+  },
+  confirmedList: {
+    flex: 1,
+    minHeight: 120
+  },
+  confirmedListContent: {
+    paddingBottom: 8
+  },
   totalText: {
     fontWeight: '700',
     marginBottom: 6
@@ -173,6 +230,83 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: 6
+  },
+  ticketModule: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+    backgroundColor: colors.surfaceAlt
+  },
+  moduleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4
+  },
+  helperText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginBottom: 6
+  },
+  inlineControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  smallNumberInput: {
+    width: 64,
+    borderColor: colors.inputBorder,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: colors.inputBackground,
+    textAlign: 'center'
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16
+  },
+  modalPanel: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '86%',
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+    padding: 12
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 10
+  },
+  aaSelectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+    backgroundColor: colors.surfaceAlt
   },
   confirmedCard: {
     borderWidth: 1,

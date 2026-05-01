@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { BackendTable, MenuItem, Order, TableWorkflow } from '../types';
+import type { BackendTable, MenuItem, Order, PaymentMethod, PaymentResult, TableWorkflow } from '../types';
 import { logger } from '../utils/logger';
 
 interface ApiResponse<T = unknown> {
@@ -158,6 +158,34 @@ export class ApiService {
   async deleteOrder(orderId: string): Promise<{ ok: boolean }> {
     const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, { method: 'DELETE' });
     return parseOrThrow<{ ok: boolean }>(response, 'Failed to delete order');
+  }
+
+  async payTable(
+    tableNumber: number,
+    tableZone: string,
+    method: PaymentMethod,
+    splitPeople?: number
+  ): Promise<PaymentResult> {
+    const response = await fetch(`${API_BASE_URL}/orders/pay-table`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableNumber, tableZone, method, splitPeople })
+    });
+    return parseOrThrow<PaymentResult>(response, 'Failed to pay table');
+  }
+
+  async paySelectedItems(
+    tableNumber: number,
+    tableZone: string,
+    method: PaymentMethod,
+    items: Array<{ orderId: string; itemId: number; qty: number }>
+  ): Promise<PaymentResult> {
+    const response = await fetch(`${API_BASE_URL}/orders/pay-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableNumber, tableZone, method, items })
+    });
+    return parseOrThrow<PaymentResult>(response, 'Failed to pay selected items');
   }
 
   async fetchMenu(): Promise<MenuItem[]> {

@@ -73,6 +73,38 @@ model Payment {
   createdAt DateTime @default(now())
 }
 
+model PaidTicket {
+  id               String           @id @default(cuid())
+  ticketNumber     String           @unique
+  mode             String
+  method           String
+  tableNumber      Int
+  tableZone        String
+  totalCents       Int
+  taxableBaseCents Int
+  vatCents         Int
+  vatRatePercent   Int
+  splitPeople      Int?
+  createdAt        DateTime         @default(now())
+  items            PaidTicketItem[]
+
+  @@index([tableZone, tableNumber])
+  @@index([createdAt])
+}
+
+model PaidTicketItem {
+  id              Int        @id @default(autoincrement())
+  ticketId        String
+  ticket          PaidTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  orderId         String?
+  orderItemId     Int?
+  menuItemId      Int?
+  name            String
+  qty             Int
+  unitPriceCents  Int
+  totalPriceCents Int
+}
+
 model PreOrderSession {
   id        String        @id @default(cuid())
   tableId   Int

@@ -1,7 +1,9 @@
 import { ApiError } from '../../middleware/errorHandler';
-import { workflowRepository } from './workflow.repository';
+import { PaidTicketLine, workflowRepository } from './workflow.repository';
 
 const VALID_TABLE_ZONES = new Set(['outside', 'floor1', 'floor2']);
+const VALID_PAYMENT_METHODS = new Set(['cash', 'card']);
+const DEFAULT_VAT_RATE_PERCENT = 10;
 
 function normalizeZone(zone: string): string {
   const normalized = zone.trim().toLowerCase();
@@ -17,6 +19,35 @@ function normalizeNumber(number: number): number {
     throw new ApiError(400, 'Invalid table number', 'INVALID_TABLE_NUMBER');
   }
   return number;
+}
+
+function normalizePaymentMethod(method: string): string {
+  const normalized = method.trim().toLowerCase();
+  if (!VALID_PAYMENT_METHODS.has(normalized)) {
+    throw new ApiError(400, 'Invalid payment method', 'INVALID_PAYMENT_METHOD');
+  }
+  return normalized;
+}
+
+function calculateTax(totalCents: number) {
+  const taxableBaseCents = Math.round(totalCents / (1 + DEFAULT_VAT_RATE_PERCENT / 100));
+  return {
+    taxableBaseCents,
+    vatCents: totalCents - taxableBaseCents,
+    vatRatePercent: DEFAULT_VAT_RATE_PERCENT
+  };
+}
+
+function nextPaidTicketNumber(sequence: number): string {
+  return `PT-${String(sequence).padStart(6, '0')}`;
+}
+
+function groupPaymentTotalsByOrder(lines: PaidTicketLine[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const line of lines) {
+    totals.set(line.orderId, (totals.get(line.orderId) ?? 0) + line.totalPriceCents);
+  }
+  return totals;
 }
 
 function getSmallestAvailableTableNumber(existingNumbers: number[]): number {
@@ -284,6 +315,162 @@ export class WorkflowService {
 
       await workflowRepository.deleteOrder(orderId, tx);
       return { ok: true };
+    });
+  }
+
+  async payTable(tableNumber: number, tableZone: string, method: string, splitPeople?: number) {
+    const normalizedNumber = normalizeNumber(tableNumber);
+    const normalizedZone = normalizeZone(tableZone);
+    const normalizedMethod = normalizePaymentMethod(method);
+
+    return workflowRepository.runInTransaction(async (tx) => {
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
+      if (!table) {
+        throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
+      }
+
+      const workflow = await workflowRepository.getTableWorkflow(table.id, tx);
+      const orders = workflow.orders;
+      const lines: PaidTicketLine[] = orders.flatMap((order) =>
+        order.items.map((item) => ({
+          orderId: order.id,
+          orderItemId: item.id,
+          menuItemId: item.menuItemId,
+          name: item.name,
+          qty: item.qty,
+          unitPriceCents: item.unitPriceCents,
+          totalPriceCents: item.totalPriceCents,
+        }))
+      );
+
+      if (lines.length === 0) {
+        throw new ApiError(409, 'No confirmed items to pay', 'EMPTY_PAYMENT');
+      }
+
+      const totalCents = lines.reduce((sum, line) => sum + line.totalPriceCents, 0);
+      const sequence = await workflowRepository.countPaidTickets(tx) + 1;
+      const tax = calculateTax(totalCents);
+      const paidTicket = await workflowRepository.createPaidTicket({
+        ticketNumber: nextPaidTicketNumber(sequence),
+        mode: splitPeople && splitPeople > 1 ? 'split' : 'full',
+        method: normalizedMethod,
+        tableNumber: table.number,
+        tableZone: table.zone ?? normalizedZone,
+        totalCents,
+        ...tax,
+        splitPeople: splitPeople && splitPeople > 1 ? splitPeople : null,
+        items: lines,
+      }, tx);
+
+      for (const [orderId, amountCents] of groupPaymentTotalsByOrder(lines)) {
+        await workflowRepository.createPayment(orderId, amountCents, normalizedMethod, tx);
+        await workflowRepository.updateOrderStatus(orderId, 'paid', tx);
+      }
+
+      return {
+        paidTicket,
+        tableNumber: table.number,
+        tableZone: table.zone ?? normalizedZone,
+      };
+    });
+  }
+
+  async paySelectedItems(
+    tableNumber: number,
+    tableZone: string,
+    method: string,
+    selectedItems: Array<{ orderId: string; itemId: number; qty: number }>
+  ) {
+    const normalizedNumber = normalizeNumber(tableNumber);
+    const normalizedZone = normalizeZone(tableZone);
+    const normalizedMethod = normalizePaymentMethod(method);
+
+    if (selectedItems.length === 0) {
+      throw new ApiError(400, 'No selected items to pay', 'EMPTY_PAYMENT_SELECTION');
+    }
+
+    const groupedSelectedItems = Array.from(selectedItems.reduce((grouped, item) => {
+      const key = `${item.orderId}:${item.itemId}`;
+      const current = grouped.get(key);
+      grouped.set(key, current ? { ...current, qty: current.qty + item.qty } : { ...item });
+      return grouped;
+    }, new Map<string, { orderId: string; itemId: number; qty: number }>()).values());
+
+    return workflowRepository.runInTransaction(async (tx) => {
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
+      if (!table) {
+        throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
+      }
+
+      const lines: PaidTicketLine[] = [];
+      for (const selected of groupedSelectedItems) {
+        if (!Number.isInteger(selected.qty) || selected.qty <= 0) {
+          throw new ApiError(400, 'Invalid payment item quantity', 'INVALID_PAYMENT_QTY');
+        }
+
+        const orderItem = await workflowRepository.getOrderItemWithOrder(selected.orderId, selected.itemId, tx);
+        if (!orderItem || orderItem.order.tableId !== table.id || orderItem.order.status !== 'confirmed') {
+          throw new ApiError(404, 'Order item not found for payment', 'PAYMENT_ITEM_NOT_FOUND');
+        }
+        if (selected.qty > orderItem.qty) {
+          throw new ApiError(409, 'Payment item quantity exceeds remaining quantity', 'PAYMENT_QTY_EXCEEDS_REMAINING');
+        }
+
+        lines.push({
+          orderId: orderItem.orderId,
+          orderItemId: orderItem.id,
+          menuItemId: orderItem.menuItemId,
+          name: orderItem.name,
+          qty: selected.qty,
+          unitPriceCents: orderItem.unitPriceCents,
+          totalPriceCents: selected.qty * orderItem.unitPriceCents,
+        });
+      }
+
+      const totalCents = lines.reduce((sum, line) => sum + line.totalPriceCents, 0);
+      const sequence = await workflowRepository.countPaidTickets(tx) + 1;
+      const tax = calculateTax(totalCents);
+      const paidTicket = await workflowRepository.createPaidTicket({
+        ticketNumber: nextPaidTicketNumber(sequence),
+        mode: 'aa',
+        method: normalizedMethod,
+        tableNumber: table.number,
+        tableZone: table.zone ?? normalizedZone,
+        totalCents,
+        ...tax,
+        items: lines,
+      }, tx);
+
+      for (const [orderId, amountCents] of groupPaymentTotalsByOrder(lines)) {
+        await workflowRepository.createPayment(orderId, amountCents, normalizedMethod, tx);
+      }
+
+      for (const line of lines) {
+        const current = await workflowRepository.getOrderItemWithOrder(line.orderId, line.orderItemId, tx);
+        if (!current) {
+          continue;
+        }
+        const nextQty = current.qty - line.qty;
+        if (nextQty <= 0) {
+          await workflowRepository.deleteOrderItem(current.id, tx);
+        } else {
+          await workflowRepository.updateOrderItemQty(current.id, nextQty, tx);
+        }
+
+        const remainingItems = await workflowRepository.getOrderItems(line.orderId, tx);
+        if (remainingItems.length === 0) {
+          await workflowRepository.updateOrderStatus(line.orderId, 'paid', tx);
+        } else {
+          const nextTotal = remainingItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+          await workflowRepository.updateOrderTotal(line.orderId, nextTotal, tx);
+        }
+      }
+
+      return {
+        paidTicket,
+        tableNumber: table.number,
+        tableZone: table.zone ?? normalizedZone,
+      };
     });
   }
 }

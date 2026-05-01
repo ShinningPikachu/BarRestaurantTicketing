@@ -103,3 +103,38 @@ export interface TableWorkflow {
   preOrderItems: PreOrderItem[];
   orders: Order[];
 }
+
+export type PaymentMethod = 'cash' | 'card';
+
+export interface PaidTicketItem {
+  id: number;
+  ticketId: string;
+  orderId?: string | null;
+  orderItemId?: number | null;
+  menuItemId?: number | null;
+  name: string;
+  qty: number;
+  unitPriceCents: number;
+  totalPriceCents: number;
+}
+
+export interface PaidTicket {
+  id: string;
+  ticketNumber: string;
+  mode: string;
+  method: PaymentMethod;
+  tableNumber: number;
+  tableZone: string;
+  totalCents: number;
+  taxableBaseCents: number;
+  vatCents: number;
+  vatRatePercent: number;
+  splitPeople?: number | null;
+  createdAt: string;
+  items: PaidTicketItem[];
+}
+
+export interface PaymentResult {
+  paidTicket: PaidTicket;
+  workflow: TableWorkflow;
+}

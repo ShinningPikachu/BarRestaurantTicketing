@@ -17,6 +17,26 @@ const itemIdParamSchema = z.object({
   itemId: z.coerce.number().positive('Item ID must be positive'),
 });
 
+const paymentMethodSchema = z.enum(['cash', 'card']);
+
+const payTableSchema = z.object({
+  tableNumber: z.number().positive('Table number must be positive'),
+  tableZone: z.string().min(1, 'Table zone is required'),
+  method: paymentMethodSchema,
+  splitPeople: z.number().int().positive().optional(),
+});
+
+const paySelectedItemsSchema = z.object({
+  tableNumber: z.number().positive('Table number must be positive'),
+  tableZone: z.string().min(1, 'Table zone is required'),
+  method: paymentMethodSchema,
+  items: z.array(z.object({
+    orderId: z.string().min(1),
+    itemId: z.number().int().positive(),
+    qty: z.number().int().positive(),
+  })).min(1),
+});
+
 export const moveToPreorderParamSchema = z.object({
   id: z.string().min(1, 'Order ID is required'),
   itemId: z.coerce.number().positive('Item ID must be positive'),
@@ -47,6 +67,42 @@ router.post(
       res.status(201).json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to send order to kitchen');
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/pay-table',
+  validateBody(payTableSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tableNumber, tableZone, method, splitPeople } = req.body;
+      logger.info({ tableNumber, tableZone, method, splitPeople }, 'Paying table ticket');
+
+      const result = await workflowService.payTable(tableNumber, tableZone, method, splitPeople);
+      const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
+      res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
+    } catch (error) {
+      logger.error({ error }, 'Failed to pay table ticket');
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/pay-items',
+  validateBody(paySelectedItemsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tableNumber, tableZone, method, items } = req.body;
+      logger.info({ tableNumber, tableZone, method, itemCount: items.length }, 'Paying selected ticket items');
+
+      const result = await workflowService.paySelectedItems(tableNumber, tableZone, method, items);
+      const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
+      res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
+    } catch (error) {
+      logger.error({ error }, 'Failed to pay selected ticket items');
       next(error);
     }
   }

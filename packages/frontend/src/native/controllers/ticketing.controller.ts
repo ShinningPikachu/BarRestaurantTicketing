@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
-import { TableId, TableZone } from '../types';
+import { Order, PaymentMethod, TableId, TableZone } from '../types';
 import { useMenuController } from './menu.controller';
 import { useTableController } from './table.controller';
 import { useTicketController } from './ticket.controller';
@@ -169,17 +169,40 @@ export function useTicketingController() {
   }
 
   // Ticket printing
-  async function printTicket(): Promise<void> {
+  async function printTicket(options?: { confirmedOrders?: Order[]; splitPeople?: number; ticketNote?: string }): Promise<void> {
     try {
       logger.info({ selectedTable }, 'Printing ticket');
       await ticketController.actions.printTicket({
         selectedTable,
-        confirmedOrders: tableConfirmedOrders,
+        confirmedOrders: options?.confirmedOrders ?? tableConfirmedOrders,
         preorderItems: workflowController.state.preorderItems,
+        splitPeople: options?.splitPeople,
+        ticketNote: options?.ticketNote,
       });
     } catch (error) {
       logger.error({ error }, 'Failed to print ticket');
       Alert.alert('Error', 'No se pudo generar el ticket');
+    }
+  }
+
+  async function payTable(method: PaymentMethod, splitPeople?: number): Promise<void> {
+    try {
+      await workflowController.actions.payTable(selectedTable, method, splitPeople);
+    } catch (error) {
+      logger.error({ error, method, splitPeople }, 'Failed to pay table');
+      Alert.alert('Error', 'No se pudo registrar el pago');
+    }
+  }
+
+  async function paySelectedItems(
+    method: PaymentMethod,
+    items: Array<{ orderId: string; itemId: number; qty: number }>
+  ): Promise<void> {
+    try {
+      await workflowController.actions.paySelectedItems(selectedTable, method, items);
+    } catch (error) {
+      logger.error({ error, method }, 'Failed to pay selected items');
+      Alert.alert('Error', 'No se pudo registrar el pago AA');
     }
   }
 
@@ -213,6 +236,8 @@ export function useTicketingController() {
       sendToKitchen,
       clearPreOrder,
       printTicket,
+      payTable,
+      paySelectedItems,
       removeOrder,
       moveConfirmedItemToPreOrder: workflowController.actions.moveConfirmedItemToPreOrder,
     }

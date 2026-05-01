@@ -8,9 +8,12 @@ export function useTicketController() {
     selectedTable: SelectedTable;
     confirmedOrders: Order[];
     preorderItems: PreOrderItem[];
+    splitPeople?: number;
+    ticketNote?: string;
   }): Promise<void> {
     try {
-      if (params.confirmedOrders.length === 0) {
+      const hasItems = params.confirmedOrders.some((order) => order.items.length > 0);
+      if (!hasItems) {
         Alert.alert('Sin ticket', 'Envía artículos a cocina antes de imprimir el ticket de cliente.');
         return;
       }
@@ -18,6 +21,8 @@ export function useTicketController() {
       await printKitchenTicket({
         selectedTable: params.selectedTable,
         confirmedOrders: params.confirmedOrders,
+        splitPeople: params.splitPeople,
+        ticketNote: params.ticketNote,
       });
     } catch {
       Alert.alert('Error', 'No se pudo generar el PDF del ticket.');

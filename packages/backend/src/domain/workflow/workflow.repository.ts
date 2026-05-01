@@ -1,6 +1,16 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import prisma from '../../db';
 
+export interface PaidTicketLine {
+  orderId: string;
+  orderItemId: number;
+  menuItemId?: number | null;
+  name: string;
+  qty: number;
+  unitPriceCents: number;
+  totalPriceCents: number;
+}
+
 export class WorkflowRepository {
   constructor(private readonly client: PrismaClient = prisma) {}
 
@@ -197,6 +207,68 @@ export class WorkflowRepository {
     });
   }
 
+  async countPaidTickets(tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.paidTicket.count();
+  }
+
+  async createPaidTicket(
+    payload: {
+      ticketNumber: string;
+      mode: string;
+      method: string;
+      tableNumber: number;
+      tableZone: string;
+      totalCents: number;
+      taxableBaseCents: number;
+      vatCents: number;
+      vatRatePercent: number;
+      splitPeople?: number | null;
+      items: PaidTicketLine[];
+    },
+    tx?: Prisma.TransactionClient
+  ) {
+    const db = tx ?? this.client;
+
+    return db.paidTicket.create({
+      data: {
+        ticketNumber: payload.ticketNumber,
+        mode: payload.mode,
+        method: payload.method,
+        tableNumber: payload.tableNumber,
+        tableZone: payload.tableZone,
+        totalCents: payload.totalCents,
+        taxableBaseCents: payload.taxableBaseCents,
+        vatCents: payload.vatCents,
+        vatRatePercent: payload.vatRatePercent,
+        splitPeople: payload.splitPeople ?? null,
+        items: {
+          create: payload.items.map((item) => ({
+            orderId: item.orderId,
+            orderItemId: item.orderItemId,
+            menuItemId: item.menuItemId ?? null,
+            name: item.name,
+            qty: item.qty,
+            unitPriceCents: item.unitPriceCents,
+            totalPriceCents: item.totalPriceCents,
+          })),
+        },
+      },
+      include: { items: true },
+    });
+  }
+
+  async createPayment(orderId: string, amountCents: number, method: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.payment.create({
+      data: {
+        orderId,
+        amountCents,
+        method,
+      },
+    });
+  }
+
   async getTableWorkflow(tableId: number, tx?: Prisma.TransactionClient) {
     const [session, orders] = await Promise.all([
       this.getDraftPreOrderSession(tableId, tx),
@@ -307,6 +379,20 @@ export class WorkflowRepository {
     return db.orderItem.delete({ where: { id: orderItemId } });
   }
 
+  async updateOrderItemQty(orderItemId: number, qty: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.orderItem.update({
+      where: { id: orderItemId },
+      data: {
+        qty,
+        totalPriceCents: qty * (await db.orderItem.findUniqueOrThrow({
+          where: { id: orderItemId },
+          select: { unitPriceCents: true }
+        })).unitPriceCents
+      }
+    });
+  }
+
   async deleteOrder(orderId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
 
@@ -334,6 +420,14 @@ export class WorkflowRepository {
     return db.order.update({
       where: { id: orderId },
       data: { totalCents }
+    });
+  }
+
+  async updateOrderStatus(orderId: string, status: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.order.update({
+      where: { id: orderId },
+      data: { status }
     });
   }
 
