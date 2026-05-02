@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
     gap: 10
   },
   mobileTopPanel: {
-    flex: 1,
+    flex: 0.9,
     minHeight: 0,
     backgroundColor: colors.surface,
     borderRadius: 8,
@@ -82,7 +82,7 @@ export const styles = StyleSheet.create({
     padding: 10
   },
   mobileTicketPanel: {
-    flex: 1,
+    flex: 1.35,
     minHeight: 0,
     backgroundColor: colors.surface,
     borderRadius: 8,
@@ -143,6 +143,90 @@ export const styles = StyleSheet.create({
   },
   mobileTopScroll: {
     flex: 1
+  },
+  mobileOrderSection: {
+    flex: 1,
+    minHeight: 0
+  },
+  mobileOrderHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: 8,
+    marginBottom: 8
+  },
+  mobileOrderScroll: {
+    flex: 1,
+    minHeight: 0
+  },
+  mobileOrderBlock: {
+    marginBottom: 8
+  },
+  mobileOrderBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 4
+  },
+  mobileBadge: {
+    minWidth: 26,
+    textAlign: 'center',
+    color: colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '700',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.zoneMenu,
+    paddingHorizontal: 8,
+    paddingVertical: 3
+  },
+  mobileOrderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginBottom: 6
+  },
+  mobileStickyActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10
+  },
+  mobilePayBar: {
+    flexDirection: 'row',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+    marginTop: 8
+  },
+  mobileDisabledButton: {
+    opacity: 0.45
+  },
+  mobileDrawerButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8
+  },
+  drawerActionRow: {
+    alignItems: 'flex-end',
+    marginBottom: 8
   },
   homeGrid: {
     flex: 1,

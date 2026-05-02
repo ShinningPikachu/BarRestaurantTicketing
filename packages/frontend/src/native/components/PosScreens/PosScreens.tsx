@@ -1,13 +1,19 @@
 import React, { ComponentProps, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { styles } from '../../app/App.styles';
-import { MenuItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
+import { MenuItem, Order, OrderItem, PreOrderItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
 import { OrderSection } from '../OrderZone/OrderSection';
 import { TableZoneGroup } from '../TableZoneGroup/TableZoneGroup';
 
 type MenuLayout = 'desktop' | 'mobile';
 type MobileTopMode = 'tables' | 'menu';
+
+interface ConfirmedItemRow {
+  key: string;
+  orderId: string;
+  item: OrderItem;
+}
 
 export interface PosScreenProps {
   tables: Map<TableZone, number[]>;
@@ -26,6 +32,7 @@ export interface PosScreenProps {
   onAddTable: (zone: TableZone) => void;
   onRemoveTable: (table: TableId) => void;
   onAddMenuItem: (menuId: number) => void;
+  onOpenCashDrawer: () => void;
   formatPrice: (cents: number) => string;
 }
 
@@ -129,6 +136,172 @@ function MenuSelector({
   );
 }
 
+function getConfirmedItems(tableOrders: Order[]): ConfirmedItemRow[] {
+  return tableOrders.flatMap((order) =>
+    order.items.map((item, index) => ({
+      key: `${order.id}-${item.id ?? index}-${item.name}-${item.unitPriceCents ?? 0}`,
+      orderId: order.id,
+      item,
+    }))
+  );
+}
+
+function MobilePreorderItem({
+  item,
+  orderProps,
+}: {
+  item: PreOrderItem;
+  orderProps: PosScreenProps['orderSectionProps'];
+}): React.JSX.Element {
+  const title = item.menuItemId
+    ? orderProps.getMenuTitleById(orderProps.menuByCategory, item.menuItemId)
+    : item.name;
+
+  return (
+    <View style={styles.mobileOrderItem}>
+      <View style={styles.flex1}>
+        <Text style={styles.itemName} numberOfLines={2}>{title}</Text>
+        <Text style={styles.itemPrice}>{orderProps.formatPrice(item.unitPriceCents * item.qty)}</Text>
+      </View>
+      <View style={styles.qtyGroup}>
+        <TouchableOpacity style={styles.qtyButton} onPress={() => orderProps.onRemovePendingItem(item.id)}>
+          <Text style={styles.qtyButtonText}>-</Text>
+        </TouchableOpacity>
+        <Text style={styles.qtyText}>{item.qty}</Text>
+        <TouchableOpacity style={styles.qtyButton} onPress={() => orderProps.onAddPendingItem(item.id)}>
+          <Text style={styles.qtyButtonText}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function MobileConfirmedItem({
+  item,
+  orderId,
+  orderProps,
+}: {
+  item: OrderItem;
+  orderId: string;
+  orderProps: PosScreenProps['orderSectionProps'];
+}): React.JSX.Element {
+  return (
+    <View style={styles.mobileOrderItem}>
+      <View style={styles.flex1}>
+        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.itemPrice}>
+          {orderProps.formatPrice((item.unitPriceCents ?? 0) * item.qty)}
+        </Text>
+      </View>
+      <Text style={styles.confirmedQtyText}>{`x${item.qty}`}</Text>
+      <TouchableOpacity
+        style={styles.compactSecondaryButton}
+        onPress={() => orderProps.onMoveConfirmedItemToPreOrder(orderId, item)}
+      >
+        <Text style={styles.secondaryButtonText}>Editar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderSectionProps'] }): React.JSX.Element {
+  const confirmedItems = getConfirmedItems(orderProps.tableOrders);
+  const hasPreorder = orderProps.preorderItems.length > 0;
+  const hasConfirmed = confirmedItems.length > 0;
+
+  return (
+    <View style={styles.mobileOrderSection}>
+      <View style={styles.mobileOrderHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>
+            {`Mesa ${tableZoneLabel(orderProps.selectedTable.zone)}-${orderProps.selectedTable.number}`}
+          </Text>
+          <Text style={styles.itemPrice}>
+            {`${orderProps.preorderItems.length} prepedido · ${confirmedItems.length} cocina`}
+          </Text>
+        </View>
+        <Text style={styles.totalText}>{orderProps.formatPrice(orderProps.preorderTotal)}</Text>
+      </View>
+
+      <ScrollView style={styles.mobileOrderScroll} showsVerticalScrollIndicator>
+        <View style={styles.mobileOrderBlock}>
+          <View style={styles.mobileOrderBlockHeader}>
+            <Text style={styles.subTitle}>Prepedido</Text>
+            <Text style={styles.mobileBadge}>{String(orderProps.preorderItems.length)}</Text>
+          </View>
+          {hasPreorder ? (
+            orderProps.preorderItems.map((item) => (
+              <MobilePreorderItem key={item.id} item={item} orderProps={orderProps} />
+            ))
+          ) : (
+            <Text style={styles.emptyText}>No hay productos seleccionados.</Text>
+          )}
+        </View>
+
+        <View style={styles.mobileStickyActions}>
+          <TouchableOpacity
+            style={[styles.primaryButton, !hasPreorder && styles.mobileDisabledButton]}
+            onPress={orderProps.onConfirmOrder}
+            disabled={!hasPreorder}
+          >
+            <Text style={styles.primaryButtonText}>Enviar a cocina</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryButton, !hasPreorder && styles.mobileDisabledButton]}
+            onPress={orderProps.onClearPreOrder}
+            disabled={!hasPreorder}
+          >
+            <Text style={styles.secondaryButtonText}>Limpiar</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.mobileOrderBlock}>
+          <View style={styles.mobileOrderBlockHeader}>
+            <Text style={styles.subTitle}>En cocina / confirmados</Text>
+            <Text style={styles.mobileBadge}>{String(confirmedItems.length)}</Text>
+          </View>
+          {hasConfirmed ? (
+            confirmedItems.map((confirmedItem) => (
+              <MobileConfirmedItem
+                key={confirmedItem.key}
+                item={confirmedItem.item}
+                orderId={confirmedItem.orderId}
+                orderProps={orderProps}
+              />
+            ))
+          ) : (
+            <Text style={styles.emptyText}>No hay productos enviados a cocina.</Text>
+          )}
+        </View>
+      </ScrollView>
+
+      <View style={styles.mobilePayBar}>
+        <TouchableOpacity
+          style={[styles.compactPrimaryButton, !hasConfirmed && styles.mobileDisabledButton]}
+          onPress={() => orderProps.onPrintTicket()}
+          disabled={!hasConfirmed}
+        >
+          <Text style={styles.primaryButtonText}>Ticket</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.compactSecondaryButton, !hasConfirmed && styles.mobileDisabledButton]}
+          onPress={() => orderProps.onPayTicket('cash')}
+          disabled={!hasConfirmed}
+        >
+          <Text style={styles.secondaryButtonText}>Efectivo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.compactSecondaryButton, !hasConfirmed && styles.mobileDisabledButton]}
+          onPress={() => orderProps.onPayTicket('card')}
+          disabled={!hasConfirmed}
+        >
+          <Text style={styles.secondaryButtonText}>Tarjeta</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
   const [topMode, setTopMode] = useState<MobileTopMode>('tables');
 
@@ -198,7 +371,10 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
       </View>
 
       <View style={styles.mobileTicketPanel}>
-        <OrderSection {...props.orderSectionProps} />
+        <MobileOrderSummary orderProps={props.orderSectionProps} />
+        <TouchableOpacity style={styles.mobileDrawerButton} onPress={props.onOpenCashDrawer}>
+          <Text style={styles.secondaryButtonText}>Abrir caja</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -247,6 +423,11 @@ export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
         </View>
 
         <View style={styles.column}>
+          <View style={styles.drawerActionRow}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={props.onOpenCashDrawer}>
+              <Text style={styles.secondaryButtonText}>Abrir caja</Text>
+            </TouchableOpacity>
+          </View>
           <OrderSection {...props.orderSectionProps} />
         </View>
       </View>

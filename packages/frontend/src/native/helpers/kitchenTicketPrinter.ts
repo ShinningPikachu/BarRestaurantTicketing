@@ -3,6 +3,7 @@ import * as Print from 'expo-print';
 import { Platform } from 'react-native';
 import { Order, tableZoneLabel } from '../types';
 import { SelectedTable } from '../app/app.types';
+import { apiService } from '../services/api';
 
 const SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY = 'bar-ticketing-simplified-invoice-sequence';
 
@@ -20,6 +21,12 @@ type ExpoLikeGlobal = typeof globalThis & {
       EXPO_PUBLIC_TICKET_ISSUER_ADDRESS?: string;
       EXPO_PUBLIC_TICKET_SERIES?: string;
       EXPO_PUBLIC_TICKET_VAT_RATE?: string;
+      EXPO_PUBLIC_TICKET_PRINT_MODE?: string;
+      EXPO_PUBLIC_XPRINTER_HOST?: string;
+      EXPO_PUBLIC_XPRINTER_PORT?: string;
+      EXPO_PUBLIC_XPRINTER_PRINTER_NAME?: string;
+      EXPO_PUBLIC_XPRINTER_USB_DEVICE?: string;
+      EXPO_PUBLIC_XPRINTER_OPEN_DRAWER?: string;
     };
   };
 };
@@ -40,12 +47,12 @@ function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
   const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
 
   return {
-    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'NOMBRE FISCAL PENDIENTE',
-    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'NOMBRE DEL BAR / RESTAURANTE',
-    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'NIF PENDIENTE',
-    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'DIRECCIÓN PENDIENTE',
-    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '',
-    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '',
+    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'YUYE CHEN',
+    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'Star Bar',
+    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'X5126994-H',
+    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'Gran Via de les Corts Catalanes 669. Bis',
+    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '08013 Barcelona',
+    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '672295395',
     series: env?.EXPO_PUBLIC_TICKET_SERIES ?? 'FS',
     vatRatePercent: Number.isFinite(vatRateRaw) && vatRateRaw > 0 ? vatRateRaw : 10,
   };
@@ -97,6 +104,30 @@ function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; to
   }
 
   return (item.unitPriceCents ?? 0) * item.qty;
+}
+
+function shouldUseXprinterBridge(): boolean {
+  const env = (globalThis as ExpoLikeGlobal).process?.env;
+  return env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-lan'
+    || env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-usb';
+}
+
+function getOptionalXprinterTarget(): {
+  printerHost?: string;
+  printerPort?: number;
+  printerName?: string;
+  usbDevice?: string;
+  openCashDrawer?: boolean;
+} {
+  const env = (globalThis as ExpoLikeGlobal).process?.env;
+  const printerPort = Number(env?.EXPO_PUBLIC_XPRINTER_PORT);
+  return {
+    printerHost: env?.EXPO_PUBLIC_XPRINTER_HOST || undefined,
+    printerPort: Number.isInteger(printerPort) && printerPort > 0 ? printerPort : undefined,
+    printerName: env?.EXPO_PUBLIC_XPRINTER_PRINTER_NAME || undefined,
+    usbDevice: env?.EXPO_PUBLIC_XPRINTER_USB_DEVICE || undefined,
+    openCashDrawer: env?.EXPO_PUBLIC_XPRINTER_OPEN_DRAWER === 'true' ? true : undefined,
+  };
 }
 
 function getCombinedOrderLines(orders: Order[]): Array<{ name: string; qty: number; unitPriceCents: number; totalPriceCents: number }> {
@@ -403,12 +434,41 @@ export async function printKitchenTicket(params: {
 }): Promise<void> {
   const config = getSimplifiedInvoiceConfig();
   const invoiceNumber = await nextInvoiceNumber(config.series);
+  const issuedAt = new Date();
+  const combinedLines = getCombinedOrderLines(params.confirmedOrders);
+  const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
+  const vatRate = config.vatRatePercent / 100;
+  const taxableBaseCents = Math.round(totalCents / (1 + vatRate));
+  const vatCents = totalCents - taxableBaseCents;
+
+  if (shouldUseXprinterBridge()) {
+    await apiService.printXprinterTicket({
+      businessName: config.businessName,
+      tradeName: config.tradeName,
+      nif: config.nif,
+      address: config.address,
+      city: config.city || null,
+      phone: config.phone || null,
+      invoiceNumber,
+      issuedAt: formatDateTime(issuedAt),
+      tableLabel: `${tableZoneLabel(params.selectedTable.zone)} ${params.selectedTable.number}`,
+      lines: combinedLines,
+      taxableBaseCents,
+      vatCents,
+      vatRatePercent: config.vatRatePercent,
+      totalCents,
+      ticketNote: params.ticketNote ?? null,
+      splitPeople: params.splitPeople ?? null,
+      ...getOptionalXprinterTarget(),
+    });
+    return;
+  }
 
   const html = buildSimplifiedInvoiceHtml({
     selectedTable: params.selectedTable,
     confirmedOrders: params.confirmedOrders,
     invoiceNumber,
-    issuedAt: new Date(),
+    issuedAt,
     config,
     splitPeople: params.splitPeople,
     ticketNote: params.ticketNote,

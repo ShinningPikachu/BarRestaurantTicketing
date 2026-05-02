@@ -445,6 +445,15 @@ export default function App(): React.JSX.Element {
     urlApi.revokeObjectURL(url);
   }
 
+  async function openCashDrawer(): Promise<void> {
+    try {
+      await apiService.openXprinterCashDrawer();
+      Alert.alert('Caja abierta', 'Se ha enviado la orden de apertura a la caja.');
+    } catch {
+      Alert.alert('Error', 'No se pudo abrir la caja.');
+    }
+  }
+
   const orderSectionProps = {
     selectedTable,
     preorderItems,
@@ -520,6 +529,9 @@ export default function App(): React.JSX.Element {
     },
     onAddMenuItem: (menuId: number) => {
       void actions.addMenuItem(menuId);
+    },
+    onOpenCashDrawer: () => {
+      void openCashDrawer();
     },
     formatPrice: centsToCurrency,
   };

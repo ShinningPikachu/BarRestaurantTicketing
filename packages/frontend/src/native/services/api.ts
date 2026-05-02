@@ -239,6 +239,51 @@ export class ApiService {
     const response = await fetch(`${API_BASE_URL}/tickets`);
     return parseOrThrow<PaidTicket[]>(response, 'Failed to fetch paid tickets');
   }
+
+  async printXprinterTicket(payload: {
+    businessName: string;
+    tradeName: string;
+    nif: string;
+    address: string;
+    city?: string | null;
+    phone?: string | null;
+    invoiceNumber: string;
+    issuedAt: string;
+    tableLabel: string;
+    lines: Array<{ name: string; qty: number; unitPriceCents: number; totalPriceCents: number }>;
+    taxableBaseCents: number;
+    vatCents: number;
+    vatRatePercent: number;
+    totalCents: number;
+    ticketNote?: string | null;
+    splitPeople?: number | null;
+    openCashDrawer?: boolean | null;
+    printerHost?: string;
+    printerPort?: number;
+    printerName?: string;
+    usbDevice?: string;
+  }): Promise<{ printed: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/printers/xprinter/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return parseOrThrow<{ printed: boolean }>(response, 'Failed to print Xprinter ticket');
+  }
+
+  async openXprinterCashDrawer(payload: {
+    printerHost?: string;
+    printerPort?: number;
+    printerName?: string;
+    usbDevice?: string;
+  } = {}): Promise<{ opened: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/printers/xprinter/drawer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return parseOrThrow<{ opened: boolean }>(response, 'Failed to open cash drawer');
+  }
 }
 
 export const apiService = new ApiService();

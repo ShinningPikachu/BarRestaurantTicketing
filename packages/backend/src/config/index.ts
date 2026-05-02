@@ -6,4 +6,11 @@ export const config = {
   database: {
     url: process.env.DATABASE_URL || 'file:./dev.db',
   },
+  xprinter: {
+    host: process.env.XPRINTER_HOST || '',
+    port: parseInt(process.env.XPRINTER_PORT || '9100', 10),
+    printerName: process.env.XPRINTER_PRINTER_NAME || '',
+    usbDevice: process.env.XPRINTER_USB_DEVICE || '',
+    openDrawer: process.env.XPRINTER_OPEN_DRAWER === 'true',
+  },
 } as const;
