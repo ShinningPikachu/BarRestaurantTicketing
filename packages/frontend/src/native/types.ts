@@ -136,6 +136,38 @@ export interface PaidTicket {
   items: PaidTicketItem[];
 }
 
+export interface SessionTicketSummary {
+  id: string;
+  ticketNumber: string;
+  method: PaymentMethod;
+  tableNumber: number;
+  tableZone: string;
+  totalCents: number;
+  createdAt: string;
+}
+
+export interface SessionItemSummary {
+  name: string;
+  qty: number;
+  totalCents: number;
+}
+
+export interface SessionSummary {
+  sessionDate: string;
+  startAt: string;
+  endAt: string;
+  ticketCount: number;
+  totalCents: number;
+  taxableBaseCents: number;
+  vatCents: number;
+  paymentTotals: {
+    cash: number;
+    card: number;
+  };
+  items: SessionItemSummary[];
+  tickets: SessionTicketSummary[];
+}
+
 export interface PaymentResult {
   paidTicket: PaidTicket;
   workflow: TableWorkflow;

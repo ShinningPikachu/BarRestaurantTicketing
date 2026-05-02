@@ -3,22 +3,22 @@ import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   zoneGroup: {
-    marginBottom: 14,
+    marginBottom: 16,
     backgroundColor: colors.surface,
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: colors.border
   },
   zoneHeader: {
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
     paddingLeft: 2
   },
   hintText: {
-    fontSize: 11,
+    fontSize: 15,
     color: colors.textTertiary,
     marginBottom: 8,
     paddingLeft: 2
@@ -26,7 +26,7 @@ export const styles = StyleSheet.create({
   zoneBoard: {
     position: 'relative',
     width: '100%',
-    height: 220,
+    height: 300,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -40,8 +40,8 @@ export const styles = StyleSheet.create({
   },
   tableNode: {
     position: 'absolute',
-    width: 92,
-    height: 56,
+    width: 120,
+    height: 74,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.borderDark,
@@ -60,7 +60,7 @@ export const styles = StyleSheet.create({
   tableNodeText: {
     color: colors.text,
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 24,
     userSelect: 'none'
   },
   tableNodeTextSelected: {
@@ -68,7 +68,7 @@ export const styles = StyleSheet.create({
   },
   addTableButton: {
     width: '100%',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -77,11 +77,12 @@ export const styles = StyleSheet.create({
   },
   addTableButtonText: {
     color: colors.buttonSecondaryText,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontSize: 16
   },
   removeSelectedButton: {
     width: '100%',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
     backgroundColor: colors.error,
     alignItems: 'center',
@@ -92,6 +93,7 @@ export const styles = StyleSheet.create({
   },
   removeSelectedButtonText: {
     color: colors.textLight,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontSize: 16
   }
 });

@@ -16,7 +16,7 @@ import {
 import { useTicketingController } from './src/native/controllers';
 import { DesktopPosScreen, MobilePosScreen } from './src/native/components';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
-import { MenuItem, PaidTicket } from './src/native/types';
+import { MenuItem, PaidTicket, SessionSummary } from './src/native/types';
 import { apiService } from './src/native/services';
 import {
   centsToCurrency,
@@ -194,6 +194,7 @@ export default function App(): React.JSX.Element {
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
   const [menuSearchText, setMenuSearchText] = useState('');
   const [paidTickets, setPaidTickets] = useState<PaidTicket[]>([]);
+  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
   const [ticketSearchText, setTicketSearchText] = useState('');
   const [managedMenuItems, setManagedMenuItems] = useState<MenuItem[]>([]);
   const [productName, setProductName] = useState('');
@@ -282,6 +283,14 @@ export default function App(): React.JSX.Element {
       setPaidTickets(await apiService.fetchPaidTickets());
     } catch {
       Alert.alert('Error', 'No se pudo cargar el historial de tickets.');
+    }
+  }
+
+  async function loadSessionSummary(): Promise<void> {
+    try {
+      setSessionSummary(await apiService.fetchSessionSummary());
+    } catch {
+      Alert.alert('Error', 'No se pudo cargar el resumen de sesión.');
     }
   }
 
@@ -588,6 +597,7 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (activeSection === 'history') {
       void loadTicketHistory();
+      void loadSessionSummary();
     }
     if (activeSection === 'products') {
       void loadManagedProducts();
@@ -636,10 +646,42 @@ export default function App(): React.JSX.Element {
         <View style={styles.fullPanel}>
           <View style={styles.panelHeaderRow}>
             <Text style={styles.sectionTitle}>Historial de tickets</Text>
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadTicketHistory()}>
-              <Text style={styles.secondaryButtonText}>Actualizar</Text>
-            </TouchableOpacity>
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadSessionSummary()}>
+                <Text style={styles.secondaryButtonText}>Resumen sesión</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadTicketHistory()}>
+                <Text style={styles.secondaryButtonText}>Actualizar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+          {sessionSummary ? (
+            <View style={styles.sessionSummaryPanel}>
+              <View style={styles.panelHeaderRow}>
+                <View>
+                  <Text style={styles.itemName}>{`Sesión ${sessionSummary.sessionDate}`}</Text>
+                  <Text style={styles.itemPrice}>
+                    {`${formatDateTime(sessionSummary.startAt)} - ${formatDateTime(sessionSummary.endAt)} · ${sessionSummary.ticketCount} tickets`}
+                  </Text>
+                </View>
+                <Text style={styles.totalText}>{centsToCurrency(sessionSummary.totalCents)}</Text>
+              </View>
+              <View style={styles.sessionSummaryGrid}>
+                <Text style={styles.itemPrice}>{`Efectivo: ${centsToCurrency(sessionSummary.paymentTotals.cash)}`}</Text>
+                <Text style={styles.itemPrice}>{`Tarjeta: ${centsToCurrency(sessionSummary.paymentTotals.card)}`}</Text>
+                <Text style={styles.itemPrice}>{`Base: ${centsToCurrency(sessionSummary.taxableBaseCents)}`}</Text>
+                <Text style={styles.itemPrice}>{`IVA: ${centsToCurrency(sessionSummary.vatCents)}`}</Text>
+              </View>
+              <Text style={styles.subTitle}>Productos vendidos</Text>
+              {sessionSummary.items.slice(0, 8).map((item) => (
+                <View key={item.name} style={styles.sessionSummaryRow}>
+                  <Text style={styles.itemPrice}>{`${item.qty}x ${item.name}`}</Text>
+                  <Text style={styles.itemPrice}>{centsToCurrency(item.totalCents)}</Text>
+                </View>
+              ))}
+              {sessionSummary.items.length === 0 ? <Text style={styles.emptyText}>No hay ventas en esta sesión.</Text> : null}
+            </View>
+          ) : null}
           <TextInput
             style={styles.menuSearchInput}
             value={ticketSearchText}

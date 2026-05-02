@@ -402,7 +402,7 @@ export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
           </ScrollView>
         </View>
 
-        <View style={styles.column}>
+        <View style={[styles.column, styles.menuColumn]}>
           <Text style={styles.sectionTitle}>Menú</Text>
           <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
             <MenuSelector
@@ -422,7 +422,7 @@ export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
           </ScrollView>
         </View>
 
-        <View style={styles.column}>
+        <View style={[styles.column, styles.ticketColumn]}>
           <View style={styles.drawerActionRow}>
             <TouchableOpacity style={styles.secondaryButton} onPress={props.onOpenCashDrawer}>
               <Text style={styles.secondaryButtonText}>Abrir caja</Text>

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { BackendTable, MenuItem, Order, PaidTicket, PaymentMethod, PaymentResult, TableWorkflow } from '../types';
+import type { BackendTable, MenuItem, Order, PaidTicket, PaymentMethod, PaymentResult, SessionSummary, TableWorkflow } from '../types';
 import { logger } from '../utils/logger';
 
 interface ApiResponse<T = unknown> {
@@ -249,6 +249,11 @@ export class ApiService {
   async fetchPaidTickets(): Promise<PaidTicket[]> {
     const response = await fetch(`${API_BASE_URL}/tickets`);
     return parseOrThrow<PaidTicket[]>(response, 'Failed to fetch paid tickets');
+  }
+
+  async fetchSessionSummary(): Promise<SessionSummary> {
+    const response = await fetch(`${API_BASE_URL}/tickets/summary/session`);
+    return parseOrThrow<SessionSummary>(response, 'Failed to fetch session summary');
   }
 
   async printXprinterTicket(payload: {

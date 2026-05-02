@@ -3,18 +3,18 @@ import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   categoryGroup: {
-    marginBottom: 12,
+    marginBottom: 14,
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border
   },
   mobileCategoryGroup: {
-    padding: 8
+    padding: 10
   },
   categoryHeader: {
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.primaryDark,
     marginBottom: 8,
@@ -24,15 +24,15 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'flex-start',
-    gap: 8
+    gap: 10
   },
   menuItemChip: {
-    minWidth: 132,
-    width: 150,
+    minWidth: 150,
+    width: 174,
     flexDirection: 'column',
     alignItems: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -43,32 +43,32 @@ export const styles = StyleSheet.create({
     width: '48%',
     flexGrow: 1,
     flexBasis: '48%',
-    paddingHorizontal: 8,
-    paddingVertical: 8
+    paddingHorizontal: 10,
+    paddingVertical: 10
   },
   itemImage: {
     width: '100%',
-    height: 74,
+    height: 106,
     borderRadius: 8,
     backgroundColor: colors.surface,
     marginBottom: 8
   },
   mobileItemImage: {
-    height: 82,
+    height: 92,
     marginBottom: 6
   },
   itemName: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 19,
     fontWeight: '700',
     marginBottom: 4
   },
   mobileItemName: {
-    minHeight: 34,
-    fontSize: 13
+    minHeight: 40,
+    fontSize: 15
   },
   itemPrice: {
-    fontSize: 12,
+    fontSize: 17,
     color: colors.textSecondary
   }
 });

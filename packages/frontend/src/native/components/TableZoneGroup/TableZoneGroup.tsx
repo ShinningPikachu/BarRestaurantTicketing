@@ -18,9 +18,9 @@ interface DraggableTableProps {
   onDragMove: (table: TableId, nextPosition: TablePosition) => void;
 }
 
-const TABLE_WIDTH = 92;
-const TABLE_HEIGHT = 56;
-const BOARD_VISIBLE_HEIGHT = 220;
+const TABLE_WIDTH = 120;
+const TABLE_HEIGHT = 74;
+const BOARD_VISIBLE_HEIGHT = 300;
 const BOARD_PADDING = 12;
 const TABLE_GAP = 12;
 
@@ -230,4 +230,3 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
     </View>
   );
 }
-
