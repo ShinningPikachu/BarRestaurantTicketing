@@ -1,0 +1,3 @@
+name,price,cost,sku,category,description,available
+Example Sandwich,10.00,5.00,FOOD-001,Sandwiches,Example product description,true
+Example Coffee,1.50,0.40,DRINK-001,Drinks,Example drink description,true

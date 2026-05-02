@@ -201,6 +201,7 @@ export class ApiService {
   async createMenuItem(payload: {
     name: string;
     priceCents: number;
+    costCents?: number | null;
     category: string;
     sku?: string | null;
     description?: string | null;
@@ -220,6 +221,7 @@ export class ApiService {
     payload: {
       name?: string;
       priceCents?: number;
+      costCents?: number | null;
       category?: string;
       sku?: string | null;
       description?: string | null;
@@ -233,6 +235,15 @@ export class ApiService {
       body: JSON.stringify(payload)
     });
     return parseOrThrow<MenuItem>(response, 'Failed to update menu item');
+  }
+
+  async importMenuCsv(csv: string): Promise<{ created: number; updated: number; total: number }> {
+    const response = await fetch(`${API_BASE_URL}/menu/import/csv`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv })
+    });
+    return parseOrThrow<{ created: number; updated: number; total: number }>(response, 'Failed to import menu CSV');
   }
 
   async fetchPaidTickets(): Promise<PaidTicket[]> {

@@ -49,6 +49,7 @@ model MenuItem {
   id                 Int                 @id @default(autoincrement())
   name               String
   priceCents         Int
+  costCents          Int?
   sku                String?
   category           String              @default("Uncategorized")
   description        String?

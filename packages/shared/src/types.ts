@@ -57,6 +57,7 @@ export interface MenuItem {
   id: number;
   name: string;
   priceCents: number;
+  costCents?: number | null;
   sku?: string;
   category: string;
   description?: string;

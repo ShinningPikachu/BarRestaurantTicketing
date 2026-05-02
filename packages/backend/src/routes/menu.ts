@@ -4,12 +4,14 @@ import { menuService } from '../services/menu.service';
 import { errorResponse, successResponse } from '../types/api';
 import { validateBody, validateParams } from '../middleware/validation';
 import { logger } from '../utils/logger.js';
+import { parseCsvObjects } from '../utils/csv.js';
 
 const router = Router();
 
 const menuItemBodySchema = z.object({
   name: z.string().trim().min(1),
   priceCents: z.number().int().min(0),
+  costCents: z.number().int().min(0).optional().nullable(),
   category: z.string().trim().min(1),
   sku: z.string().trim().optional().nullable(),
   description: z.string().trim().optional().nullable(),
@@ -24,6 +26,52 @@ const updateMenuItemBodySchema = menuItemBodySchema.partial().refine((payload) =
 const menuItemParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
+
+const importCsvBodySchema = z.object({
+  csv: z.string().min(1),
+});
+
+function parseBoolean(value: string | undefined): boolean | undefined {
+  if (value === undefined || value.trim() === '') return undefined;
+  return ['true', '1', 'yes', 'si', 'sí'].includes(value.trim().toLowerCase());
+}
+
+function parseCents(record: Record<string, string>, centsKey: string, euroKey: string): number | null {
+  const centsValue = record[centsKey]?.trim();
+  if (centsValue) {
+    const parsed = Number(centsValue);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  const euroValue = record[euroKey]?.replace(',', '.').trim();
+  if (!euroValue) return null;
+  const parsed = Number(euroValue);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
+}
+
+function parseMenuImportCsv(csv: string) {
+  return parseCsvObjects(csv).map((record, index) => {
+    const name = record.name?.trim();
+    const category = record.category?.trim();
+    const priceCents = parseCents(record, 'priceCents', 'price');
+    const costCents = parseCents(record, 'costCents', 'cost');
+
+    if (!name || !category || priceCents === null) {
+      throw new Error(`Invalid CSV row ${index + 2}: name, category and price are required`);
+    }
+
+    return {
+      name,
+      category,
+      priceCents,
+      costCents,
+      sku: record.sku?.trim() || null,
+      description: record.description?.trim() || null,
+      imageDataUrl: record.imageDataUrl?.trim() || null,
+      available: parseBoolean(record.available),
+    };
+  });
+}
 
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -47,6 +95,21 @@ router.get('/manage/all', async (_req: Request, res: Response, next: NextFunctio
     next(error);
   }
 });
+
+router.post(
+  '/import/csv',
+  validateBody(importCsvBodySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const items = parseMenuImportCsv(req.body.csv);
+      const result = await menuService.importMenuItems(items);
+      res.json(successResponse(result));
+    } catch (error) {
+      logger.error({ error }, 'Failed to import menu CSV');
+      next(error);
+    }
+  }
+);
 
 router.post(
   '/',

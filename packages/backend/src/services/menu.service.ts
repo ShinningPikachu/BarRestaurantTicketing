@@ -1,5 +1,15 @@
 import prisma from '../db';
 
+interface MenuImportItem {
+  name: string;
+  priceCents: number;
+  costCents?: number | null;
+  category: string;
+  sku?: string | null;
+  description?: string | null;
+  available?: boolean;
+}
+
 export class MenuService {
   async getAllMenuItems() {
     return prisma.menuItem.findMany({ where: { available: true } });
@@ -22,6 +32,7 @@ export class MenuService {
   async createMenuItem(payload: {
     name: string;
     priceCents: number;
+    costCents?: number | null;
     category: string;
     sku?: string | null;
     description?: string | null;
@@ -32,6 +43,7 @@ export class MenuService {
       data: {
         name: payload.name,
         priceCents: payload.priceCents,
+        costCents: payload.costCents ?? null,
         category: payload.category,
         sku: payload.sku || null,
         description: payload.description || null,
@@ -44,6 +56,7 @@ export class MenuService {
   async updateMenuItem(id: number, payload: {
     name?: string;
     priceCents?: number;
+    costCents?: number | null;
     category?: string;
     sku?: string | null;
     description?: string | null;
@@ -54,6 +67,36 @@ export class MenuService {
       where: { id },
       data: payload
     });
+  }
+
+  async importMenuItems(items: MenuImportItem[]) {
+    let created = 0;
+    let updated = 0;
+
+    for (const item of items) {
+      const data = {
+        name: item.name,
+        priceCents: item.priceCents,
+        costCents: item.costCents ?? null,
+        category: item.category,
+        sku: item.sku || null,
+        description: item.description || null,
+        available: item.available ?? true,
+      };
+      const existing = item.sku
+        ? await prisma.menuItem.findFirst({ where: { sku: item.sku } })
+        : await prisma.menuItem.findFirst({ where: { name: item.name, category: item.category } });
+
+      if (existing) {
+        await prisma.menuItem.update({ where: { id: existing.id }, data });
+        updated += 1;
+      } else {
+        await prisma.menuItem.create({ data });
+        created += 1;
+      }
+    }
+
+    return { created, updated, total: items.length };
   }
 }
 

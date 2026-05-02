@@ -199,6 +199,7 @@ export default function App(): React.JSX.Element {
   const [productName, setProductName] = useState('');
   const [productCategory, setProductCategory] = useState('');
   const [productPrice, setProductPrice] = useState('');
+  const [productCost, setProductCost] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productDescription, setProductDescription] = useState('');
   const [productImageDataUrl, setProductImageDataUrl] = useState<string | null>(null);
@@ -294,11 +295,16 @@ export default function App(): React.JSX.Element {
 
   async function saveNewProduct(): Promise<void> {
     const priceCents = parsePriceToCents(productPrice);
+    const costCents = productCost.trim() ? parsePriceToCents(productCost) : null;
     const name = productName.trim();
     const category = productCategory.trim();
 
     if (!name || !category || priceCents === null) {
       Alert.alert('Producto no válido', 'Introduce nombre, tipo y precio válido.');
+      return;
+    }
+    if (costCents === null && productCost.trim()) {
+      Alert.alert('Coste no válido', 'Introduce un coste válido o deja el campo vacío.');
       return;
     }
 
@@ -307,6 +313,7 @@ export default function App(): React.JSX.Element {
         name,
         category,
         priceCents,
+        costCents,
         sku: productSku.trim() || null,
         description: productDescription.trim() || null,
         imageDataUrl: productImageDataUrl,
@@ -315,6 +322,7 @@ export default function App(): React.JSX.Element {
       setProductName('');
       setProductCategory('');
       setProductPrice('');
+      setProductCost('');
       setProductSku('');
       setProductDescription('');
       setProductImageDataUrl(null);
@@ -405,6 +413,22 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function updateProductCost(item: MenuItem, value: string): Promise<void> {
+    const trimmedValue = value.trim();
+    const costCents = trimmedValue ? parsePriceToCents(trimmedValue) : null;
+    if (costCents === null && trimmedValue) {
+      Alert.alert('Coste no válido', 'Introduce un coste válido o deja el campo vacío.');
+      return;
+    }
+
+    try {
+      await apiService.updateMenuItem(item.id, { costCents });
+      await loadManagedProducts();
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar el coste interno.');
+    }
+  }
+
   async function updateProductCategory(item: MenuItem, category: string): Promise<void> {
     const nextCategory = category.trim();
     if (!nextCategory) {
@@ -419,6 +443,31 @@ export default function App(): React.JSX.Element {
     } catch {
       Alert.alert('Error', 'No se pudo actualizar el tipo.');
     }
+  }
+
+  function importProductsCsv(): void {
+    if (Platform.OS !== 'web') {
+      Alert.alert('Importación CSV', 'Importa CSV desde la pantalla de ordenador.');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      file.text()
+        .then(async (csv) => {
+          const result = await apiService.importMenuCsv(csv);
+          Alert.alert('CSV importado', `${result.created} creados, ${result.updated} actualizados.`);
+          await loadManagedProducts();
+          await actions.reloadMenu();
+        })
+        .catch(() => Alert.alert('Error', 'No se pudo importar el CSV.'));
+    };
+    input.click();
   }
 
   function downloadTicket(ticket: PaidTicket): void {
@@ -622,10 +671,17 @@ export default function App(): React.JSX.Element {
       {activeSection === 'products' ? (
         <View style={styles.fullPanel}>
           <Text style={styles.sectionTitle}>Productos</Text>
+          <View style={styles.panelHeaderRow}>
+            <Text style={styles.helperText}>CSV recomendado: name, price, cost, sku, category, description, available</Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={importProductsCsv}>
+              <Text style={styles.secondaryButtonText}>Importar CSV</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.productForm}>
             <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="Nombre" placeholderTextColor="#6B7280" />
             <TextInput style={styles.formInput} value={productCategory} onChangeText={setProductCategory} placeholder="Tipo / categoría" placeholderTextColor="#6B7280" />
             <TextInput style={styles.formInput} value={productPrice} onChangeText={setProductPrice} placeholder="Precio" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
+            <TextInput style={styles.formInput} value={productCost} onChangeText={setProductCost} placeholder="Coste interno" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
             <TextInput style={styles.formInput} value={productSku} onChangeText={setProductSku} placeholder="SKU opcional" placeholderTextColor="#6B7280" />
             <TextInput style={[styles.formInput, styles.formInputWide]} value={productDescription} onChangeText={setProductDescription} placeholder="Descripción opcional" placeholderTextColor="#6B7280" />
             <View style={styles.productImagePicker}>
@@ -683,6 +739,15 @@ export default function App(): React.JSX.Element {
                   keyboardType="decimal-pad"
                   onSubmitEditing={(event) => void updateProductPrice(item, event.nativeEvent.text)}
                   onEndEditing={(event) => void updateProductPrice(item, event.nativeEvent.text)}
+                />
+                <TextInput
+                  style={styles.priceInput}
+                  defaultValue={item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : ''}
+                  keyboardType="decimal-pad"
+                  placeholder="Coste"
+                  placeholderTextColor="#6B7280"
+                  onSubmitEditing={(event) => void updateProductCost(item, event.nativeEvent.text)}
+                  onEndEditing={(event) => void updateProductCost(item, event.nativeEvent.text)}
                 />
                 <TouchableOpacity style={styles.secondaryButton} onPress={() => void updateProductImage(item)}>
                   <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
