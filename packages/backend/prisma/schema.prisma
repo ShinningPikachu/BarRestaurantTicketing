@@ -8,69 +8,70 @@ datasource db {
 }
 
 model Table {
-  id     Int     @id @default(autoincrement())
-  number Int
-  zone   String?
-  seats  Int?    @default(4)
-  name   String?
-  orders Order[]
+  id               Int               @id @default(autoincrement())
+  number           Int
+  zone             String?
+  seats            Int?              @default(4)
+  name             String?
+  orders           Order[]
   preOrderSessions PreOrderSession[]
-  kitchenTickets KitchenTicket[]
-  
+  kitchenTickets   KitchenTicket[]
+
   @@unique([number, zone])
 }
 
 model Order {
-  id         String      @id @default(cuid())
-  tableId    Int
-  table      Table       @relation(fields: [tableId], references: [id])
-  status     String      @default("open")
-  totalCents Int         @default(0)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  items      OrderItem[]
-  payments   Payment[]
+  id             String          @id @default(cuid())
+  tableId        Int
+  table          Table           @relation(fields: [tableId], references: [id])
+  status         String          @default("open")
+  totalCents     Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  items          OrderItem[]
+  payments       Payment[]
   kitchenTickets KitchenTicket[]
 }
 
 model OrderItem {
-  id               Int     @id @default(autoincrement())
-  orderId          String
-  order            Order   @relation(fields: [orderId], references: [id])
-  menuItemId       Int?
-  menuItem         MenuItem? @relation(fields: [menuItemId], references: [id])
-  name             String
-  qty              Int
-  unitPriceCents   Int     @default(0)
-  totalPriceCents  Int     @default(0)
+  id              Int       @id @default(autoincrement())
+  orderId         String
+  order           Order     @relation(fields: [orderId], references: [id])
+  menuItemId      Int?
+  menuItem        MenuItem? @relation(fields: [menuItemId], references: [id])
+  name            String
+  qty             Int
+  unitPriceCents  Int       @default(0)
+  totalPriceCents Int       @default(0)
 }
 
 model MenuItem {
-  id          Int     @id @default(autoincrement())
-  name        String
-  priceCents  Int
-  sku         String?
-  category    String  @default("Uncategorized")
-  description String?
-  available   Boolean @default(true)
-  orderItems OrderItem[]
-  preOrderItems PreOrderItem[]
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  priceCents         Int
+  sku                String?
+  category           String              @default("Uncategorized")
+  description        String?
+  imageDataUrl       String?
+  available          Boolean             @default(true)
+  orderItems         OrderItem[]
+  preOrderItems      PreOrderItem[]
   kitchenTicketItems KitchenTicketItem[]
 }
 
 model User {
-  id    Int    @id @default(autoincrement())
-  name  String
-  role  String @default("staff")
+  id   Int    @id @default(autoincrement())
+  name String
+  role String @default("staff")
 }
 
 model Payment {
-  id        Int      @id @default(autoincrement())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id])
+  id          Int      @id @default(autoincrement())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
   amountCents Int
-  method    String?
-  createdAt DateTime @default(now())
+  method      String?
+  createdAt   DateTime @default(now())
 }
 
 model PaidTicket {
@@ -106,12 +107,12 @@ model PaidTicketItem {
 }
 
 model PreOrderSession {
-  id        String        @id @default(cuid())
+  id        String         @id @default(cuid())
   tableId   Int
-  table     Table         @relation(fields: [tableId], references: [id])
-  status    String        @default("draft")
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  table     Table          @relation(fields: [tableId], references: [id])
+  status    String         @default("draft")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
   items     PreOrderItem[]
 
   @@index([tableId, status])
@@ -130,13 +131,13 @@ model PreOrderItem {
 }
 
 model KitchenTicket {
-  id        String             @id @default(cuid())
+  id        String              @id @default(cuid())
   orderId   String
-  order     Order              @relation(fields: [orderId], references: [id])
+  order     Order               @relation(fields: [orderId], references: [id])
   tableId   Int
-  table     Table              @relation(fields: [tableId], references: [id])
-  status    String             @default("queued")
-  createdAt DateTime           @default(now())
+  table     Table               @relation(fields: [tableId], references: [id])
+  status    String              @default("queued")
+  createdAt DateTime            @default(now())
   items     KitchenTicketItem[]
 
   @@index([tableId, status])

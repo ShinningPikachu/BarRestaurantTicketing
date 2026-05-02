@@ -67,6 +67,83 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 12
   },
+  mobilePosScreen: {
+    flex: 1,
+    minHeight: 0,
+    gap: 10
+  },
+  mobileTopPanel: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 10
+  },
+  mobileTicketPanel: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 10
+  },
+  mobileTopHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8
+  },
+  mobileContextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8
+  },
+  mobileContextText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  mobileModeSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.buttonSecondary
+  },
+  mobileModeButton: {
+    minWidth: 76,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: 'center'
+  },
+  mobileModeButtonSelected: {
+    backgroundColor: colors.primary
+  },
+  mobileModeButtonText: {
+    color: colors.buttonSecondaryText,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  mobileModeButtonTextSelected: {
+    color: colors.textLight
+  },
+  mobileTopScroll: {
+    flex: 1
+  },
   homeGrid: {
     flex: 1,
     flexDirection: 'row',
@@ -138,6 +215,30 @@ export const styles = StyleSheet.create({
     minWidth: 260,
     flex: 1
   },
+  productImagePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  productImagePreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt
+  },
+  productImagePlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -148,6 +249,24 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     padding: 10,
     marginBottom: 8
+  },
+  productRowImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface
+  },
+  productRowImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   columnScroll: {
     flex: 1

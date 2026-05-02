@@ -10,6 +10,9 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  mobileCategoryGroup: {
+    padding: 8
+  },
   categoryHeader: {
     fontSize: 12,
     fontWeight: '700',
@@ -25,6 +28,7 @@ export const styles = StyleSheet.create({
   },
   menuItemChip: {
     minWidth: 132,
+    width: 150,
     flexDirection: 'column',
     alignItems: 'flex-start',
     paddingHorizontal: 10,
@@ -34,11 +38,34 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  mobileMenuItemChip: {
+    minWidth: 0,
+    width: '48%',
+    flexGrow: 1,
+    flexBasis: '48%',
+    paddingHorizontal: 8,
+    paddingVertical: 8
+  },
+  itemImage: {
+    width: '100%',
+    height: 74,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    marginBottom: 8
+  },
+  mobileItemImage: {
+    height: 82,
+    marginBottom: 6
+  },
   itemName: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 4
+  },
+  mobileItemName: {
+    minHeight: 34,
+    fontSize: 13
   },
   itemPrice: {
     fontSize: 12,

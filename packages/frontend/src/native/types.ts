@@ -52,6 +52,7 @@ export interface MenuItem {
   sku?: string;
   category: string;
   description?: string;
+  imageDataUrl?: string | null;
   available?: boolean;
 }
 

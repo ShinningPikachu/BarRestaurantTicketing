@@ -4,6 +4,16 @@
     "slug": "bar-restaurant-ticketing",
     "version": "1.0.0",
     "orientation": "portrait",
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Usamos la cámara para hacer fotos de productos del menú."
+      }
+    },
+    "android": {
+      "permissions": [
+        "CAMERA"
+      ]
+    },
     "assetBundlePatterns": [
       "**/*"
     ]

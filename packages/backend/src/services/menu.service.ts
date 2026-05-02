@@ -25,6 +25,7 @@ export class MenuService {
     category: string;
     sku?: string | null;
     description?: string | null;
+    imageDataUrl?: string | null;
     available?: boolean;
   }) {
     return prisma.menuItem.create({
@@ -34,6 +35,7 @@ export class MenuService {
         category: payload.category,
         sku: payload.sku || null,
         description: payload.description || null,
+        imageDataUrl: payload.imageDataUrl || null,
         available: payload.available ?? true,
       }
     });
@@ -45,6 +47,7 @@ export class MenuService {
     category?: string;
     sku?: string | null;
     description?: string | null;
+    imageDataUrl?: string | null;
     available?: boolean;
   }) {
     return prisma.menuItem.update({

@@ -1,19 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Alert,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from 'react-native';
 import { useTicketingController } from './src/native/controllers';
-import { TableZoneGroup, MenuCategoryGroup } from './src/native/components';
+import { DesktopPosScreen, MobilePosScreen } from './src/native/components';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
-import { OrderSection } from './src/native/components/OrderZone/OrderSection';
-import { MenuItem, PaidTicket, TABLE_ZONES, TableZone } from './src/native/types';
+import { MenuItem, PaidTicket } from './src/native/types';
 import { apiService } from './src/native/services';
 import {
   centsToCurrency,
@@ -23,7 +26,75 @@ import { styles } from './src/native/app/App.styles';
 
 const MIN_SEARCH_LENGTH = 2;
 const MAX_SEARCH_RESULTS = 24;
+const PRODUCT_IMAGE_MAX_SIZE = 512;
+const PRODUCT_IMAGE_QUALITY = 0.82;
 type AppSection = 'home' | 'pos' | 'history' | 'products';
+
+interface ExpoLikeGlobal {
+  process?: {
+    env?: {
+      EXPO_PUBLIC_TPV_SCREEN?: string;
+    };
+  };
+}
+
+function resizeImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.onload = () => {
+      const source = String(reader.result ?? '');
+      const image = new window.Image();
+      image.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
+      image.onload = () => {
+        const scale = Math.min(1, PRODUCT_IMAGE_MAX_SIZE / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('No se pudo preparar la imagen.'));
+          return;
+        }
+
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', PRODUCT_IMAGE_QUALITY));
+      };
+      image.src = source;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function resizeNativeImage(uri: string, width?: number, height?: number): Promise<string> {
+  const largestSide = Math.max(width ?? 0, height ?? 0);
+  const resizeAction = largestSide > PRODUCT_IMAGE_MAX_SIZE && width && height
+    ? [{
+        resize: width >= height
+          ? { width: PRODUCT_IMAGE_MAX_SIZE }
+          : { height: PRODUCT_IMAGE_MAX_SIZE }
+      }]
+    : [];
+
+  const image = await ImageManipulator.manipulateAsync(
+    uri,
+    resizeAction,
+    {
+      compress: PRODUCT_IMAGE_QUALITY,
+      format: ImageManipulator.SaveFormat.JPEG,
+      base64: true,
+    }
+  );
+
+  if (!image.base64) {
+    throw new Error('No se pudo convertir la imagen.');
+  }
+
+  return `data:image/jpeg;base64,${image.base64}`;
+}
 
 function normalizeSearchText(value: string | null | undefined): string {
   return (value ?? '')
@@ -118,6 +189,7 @@ function buildPaidTicketHtml(ticket: PaidTicket): string {
 
 export default function App(): React.JSX.Element {
   const { state, actions } = useTicketingController();
+  const { width } = useWindowDimensions();
   const [activeSection, setActiveSection] = useState<AppSection>('home');
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
   const [menuSearchText, setMenuSearchText] = useState('');
@@ -129,6 +201,7 @@ export default function App(): React.JSX.Element {
   const [productPrice, setProductPrice] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productDescription, setProductDescription] = useState('');
+  const [productImageDataUrl, setProductImageDataUrl] = useState<string | null>(null);
   const {
     loading,
     tables,
@@ -186,6 +259,12 @@ export default function App(): React.JSX.Element {
     () => Array.from(new Set(managedMenuItems.map((item) => item.category))).sort((a, b) => a.localeCompare(b)),
     [managedMenuItems]
   );
+  const forcedTpvScreen = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TPV_SCREEN;
+  const useMobilePosLayout = forcedTpvScreen === 'mobile'
+    ? true
+    : forcedTpvScreen === 'desktop'
+      ? false
+      : Platform.OS !== 'web' || width < 760;
 
   useEffect(() => {
     if (!visibleMenuCategory) {
@@ -230,6 +309,7 @@ export default function App(): React.JSX.Element {
         priceCents,
         sku: productSku.trim() || null,
         description: productDescription.trim() || null,
+        imageDataUrl: productImageDataUrl,
         available: true,
       });
       setProductName('');
@@ -237,10 +317,75 @@ export default function App(): React.JSX.Element {
       setProductPrice('');
       setProductSku('');
       setProductDescription('');
+      setProductImageDataUrl(null);
       await loadManagedProducts();
       await actions.reloadMenu();
     } catch {
       Alert.alert('Error', 'No se pudo crear el producto.');
+    }
+  }
+
+  async function chooseProductImage(onSelected: (imageDataUrl: string) => void): Promise<void> {
+    if (Platform.OS !== 'web') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permiso de cámara', 'Activa el permiso de cámara para hacer la foto del producto.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: PRODUCT_IMAGE_QUALITY,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+
+      try {
+        const asset = result.assets[0];
+        onSelected(await resizeNativeImage(asset.uri, asset.width, asset.height));
+      } catch {
+        Alert.alert('Error', 'No se pudo preparar la imagen.');
+      }
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      resizeImageFile(file)
+        .then(onSelected)
+        .catch(() => Alert.alert('Error', 'No se pudo preparar la imagen.'));
+    };
+    input.click();
+  }
+
+  async function updateProductImage(item: MenuItem): Promise<void> {
+    await chooseProductImage((imageDataUrl) => {
+      void (async () => {
+        try {
+          await apiService.updateMenuItem(item.id, { imageDataUrl });
+          await loadManagedProducts();
+          await actions.reloadMenu();
+        } catch {
+          Alert.alert('Error', 'No se pudo guardar la imagen del producto.');
+        }
+      })();
+    });
+  }
+
+  async function removeProductImage(item: MenuItem): Promise<void> {
+    try {
+      await apiService.updateMenuItem(item.id, { imageDataUrl: null });
+      await loadManagedProducts();
+      await actions.reloadMenu();
+    } catch {
+      Alert.alert('Error', 'No se pudo quitar la imagen del producto.');
     }
   }
 
@@ -299,6 +444,85 @@ export default function App(): React.JSX.Element {
     link.click();
     urlApi.revokeObjectURL(url);
   }
+
+  const orderSectionProps = {
+    selectedTable,
+    preorderItems,
+    tableOrders: tableConfirmedOrders,
+    menuByCategory,
+    preorderTotal,
+    priceDraftByItemId,
+    getMenuTitleById,
+    formatPrice: centsToCurrency,
+    onRemovePendingItem: (itemId: number) => {
+      void actions.decrementPendingItem(itemId);
+    },
+    onAddPendingItem: (itemId: number) => {
+      void actions.incrementPendingItem(itemId);
+    },
+    onUpdatePriceDraft: actions.updatePriceDraft,
+    onCommitPriceDraft: (itemId: number) => {
+      void actions.commitPriceDraft(itemId);
+    },
+    onAdjustItemPrice: (itemId: number, deltaCents: number) => {
+      void actions.adjustItemPrice(itemId, deltaCents);
+    },
+    onConfirmOrder: () => {
+      void actions.sendToKitchen();
+    },
+    onClearPreOrder: () => {
+      void actions.clearPreOrder();
+    },
+    onPrintTicket: (options?: Parameters<typeof actions.printTicket>[0]) => {
+      void actions.printTicket(options);
+    },
+    onPayTicket: (method: Parameters<typeof actions.payTable>[0], splitPeople?: number) => {
+      void actions.payTable(method, splitPeople);
+    },
+    onPaySelectedItems: (
+      method: Parameters<typeof actions.paySelectedItems>[0],
+      items: Parameters<typeof actions.paySelectedItems>[1]
+    ) => {
+      void actions.paySelectedItems(method, items);
+    },
+    onRemoveOrder: (orderId: string) => {
+      void actions.removeOrder(orderId);
+    },
+    onMoveConfirmedItemToPreOrder: (
+      orderId: Parameters<typeof actions.moveConfirmedItemToPreOrder>[0],
+      item: Parameters<typeof actions.moveConfirmedItemToPreOrder>[1]
+    ) => {
+      void actions.moveConfirmedItemToPreOrder(orderId, item);
+    },
+  };
+
+  const posScreenProps = {
+    tables,
+    selectedTable,
+    menuCategories,
+    visibleMenuCategory,
+    menuSearchText,
+    normalizedMenuSearch,
+    displayedMenuCategory,
+    displayedMenuItems,
+    minSearchLength: MIN_SEARCH_LENGTH,
+    orderSectionProps,
+    onMenuSearchTextChange: setMenuSearchText,
+    onSelectMenuCategory: setSelectedMenuCategory,
+    onSelectTable: (table: typeof selectedTable) => {
+      void actions.selectTable(table);
+    },
+    onAddTable: (zone: Parameters<typeof actions.addTable>[0]) => {
+      void actions.addTable(zone);
+    },
+    onRemoveTable: (table: typeof selectedTable) => {
+      void actions.removeTable(table);
+    },
+    onAddMenuItem: (menuId: number) => {
+      void actions.addMenuItem(menuId);
+    },
+    formatPrice: centsToCurrency,
+  };
 
   useEffect(() => {
     if (activeSection === 'history') {
@@ -392,6 +616,23 @@ export default function App(): React.JSX.Element {
             <TextInput style={styles.formInput} value={productPrice} onChangeText={setProductPrice} placeholder="Precio" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
             <TextInput style={styles.formInput} value={productSku} onChangeText={setProductSku} placeholder="SKU opcional" placeholderTextColor="#6B7280" />
             <TextInput style={[styles.formInput, styles.formInputWide]} value={productDescription} onChangeText={setProductDescription} placeholder="Descripción opcional" placeholderTextColor="#6B7280" />
+            <View style={styles.productImagePicker}>
+              {productImageDataUrl ? (
+                <Image source={{ uri: productImageDataUrl }} style={styles.productImagePreview} resizeMode="contain" />
+              ) : (
+                <View style={styles.productImagePlaceholder}>
+                  <Text style={styles.itemPrice}>Imagen</Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => void chooseProductImage(setProductImageDataUrl)}>
+                <Text style={styles.secondaryButtonText}>{productImageDataUrl ? 'Cambiar imagen' : Platform.OS === 'web' ? 'Añadir imagen' : 'Hacer foto'}</Text>
+              </TouchableOpacity>
+              {productImageDataUrl ? (
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => setProductImageDataUrl(null)}>
+                  <Text style={styles.secondaryButtonText}>Quitar</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <TouchableOpacity style={styles.primaryButton} onPress={() => void saveNewProduct()}>
               <Text style={styles.primaryButtonText}>Añadir producto</Text>
             </TouchableOpacity>
@@ -406,6 +647,13 @@ export default function App(): React.JSX.Element {
           <ScrollView style={styles.columnScroll}>
             {managedMenuItems.map((item) => (
               <View key={item.id} style={styles.productRow}>
+                {item.imageDataUrl ? (
+                  <Image source={{ uri: item.imageDataUrl }} style={styles.productRowImage} resizeMode="contain" />
+                ) : (
+                  <View style={styles.productRowImagePlaceholder}>
+                    <Text style={styles.itemPrice}>Sin imagen</Text>
+                  </View>
+                )}
                 <View style={styles.flex1}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   <TextInput
@@ -424,140 +672,26 @@ export default function App(): React.JSX.Element {
                   onSubmitEditing={(event) => void updateProductPrice(item, event.nativeEvent.text)}
                   onEndEditing={(event) => void updateProductPrice(item, event.nativeEvent.text)}
                 />
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => void updateProductImage(item)}>
+                  <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
+                </TouchableOpacity>
+                {item.imageDataUrl ? (
+                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void removeProductImage(item)}>
+                    <Text style={styles.secondaryButtonText}>Quitar</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ))}
           </ScrollView>
         </View>
       ) : null}
 
-      {activeSection === 'pos' ? (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.columnsScroll}
-        contentContainerStyle={styles.columnsContent}
-      >
-        <View style={styles.columns}>
-          <View style={[styles.column, styles.tablesColumn]}>
-            <Text style={styles.sectionTitle}>Mesas</Text>
-            <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
-              {TABLE_ZONES.map((zone: TableZone) => {
-                const numbers = tables.get(zone) ?? [];
-                return (
-                  <TableZoneGroup
-                    key={zone}
-                    zone={zone}
-                    numbers={numbers}
-                    selectedTable={selectedTable}
-                    onSelectTable={(table) => {
-                      void actions.selectTable(table);
-                    }}
-                    onAddTable={(zoneValue) => {
-                      void actions.addTable(zoneValue);
-                    }}
-                    onRemoveTable={(table) => {
-                      void actions.removeTable(table);
-                    }}
-                  />
-                );
-              })}
-            </ScrollView>
-          </View>
+      {activeSection === 'pos' && useMobilePosLayout ? (
+        <MobilePosScreen {...posScreenProps} />
+      ) : null}
 
-          <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Menú</Text>
-            <TextInput
-              style={styles.menuSearchInput}
-              value={menuSearchText}
-              onChangeText={setMenuSearchText}
-              placeholder="Buscar producto"
-              placeholderTextColor="#6B7280"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-            />
-            <View style={styles.menuTypeSelector}>
-              {menuCategories.map((category) => {
-                const isSelected = category === visibleMenuCategory;
-                return (
-                  <TouchableOpacity
-                    key={category}
-                    style={[styles.menuTypeButton, isSelected && styles.menuTypeButtonSelected]}
-                    onPress={() => setSelectedMenuCategory(category)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.menuTypeButtonText, isSelected && styles.menuTypeButtonTextSelected]}>
-                      {translateCategory(category)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
-              {normalizedMenuSearch.length > 0 && normalizedMenuSearch.length < MIN_SEARCH_LENGTH ? (
-                <Text style={styles.emptyText}>Escribe al menos 2 letras para buscar.</Text>
-              ) : displayedMenuCategory ? (
-                <MenuCategoryGroup
-                  category={displayedMenuCategory}
-                  items={displayedMenuItems}
-                  onSelectItem={(menuId) => {
-                    void actions.addMenuItem(menuId);
-                  }}
-                  formatPrice={centsToCurrency}
-                />
-              ) : (
-                <Text style={styles.emptyText}>No hay productos disponibles.</Text>
-              )}
-            </ScrollView>
-          </View>
-
-          <View style={styles.column}>
-            <OrderSection
-              selectedTable={selectedTable}
-              preorderItems={preorderItems}
-              tableOrders={tableConfirmedOrders}
-              menuByCategory={menuByCategory}
-              preorderTotal={preorderTotal}
-              priceDraftByItemId={priceDraftByItemId}
-              getMenuTitleById={getMenuTitleById}
-              formatPrice={centsToCurrency}
-              onRemovePendingItem={(itemId) => {
-                void actions.decrementPendingItem(itemId);
-              }}
-              onAddPendingItem={(itemId) => {
-                void actions.incrementPendingItem(itemId);
-              }}
-              onUpdatePriceDraft={actions.updatePriceDraft}
-              onCommitPriceDraft={(itemId) => {
-                void actions.commitPriceDraft(itemId);
-              }}
-              onAdjustItemPrice={(itemId, deltaCents) => {
-                void actions.adjustItemPrice(itemId, deltaCents);
-              }}
-              onConfirmOrder={() => {
-                void actions.sendToKitchen();
-              }}
-              onClearPreOrder={() => {
-                void actions.clearPreOrder();
-              }}
-              onPrintTicket={(options) => {
-                void actions.printTicket(options);
-              }}
-              onPayTicket={(method, splitPeople) => {
-                void actions.payTable(method, splitPeople);
-              }}
-              onPaySelectedItems={(method, items) => {
-                void actions.paySelectedItems(method, items);
-              }}
-              onRemoveOrder={(orderId) => {
-                void actions.removeOrder(orderId);
-              }}
-              onMoveConfirmedItemToPreOrder={(orderId, item) => {
-                void actions.moveConfirmedItemToPreOrder(orderId, item);
-              }}
-            />
-          </View>
-        </View>
-      </ScrollView>
+      {activeSection === 'pos' && !useMobilePosLayout ? (
+        <DesktopPosScreen {...posScreenProps} />
       ) : null}
     </SafeAreaView>
   );

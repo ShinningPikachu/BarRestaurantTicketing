@@ -204,6 +204,7 @@ export class ApiService {
     category: string;
     sku?: string | null;
     description?: string | null;
+    imageDataUrl?: string | null;
     available?: boolean;
   }): Promise<MenuItem> {
     const response = await fetch(`${API_BASE_URL}/menu`, {
@@ -222,6 +223,7 @@ export class ApiService {
       category?: string;
       sku?: string | null;
       description?: string | null;
+      imageDataUrl?: string | null;
       available?: boolean;
     }
   ): Promise<MenuItem> {

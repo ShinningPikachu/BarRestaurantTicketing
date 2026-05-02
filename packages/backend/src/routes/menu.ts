@@ -13,6 +13,7 @@ const menuItemBodySchema = z.object({
   category: z.string().trim().min(1),
   sku: z.string().trim().optional().nullable(),
   description: z.string().trim().optional().nullable(),
+  imageDataUrl: z.string().trim().max(1_500_000).startsWith('data:image/').optional().nullable(),
   available: z.boolean().optional(),
 });
 
