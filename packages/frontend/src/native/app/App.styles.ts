@@ -50,30 +50,36 @@ export const styles = StyleSheet.create({
   },
   tablesColumn: {
     flex: 1.55,
+    flexBasis: 560,
     minWidth: 560
   },
   menuColumn: {
     flex: 0.8,
-    minWidth: 290
+    flexBasis: 330,
+    minWidth: 330
   },
   ticketColumn: {
     flex: 0.9,
+    flexBasis: 330,
     minWidth: 330
   },
   columns: {
     flex: 1,
     flexDirection: 'row',
     gap: 14,
+    width: '100%',
     minWidth: 1220
   },
   column: {
     flex: 1,
+    flexShrink: 0,
     minHeight: 0,
     backgroundColor: colors.surface,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14
+    padding: 14,
+    overflow: 'hidden'
   },
   mobilePosScreen: {
     flex: 1,
@@ -629,6 +635,21 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 4
+  },
+  splitTicketControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0
+  },
+  splitTicketLabel: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  splitPeopleInput: {
+    width: 56,
+    paddingHorizontal: 6
   },
   ticketModule: {
     borderWidth: 1,

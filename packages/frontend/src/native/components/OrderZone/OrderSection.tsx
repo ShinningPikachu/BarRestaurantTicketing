@@ -276,17 +276,19 @@ export function OrderSection({
           <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => onPayTicket('card')}>
             <Text style={styles.secondaryButtonText}>Pagar tarjeta</Text>
           </TouchableOpacity>
-          <Text style={styles.compactLabel}>Comensales</Text>
-          <TextInput
-            style={styles.smallNumberInput}
-            keyboardType="number-pad"
-            value={splitPeopleText}
-            onChangeText={setSplitPeopleText}
-            placeholder="2"
-          />
-          <TouchableOpacity style={styles.compactSecondaryButton} onPress={handlePrintDividedTicket}>
-            <Text style={styles.secondaryButtonText}>Imprimir dividido</Text>
-          </TouchableOpacity>
+          <View style={styles.splitTicketControls}>
+            <Text style={styles.splitTicketLabel}>Comensales</Text>
+            <TextInput
+              style={[styles.smallNumberInput, styles.splitPeopleInput]}
+              keyboardType="number-pad"
+              value={splitPeopleText}
+              onChangeText={setSplitPeopleText}
+              placeholder="2"
+            />
+            <TouchableOpacity style={styles.compactSecondaryButton} onPress={handlePrintDividedTicket}>
+              <Text style={styles.secondaryButtonText}>Imprimir dividido</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 

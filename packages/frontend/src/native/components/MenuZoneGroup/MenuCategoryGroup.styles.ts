@@ -3,12 +3,15 @@ import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   categoryGroup: {
+    width: '100%',
+    maxWidth: '100%',
     marginBottom: 14,
     borderRadius: 8,
     padding: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: colors.border,
+    overflow: 'hidden'
   },
   mobileCategoryGroup: {
     padding: 10
@@ -21,6 +24,7 @@ export const styles = StyleSheet.create({
     paddingLeft: 2
   },
   itemsWrap: {
+    maxWidth: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'flex-start',
@@ -29,6 +33,8 @@ export const styles = StyleSheet.create({
   menuItemChip: {
     minWidth: 150,
     width: 174,
+    maxWidth: '100%',
+    flexShrink: 1,
     flexDirection: 'column',
     alignItems: 'flex-start',
     paddingHorizontal: 14,
@@ -58,6 +64,7 @@ export const styles = StyleSheet.create({
     marginBottom: 6
   },
   itemName: {
+    maxWidth: '100%',
     color: colors.text,
     fontSize: 19,
     fontWeight: '700',
