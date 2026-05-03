@@ -43,6 +43,7 @@ export const styles = StyleSheet.create({
   },
   columnsContent: {
     flexGrow: 1,
+    width: '100%',
     paddingBottom: 16
   },
   columnsScroll: {
@@ -50,17 +51,17 @@ export const styles = StyleSheet.create({
   },
   tablesColumn: {
     flex: 1.55,
-    flexBasis: 560,
+    flexBasis: 0,
     minWidth: 560
   },
   menuColumn: {
     flex: 0.8,
-    flexBasis: 330,
-    minWidth: 330
+    flexBasis: 0,
+    minWidth: 290
   },
   ticketColumn: {
     flex: 0.9,
-    flexBasis: 330,
+    flexBasis: 0,
     minWidth: 330
   },
   columns: {
@@ -72,14 +73,12 @@ export const styles = StyleSheet.create({
   },
   column: {
     flex: 1,
-    flexShrink: 0,
     minHeight: 0,
     backgroundColor: colors.surface,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    overflow: 'hidden'
+    padding: 14
   },
   mobilePosScreen: {
     flex: 1,
@@ -292,6 +291,23 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     padding: 12,
     marginBottom: 8
+  },
+  historyInlineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end'
+  },
+  historyToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10
+  },
+  historySearchInput: {
+    flex: 1,
+    marginBottom: 0
   },
   sessionSummaryPanel: {
     borderWidth: 1,

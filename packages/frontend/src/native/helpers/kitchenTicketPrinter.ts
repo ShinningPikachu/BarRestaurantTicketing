@@ -31,7 +31,7 @@ type ExpoLikeGlobal = typeof globalThis & {
   };
 };
 
-interface SimplifiedInvoiceConfig {
+export interface SimplifiedInvoiceConfig {
   businessName: string;
   tradeName: string;
   nif: string;
@@ -42,7 +42,7 @@ interface SimplifiedInvoiceConfig {
   vatRatePercent: number;
 }
 
-function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
+export function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
   const env = (globalThis as ExpoLikeGlobal).process?.env;
   const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
 
@@ -112,7 +112,7 @@ function shouldUseXprinterBridge(): boolean {
     || env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-usb';
 }
 
-function getOptionalXprinterTarget(): {
+export function getOptionalXprinterTarget(): {
   printerHost?: string;
   printerPort?: number;
   printerName?: string;

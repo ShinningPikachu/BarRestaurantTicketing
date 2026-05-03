@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import {
   Alert,
   Image,
@@ -16,8 +18,9 @@ import {
 import { useTicketingController } from './src/native/controllers';
 import { DesktopPosScreen, MobilePosScreen } from './src/native/components';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
-import { MenuItem, PaidTicket, SessionSummary } from './src/native/types';
+import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
 import { apiService } from './src/native/services';
+import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import {
   centsToCurrency,
   getMenuTitleById
@@ -142,11 +145,20 @@ function formatDateTime(value: string): string {
   });
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function buildPaidTicketHtml(ticket: PaidTicket): string {
   const rows = ticket.items.map((item) => `
     <tr>
       <td>${item.qty}</td>
-      <td>${item.name}</td>
+      <td>${escapeHtml(item.name)}</td>
       <td>${centsToCurrency(item.unitPriceCents)}</td>
       <td>${centsToCurrency(item.totalPriceCents)}</td>
     </tr>`).join('');
@@ -167,12 +179,13 @@ function buildPaidTicketHtml(ticket: PaidTicket): string {
     .totals { margin-top: 12px; font-size: 13px; }
     .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
     .total { font-weight: 700; font-size: 15px; border-top: 1px solid #111827; padding-top: 8px; }
+    @page { size: A4; margin: 18mm; }
   </style>
 </head>
 <body>
   <section class="ticket">
-    <h1>Factura simplificada ${ticket.ticketNumber}</h1>
-    <div class="meta">Mesa ${ticket.tableZone}-${ticket.tableNumber} · ${formatDateTime(ticket.createdAt)} · ${ticket.method === 'cash' ? 'Efectivo' : 'Tarjeta'}</div>
+    <h1>Factura simplificada ${escapeHtml(ticket.ticketNumber)}</h1>
+    <div class="meta">Mesa ${escapeHtml(ticket.tableZone)}-${ticket.tableNumber} · ${formatDateTime(ticket.createdAt)} · ${ticket.method === 'cash' ? 'Efectivo' : 'Tarjeta'}</div>
     <table>
       <thead><tr><th>Ud.</th><th>Producto</th><th>Precio</th><th>Total</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -286,9 +299,18 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  async function loadSessionSummary(): Promise<void> {
+  async function refreshSessionSummary(showFeedback = false): Promise<void> {
     try {
-      setSessionSummary(await apiService.fetchSessionSummary());
+      const summary = await apiService.fetchSessionSummary();
+      setSessionSummary(summary);
+      if (showFeedback) {
+        Alert.alert(
+          'Resumen actualizado',
+          summary.ticketCount > 0
+            ? `${summary.ticketCount} tickets · ${centsToCurrency(summary.totalCents)}`
+            : 'No hay ventas en la sesión actual.'
+        );
+      }
     } catch {
       Alert.alert('Error', 'No se pudo cargar el resumen de sesión.');
     }
@@ -479,28 +501,82 @@ export default function App(): React.JSX.Element {
     input.click();
   }
 
-  function downloadTicket(ticket: PaidTicket): void {
+  async function downloadTicket(ticket: PaidTicket): Promise<void> {
     const html = buildPaidTicketHtml(ticket);
-    if (Platform.OS !== 'web') {
-      Alert.alert('Descarga no disponible', 'La descarga directa está disponible en la versión web.');
+
+    if (Platform.OS === 'web') {
+      const windowRef = (globalThis as typeof globalThis & { window?: Window }).window;
+      const printWindow = windowRef?.open('', '_blank', 'width=820,height=900');
+      if (!printWindow) {
+        Alert.alert('PDF bloqueado', 'Permite ventanas emergentes para guardar el ticket como PDF.');
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.setTimeout(() => printWindow.print(), 250);
       return;
     }
 
-    const documentRef = (globalThis as typeof globalThis & { document?: Document }).document;
-    const urlApi = (globalThis as typeof globalThis & { URL?: typeof URL }).URL;
-    const blobApi = (globalThis as typeof globalThis & { Blob?: typeof Blob }).Blob;
-    if (!documentRef || !urlApi || !blobApi) {
-      Alert.alert('Error', 'No se pudo preparar la descarga.');
+    try {
+      const pdf = await Print.printToFileAsync({
+        html,
+        width: 595,
+        height: 842,
+      });
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('PDF generado', pdf.uri);
+        return;
+      }
+
+      await Sharing.shareAsync(pdf.uri, {
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+        dialogTitle: `Guardar ${ticket.ticketNumber}.pdf`,
+      });
+    } catch {
+      Alert.alert('Error', 'No se pudo generar el PDF del ticket.');
       return;
     }
+  }
 
-    const blob = new blobApi([html], { type: 'text/html;charset=utf-8' });
-    const url = urlApi.createObjectURL(blob);
-    const link = documentRef.createElement('a');
-    link.href = url;
-    link.download = `${ticket.ticketNumber}.html`;
-    link.click();
-    urlApi.revokeObjectURL(url);
+  async function printSimplifiedPaidTicket(ticket: PaidTicket): Promise<void> {
+    const config = getSimplifiedInvoiceConfig();
+    const lines = ticket.items.map((item) => ({
+      name: item.name,
+      qty: item.qty,
+      unitPriceCents: item.unitPriceCents,
+      totalPriceCents: item.totalPriceCents,
+    }));
+
+    try {
+      await apiService.printXprinterTicket({
+        businessName: config.businessName,
+        tradeName: config.tradeName,
+        nif: config.nif,
+        address: config.address,
+        city: config.city || null,
+        phone: config.phone || null,
+        invoiceNumber: ticket.ticketNumber,
+        issuedAt: formatDateTime(ticket.createdAt),
+        tableLabel: `${tableZoneLabel(normalizeTableZone(ticket.tableZone))} ${ticket.tableNumber}`,
+        lines,
+        taxableBaseCents: ticket.taxableBaseCents,
+        vatCents: ticket.vatCents,
+        vatRatePercent: ticket.vatRatePercent,
+        totalCents: ticket.totalCents,
+        ticketNote: ticket.mode === 'split' ? 'Cuenta dividida' : null,
+        splitPeople: ticket.splitPeople ?? null,
+        openCashDrawer: false,
+        ...getOptionalXprinterTarget(),
+      });
+      Alert.alert('Ticket impreso', `Se ha enviado ${ticket.ticketNumber} a la impresora.`);
+    } catch {
+      Alert.alert('Error', 'No se pudo imprimir el ticket simplificado.');
+    }
   }
 
   async function openCashDrawer(): Promise<void> {
@@ -597,7 +673,7 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (activeSection === 'history') {
       void loadTicketHistory();
-      void loadSessionSummary();
+      void refreshSessionSummary();
     }
     if (activeSection === 'products') {
       void loadManagedProducts();
@@ -646,14 +722,6 @@ export default function App(): React.JSX.Element {
         <View style={styles.fullPanel}>
           <View style={styles.panelHeaderRow}>
             <Text style={styles.sectionTitle}>Historial de tickets</Text>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadSessionSummary()}>
-                <Text style={styles.secondaryButtonText}>Resumen sesión</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadTicketHistory()}>
-                <Text style={styles.secondaryButtonText}>Actualizar</Text>
-              </TouchableOpacity>
-            </View>
           </View>
           {sessionSummary ? (
             <View style={styles.sessionSummaryPanel}>
@@ -664,7 +732,12 @@ export default function App(): React.JSX.Element {
                     {`${formatDateTime(sessionSummary.startAt)} - ${formatDateTime(sessionSummary.endAt)} · ${sessionSummary.ticketCount} tickets`}
                   </Text>
                 </View>
-                <Text style={styles.totalText}>{centsToCurrency(sessionSummary.totalCents)}</Text>
+                <View style={styles.historyInlineActions}>
+                  <Text style={styles.totalText}>{centsToCurrency(sessionSummary.totalCents)}</Text>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void refreshSessionSummary(true)}>
+                    <Text style={styles.secondaryButtonText}>Actualizar totales</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.sessionSummaryGrid}>
                 <Text style={styles.itemPrice}>{`Efectivo: ${centsToCurrency(sessionSummary.paymentTotals.cash)}`}</Text>
@@ -682,13 +755,18 @@ export default function App(): React.JSX.Element {
               {sessionSummary.items.length === 0 ? <Text style={styles.emptyText}>No hay ventas en esta sesión.</Text> : null}
             </View>
           ) : null}
-          <TextInput
-            style={styles.menuSearchInput}
-            value={ticketSearchText}
-            onChangeText={setTicketSearchText}
-            placeholder="Buscar por número, mesa, pago o producto"
-            placeholderTextColor="#6B7280"
-          />
+          <View style={styles.historyToolbar}>
+            <TextInput
+              style={[styles.menuSearchInput, styles.historySearchInput]}
+              value={ticketSearchText}
+              onChangeText={setTicketSearchText}
+              placeholder="Buscar por número, mesa, pago o producto"
+              placeholderTextColor="#6B7280"
+            />
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadTicketHistory()}>
+              <Text style={styles.secondaryButtonText}>Actualizar tickets</Text>
+            </TouchableOpacity>
+          </View>
           <ScrollView style={styles.columnScroll}>
             {filteredPaidTickets.map((ticket) => (
               <View key={ticket.id} style={styles.historyRow}>
@@ -700,8 +778,11 @@ export default function App(): React.JSX.Element {
                   <Text style={styles.itemPrice}>{ticket.items.map((item) => `${item.qty}x ${item.name}`).join(', ')}</Text>
                 </View>
                 <Text style={styles.totalText}>{centsToCurrency(ticket.totalCents)}</Text>
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => downloadTicket(ticket)}>
-                  <Text style={styles.secondaryButtonText}>Descargar</Text>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => void printSimplifiedPaidTicket(ticket)}>
+                  <Text style={styles.secondaryButtonText}>Imprimir</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => void downloadTicket(ticket)}>
+                  <Text style={styles.secondaryButtonText}>PDF</Text>
                 </TouchableOpacity>
               </View>
             ))}

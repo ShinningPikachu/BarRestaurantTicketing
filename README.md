@@ -1,124 +1,346 @@
 # BarRestaurantTicketing
 
-Monorepo for a bar/restaurant ticketing system. This repository contains simple starter scaffolds for the `backend`, `frontend`, and `shared` packages.
+Restaurant/bar POS for table management, menu ordering, kitchen workflow, paid ticket history, simplified receipts, PDF ticket copies, and Xprinter cash drawer/receipt printing.
 
-Quick start (requires Node 18+ / npm 9+):
+This is a monorepo with three workspaces:
 
-Install dependencies for all workspaces:
+- `packages/backend`: Express API, Prisma, SQLite database, printer bridge.
+- `packages/frontend`: Expo React Native app for desktop web and phone/tablet.
+- `packages/shared`: Shared TypeScript types/constants.
+
+## Requirements
+
+- Node.js 18 or newer.
+- npm 9 or newer.
+- A computer on the same network as any phone/tablet using the POS.
+- For database persistence: Prisma with the included SQLite setup.
+- For receipt printing: one of these printer paths:
+  - Xprinter or ESC/POS printer reachable by LAN, usually port `9100`.
+  - System printer configured with `lp`.
+  - USB device path exposed by the OS.
+
+Optional:
+
+- Expo Go on a phone/tablet for the mobile POS.
+- A browser for the desktop POS.
+
+## Quick Start
+
+Install dependencies from the repo root:
 
 ```bash
 npm install
 ```
 
-Run the backend and frontend in development (two terminals or use the workspace runner):
-
-Terminal 1 — backend:
+Create and prepare the local SQLite database:
 
 ```bash
-npm run -w backend dev
+cd packages/backend
+npm run prisma:generate
+npm run prisma:migrate:dev
+npm run seed
+cd ../..
 ```
 
-Terminal 2 — frontend:
-
-```bash
-npm run -w frontend dev
-```
-
-Or run both with the root helper (requires `concurrently`):
+Run backend, desktop web POS, and phone Expo server together:
 
 ```bash
 npm run dev
 ```
 
-Frontend: this package is now an Expo React Native app. `npm run -w frontend dev` starts the Expo dev server and shows a QR code for Expo Go plus emulator options.
+The helper prints URLs similar to:
 
-Mobile API base URL:
-- iOS simulator default: `http://localhost:3000/api`
-- Android emulator default: `http://10.0.2.2:3000/api`
-- Physical device: set `EXPO_PUBLIC_API_BASE_URL`, for example:
-
-```bash
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run -w frontend dev
+```text
+Backend API shared by both screens: http://192.168.1.50:3000/api
+Computer web TPV: http://localhost:8081
+Phone Expo TPV: scan the QR code from the Expo server on port 8082
 ```
 
-Backend: simple Express server listens on port 3000 by default at http://localhost:3000.
+Use the computer URL for the desktop POS. Scan the Expo QR code for the mobile POS.
 
-Core endpoints:
-- `GET /health` — health check
-- `GET /api/menu` — list available menu items
-- `GET /api/orders` — list confirmed orders
-- `DELETE /api/orders/:id` — delete an order
-- `POST /api/orders/:id/items/:itemId/move-to-preorder` — move a confirmed item back to draft preorder
-- `GET /api/tables` — list tables
-- `POST /api/tables` — add a table in a zone (`{ "zone": "outside" | "floor1" | "floor2" }`)
-- `GET /api/tables/:zone/:number/workflow` — get table workflow (draft preorder + confirmed orders)
-- `POST /api/tables/:zone/:number/preorder/items` — add menu item to draft preorder
-- `PATCH /api/tables/:zone/:number/preorder/items/:itemId` — update qty/price for draft item
-- `POST /api/tables/:zone/:number/preorder/clear` — clear draft preorder
-- `POST /api/tables/:zone/:number/send-to-kitchen` — confirm draft preorder and create kitchen ticket
+## Run Separately
 
-Database / Prisma quick-start
+Backend only:
 
-This project includes a basic Prisma schema for SQLite at `packages/backend/prisma/schema.prisma`.
-To create the SQLite DB and generate the Prisma client, from the repo root run:
+```bash
+npm run -w backend dev
+```
+
+Frontend web only:
+
+```bash
+npm run -w frontend web
+```
+
+Frontend Expo/mobile only:
+
+```bash
+npm run -w frontend dev:phone
+```
+
+If using a physical phone, the phone must reach the backend. Set the API URL to your computer LAN IP:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run -w frontend dev:phone
+```
+
+## Environment
+
+The root `npm run dev` script reads a root `.env` file if present.
+
+Example `.env`:
+
+```env
+PORT=3000
+DATABASE_URL=file:./dev.db
+
+EXPO_PUBLIC_TICKET_TRADE_NAME=Your Restaurant Name
+EXPO_PUBLIC_TICKET_BUSINESS_NAME=Your Legal Business Name
+EXPO_PUBLIC_TICKET_BUSINESS_NIF=Your Tax ID
+EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS=Your Business Address
+EXPO_PUBLIC_TICKET_BUSINESS_CITY=Your City
+EXPO_PUBLIC_TICKET_BUSINESS_PHONE=Your Phone Number
+EXPO_PUBLIC_TICKET_SERIES=FS
+EXPO_PUBLIC_TICKET_VAT_RATE=10
+
+# Optional printer mode for frontend-triggered customer tickets.
+EXPO_PUBLIC_TICKET_PRINT_MODE=xprinter-lan
+EXPO_PUBLIC_XPRINTER_HOST=192.168.1.80
+EXPO_PUBLIC_XPRINTER_PORT=9100
+EXPO_PUBLIC_XPRINTER_OPEN_DRAWER=false
+
+# Backend printer bridge settings.
+XPRINTER_HOST=192.168.1.80
+XPRINTER_PORT=9100
+XPRINTER_OPEN_DRAWER=false
+```
+
+Printer alternatives:
+
+```env
+XPRINTER_PRINTER_NAME=YourSystemPrinterName
+```
+
+or:
+
+```env
+XPRINTER_USB_DEVICE=/dev/usb/lp0
+```
+
+## How To Use
+
+### 1. Open The POS
+
+From the home screen:
+
+- `TPV`: table ordering and payments.
+- `Historial de tickets`: paid ticket history, reprint simplified receipts, PDF copies, session totals.
+- `Productos`: add/edit menu products, prices, categories, cost, and images.
+
+### 2. Select A Table
+
+In `TPV`, choose a table from `Terraza`, `Planta 1`, or `Planta 2`.
+
+You can:
+
+- Add a table with `+ Añadir mesa`.
+- Select a table by pressing it.
+- Drag a table to reposition it inside a zone.
+- Remove the selected table with the red delete button.
+
+### 3. Add Products
+
+Use the menu categories and search field. Press products to add them to the table preorder.
+
+In the preorder area you can:
+
+- Increase/decrease quantity.
+- Edit item price.
+- Use quick price buttons.
+- Clear the preorder.
+
+### 4. Send To Kitchen
+
+Press `Enviar a cocina` to confirm the preorder. Confirmed items move to the confirmed order section.
+
+### 5. Print Or Pay
+
+For confirmed orders:
+
+- `Imprimir ticket`: print/generate the customer ticket.
+- `AA`: choose individual items for separate payment or individual ticket.
+- `Pagar efectivo`: register cash payment.
+- `Pagar tarjeta`: register card payment.
+- `Comensales` + `Imprimir dividido`: print a split ticket by number of people.
+
+Paid orders create records in the ticket history.
+
+### 6. Ticket History
+
+Open `Historial de tickets`.
+
+The top summary panel shows the current session totals:
+
+- Total sales.
+- Cash/card totals.
+- Taxable base.
+- VAT.
+- Products sold.
+
+Use:
+
+- `Actualizar totales`: refresh only the session summary.
+- Search box: filter paid tickets by number, table, payment method, or product.
+- `Actualizar tickets`: refresh only the ticket list.
+- `Imprimir`: reprint a simplified receipt through the configured printer bridge.
+- `PDF`: create/open a clearer detailed ticket copy. On web, use the browser print dialog and choose `Save as PDF`.
+
+The current session window is controlled by the backend: it starts at 06:00 and ends at 04:00 the next day.
+
+### 7. Manage Products
+
+Open `Productos`.
+
+You can:
+
+- Add products manually.
+- Set category/type.
+- Set sale price and internal cost.
+- Add/change/remove product images.
+- Import CSV.
+
+CSV import expects columns like:
+
+```csv
+name,priceCents,sku,category,description,available
+Classic Burger,1299,FOOD-001,Main Course,Juicy beef patty,true
+```
+
+There is a template at:
+
+```text
+packages/backend/data/menu-import-template.csv
+```
+
+## Printing Notes
+
+Normal customer ticket printing can work in two ways:
+
+- If `EXPO_PUBLIC_TICKET_PRINT_MODE` is `xprinter-lan` or `xprinter-usb`, the frontend sends the print payload to the backend printer bridge.
+- Otherwise, web opens the browser print flow and native opens the platform print flow.
+
+History reprint uses the backend Xprinter endpoint directly. Make sure backend printer variables are configured:
+
+```env
+XPRINTER_HOST=192.168.1.80
+XPRINTER_PORT=9100
+```
+
+For system printer:
+
+```env
+XPRINTER_PRINTER_NAME=PrinterName
+```
+
+For USB device:
+
+```env
+XPRINTER_USB_DEVICE=/dev/usb/lp0
+```
+
+Cash drawer opening uses the same printer bridge and sends an ESC/POS drawer pulse.
+
+## Useful Commands
+
+Run all dev services:
+
+```bash
+npm run dev
+```
+
+Run backend tests:
+
+```bash
+npm run -w backend test
+```
+
+Typecheck frontend:
+
+```bash
+npm run -w frontend typecheck
+```
+
+Build everything:
+
+```bash
+npm run build
+```
+
+Prisma Studio:
 
 ```bash
 cd packages/backend
-npm install
-npm run prisma:generate
+npm run prisma:studio
+```
+
+## Troubleshooting
+
+### Phone Cannot Connect To Backend
+
+Use the computer LAN IP, not `localhost`, for `EXPO_PUBLIC_API_BASE_URL`.
+
+Example:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run -w frontend dev:phone
+```
+
+Make sure the phone and computer are on the same Wi-Fi and the backend is running.
+
+### Printer Does Not Print
+
+Check:
+
+- Backend is running.
+- Printer IP/port is correct.
+- Printer is on the same network.
+- `XPRINTER_HOST` or `XPRINTER_PRINTER_NAME` or `XPRINTER_USB_DEVICE` is set.
+- Firewalls allow connection to printer port `9100` if using LAN.
+
+### PDF Button Opens Print Dialog On Web
+
+That is expected. Browser apps cannot silently save a PDF without extra PDF generation infrastructure. Choose `Save as PDF` in the print dialog.
+
+### Database Is Empty
+
+Run migrations and seed:
+
+```bash
+cd packages/backend
 npm run prisma:migrate:dev
-```
-
-That will create `packages/backend/prisma/dev.db` and generate the TypeScript Prisma client used by the backend.
-
-If you prefer Postgres for multi-terminal use, update `datasource db` in `prisma/schema.prisma` and run the migrate steps against Postgres.
-
-## Menu Management
-
-The system includes a menu management feature. Menu items are stored in the database and can be seeded from a CSV file.
-
-## Domain Persistence
-
-Business workflow persistence is now backend-owned (not frontend-local only):
-- `PreOrderSession` + `PreOrderItem` persist table draft preorder state
-- `Order` + `OrderItem` persist confirmed items
-- `KitchenTicket` + `KitchenTicketItem` persist send-to-kitchen dispatch events
-
-After pulling schema updates, run migrations and regenerate Prisma client:
-
-```bash
-cd packages/backend
-npm run prisma:migrate:dev
-npm run prisma:generate
-```
-
-### Seeding Menu Items
-
-Menu items are defined in `packages/backend/data/menu-items.csv`. To populate the database with menu items:
-
-```bash
-cd packages/backend
 npm run seed
 ```
 
-The CSV file includes:
-- name: Item name
-- priceCents: Price in cents (e.g., 1299 for $12.99)
-- sku: Stock keeping unit identifier
-- category: Category (Main Course, Appetizer, Sides, Dessert, Beverage, etc.)
-- description: Item description
-- available: Whether the item is currently available (true/false)
+### Port Already In Use
 
-### Menu API Endpoints
+Override ports:
 
-- `GET /api/menu` — Get all available menu items
-- `GET /api/menu/:id` — Get a specific menu item by ID
-- `GET /api/menu/category/:category` — Get menu items by category
-
-Example:
 ```bash
-curl http://localhost:3000/api/menu
-curl http://localhost:3000/api/menu/category/Main%20Course
+PORT=3001 DESKTOP_EXPO_PORT=8091 PHONE_EXPO_PORT=8092 npm run dev
 ```
 
-# BarRestaurantTicketing
+## Project Structure
+
+```text
+packages/
+  backend/
+    prisma/          Database schema and migrations
+    src/routes/      Express API routes
+    src/services/    Printer and menu services
+    data/            CSV menu data/templates
+  frontend/
+    App.tsx          Main app shell
+    src/native/      Controllers, components, styles, services
+  shared/
+    src/             Shared types/constants
+```
