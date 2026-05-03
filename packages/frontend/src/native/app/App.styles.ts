@@ -22,6 +22,10 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     marginBottom: 12
   },
+  compactHeaderBar: {
+    minHeight: 38,
+    marginBottom: 8
+  },
   headerButton: {
     backgroundColor: colors.buttonSecondary,
     borderWidth: 1,
@@ -29,6 +33,10 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8
+  },
+  compactHeaderButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 7
   },
   headerActions: {
     flexDirection: 'row',
@@ -40,6 +48,9 @@ export const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: 0
+  },
+  compactHeader: {
+    fontSize: 17
   },
   title: {
     color: colors.text,
@@ -119,7 +130,63 @@ export const styles = StyleSheet.create({
   mobilePosScreen: {
     flex: 1,
     minHeight: 0,
-    gap: 10
+    gap: 8
+  },
+  mobileViewSwitch: {
+    flexDirection: 'row',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.buttonSecondary,
+    padding: 4
+  },
+  mobileViewButton: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6
+  },
+  mobileViewButtonSelected: {
+    backgroundColor: colors.primary
+  },
+  mobileViewButtonText: {
+    color: colors.buttonSecondaryText,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  mobileViewButtonTextSelected: {
+    color: colors.textLight
+  },
+  mobileSinglePanel: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 8
+  },
+  mobilePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 6
+  },
+  mobilePanelAction: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7
+  },
+  mobilePanelScroll: {
+    flex: 1,
+    minHeight: 0
   },
   mobileTopPanel: {
     flex: 0.9,
@@ -155,13 +222,18 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    marginBottom: 0
   },
   mobileContextText: {
     color: colors.textSecondary,
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  mobilePanelTitle: {
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '700'
   },
   mobileModeSwitch: {
@@ -204,15 +276,15 @@ export const styles = StyleSheet.create({
     gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    paddingBottom: 8,
-    marginBottom: 8
+    paddingBottom: 6,
+    marginBottom: 6
   },
   mobileOrderScroll: {
     flex: 1,
     minHeight: 0
   },
   mobileOrderBlock: {
-    marginBottom: 8
+    marginBottom: 6
   },
   mobileOrderBlockHeader: {
     flexDirection: 'row',
@@ -221,43 +293,95 @@ export const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4
   },
+  mobileOrderTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2
+  },
+  mobileOrderBlockTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  mobileOrderItemName: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  mobileOrderItemPrice: {
+    color: colors.textSecondary,
+    fontSize: 12
+  },
+  mobileOrderTotal: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 16
+  },
   mobileBadge: {
-    minWidth: 32,
+    minWidth: 28,
     textAlign: 'center',
     color: colors.primaryDark,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.zoneMenu,
-    paddingHorizontal: 8,
-    paddingVertical: 4
+    paddingHorizontal: 7,
+    paddingVertical: 3
   },
   mobileOrderItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.borderLight,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
     marginBottom: 6
   },
   mobileStickyActions: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10
+    gap: 6,
+    marginBottom: 8
+  },
+  mobileTicketControls: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+    marginTop: 6,
+    gap: 6
+  },
+  mobileTicketActionsRow: {
+    flexDirection: 'row',
+    gap: 6
+  },
+  mobileSplitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  mobileSplitLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  mobileSplitInput: {
+    width: 46,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    fontSize: 13
   },
   mobilePayBar: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: 8,
-    marginTop: 8
+    paddingTop: 6,
+    marginTop: 6
   },
   mobileDisabledButton: {
     opacity: 0.45
@@ -273,6 +397,35 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8
   },
+  mobileAaModalPanel: {
+    width: '92%',
+    maxHeight: '84%',
+    padding: 12
+  },
+  mobileAaList: {
+    maxHeight: 360
+  },
+  mobileAaSelectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginBottom: 6
+  },
+  mobileAaFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+    marginTop: 8
+  },
   drawerActionRow: {
     alignItems: 'flex-end',
     marginBottom: 8
@@ -283,6 +436,10 @@ export const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'stretch'
   },
+  compactHomeGrid: {
+    flexDirection: 'column',
+    gap: 8
+  },
   homeButton: {
     flex: 1,
     borderWidth: 1,
@@ -292,15 +449,26 @@ export const styles = StyleSheet.create({
     padding: 18,
     justifyContent: 'center'
   },
+  compactHomeButton: {
+    padding: 12,
+    minHeight: 86
+  },
   homeButtonTitle: {
     color: colors.text,
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 8
   },
+  compactHomeButtonTitle: {
+    fontSize: 17,
+    marginBottom: 4
+  },
   homeButtonText: {
     color: colors.textSecondary,
     fontSize: 14
+  },
+  compactHomeButtonText: {
+    fontSize: 13
   },
   fullPanel: {
     flex: 1,
@@ -311,11 +479,18 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: 12
   },
+  compactFullPanel: {
+    padding: 8
+  },
   panelHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8
+  },
+  compactPanelHeaderRow: {
+    alignItems: 'flex-start',
+    flexWrap: 'wrap'
   },
   historyRow: {
     flexDirection: 'row',
@@ -328,6 +503,12 @@ export const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8
   },
+  compactHistoryRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 8,
+    padding: 8
+  },
   historyInlineActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,15 +516,34 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'flex-end'
   },
+  compactInlineActions: {
+    alignItems: 'flex-end',
+    gap: 6
+  },
+  compactHistoryActions: {
+    width: '100%',
+    justifyContent: 'flex-start',
+    gap: 6
+  },
   historyToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 10
   },
+  compactHistoryToolbar: {
+    flexWrap: 'wrap',
+    gap: 6
+  },
   historySearchInput: {
     flex: 1,
     marginBottom: 0
+  },
+  compactSearchInput: {
+    minWidth: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13
   },
   sessionSummaryPanel: {
     borderWidth: 1,
@@ -354,11 +554,20 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 8
   },
+  compactSessionSummaryPanel: {
+    padding: 8,
+    marginTop: 4,
+    marginBottom: 8
+  },
   sessionSummaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     marginBottom: 8
+  },
+  compactSessionSummaryGrid: {
+    gap: 6,
+    marginBottom: 6
   },
   sessionSummaryRow: {
     flexDirection: 'row',
@@ -375,6 +584,10 @@ export const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 10
   },
+  compactProductForm: {
+    gap: 6,
+    marginBottom: 8
+  },
   formInput: {
     minWidth: 150,
     borderColor: colors.inputBorder,
@@ -385,6 +598,13 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     color: colors.inputText
   },
+  compactFormInput: {
+    minWidth: '100%',
+    flexBasis: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13
+  },
   formInputWide: {
     minWidth: 260,
     flex: 1
@@ -394,6 +614,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap'
+  },
+  compactProductImagePicker: {
+    gap: 6
   },
   productImagePreview: {
     width: 64,
@@ -413,6 +636,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  compactProductImage: {
+    width: 48,
+    height: 48
+  },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -423,6 +650,12 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     padding: 10,
     marginBottom: 8
+  },
+  compactProductRow: {
+    alignItems: 'flex-start',
+    gap: 6,
+    padding: 8,
+    flexWrap: 'wrap'
   },
   productRowImage: {
     width: 56,
@@ -441,6 +674,10 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  compactProductRowImage: {
+    width: 44,
+    height: 44
   },
   columnScroll: {
     flex: 1
@@ -492,12 +729,21 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 10
   },
+  compactSectionTitle: {
+    fontSize: 18,
+    marginBottom: 6
+  },
   subTitle: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginTop: 6,
     marginBottom: 6
+  },
+  compactSubTitle: {
+    fontSize: 15,
+    marginTop: 4,
+    marginBottom: 4
   },
   preorderRow: {
     flexDirection: 'row',
@@ -526,6 +772,9 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600'
   },
+  compactItemName: {
+    fontSize: 15
+  },
   modifiedLabel: {
     fontSize: 13,
     fontWeight: '700',
@@ -535,6 +784,9 @@ export const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 16,
     color: colors.textSecondary
+  },
+  compactItemPrice: {
+    fontSize: 13
   },
   originalPrice: {
     fontSize: 13,
@@ -564,10 +816,24 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  compactUiButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
   secondaryButtonText: {
     color: colors.buttonSecondaryText,
     fontWeight: '700',
     fontSize: 16
+  },
+  compactButtonText: {
+    color: colors.buttonSecondaryText,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  compactPrimaryButtonText: {
+    color: colors.buttonPrimaryText,
+    fontSize: 13,
+    fontWeight: '700'
   },
   qtyGroup: {
     flexDirection: 'row',
@@ -589,6 +855,15 @@ export const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700'
   },
+  mobileQtyButton: {
+    width: 32,
+    height: 32
+  },
+  mobileQtyButtonText: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700'
+  },
   qtyText: {
     minWidth: 28,
     textAlign: 'center',
@@ -603,6 +878,20 @@ export const styles = StyleSheet.create({
     color: colors.success,
     fontSize: 18
   },
+  mobileQtyText: {
+    minWidth: 22,
+    textAlign: 'center',
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 15
+  },
+  mobileConfirmedQtyText: {
+    minWidth: 30,
+    textAlign: 'center',
+    fontWeight: '700',
+    color: colors.success,
+    fontSize: 15
+  },
   priceInput: {
     width: 112,
     borderColor: colors.inputBorder,
@@ -614,6 +903,20 @@ export const styles = StyleSheet.create({
     color: colors.inputText,
     textAlign: 'center',
     fontSize: 16
+  },
+  compactPriceInput: {
+    width: 72,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    fontSize: 13
+  },
+  compactProductCategoryInput: {
+    minWidth: 0,
+    width: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    fontSize: 13,
+    marginTop: 4
   },
   priceQuickActions: {
     flexDirection: 'row',
@@ -651,6 +954,10 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
     fontSize: 20
+  },
+  compactTotalText: {
+    fontSize: 16,
+    marginBottom: 0
   },
   actionsRow: {
     flexDirection: 'row',
@@ -721,6 +1028,12 @@ export const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 16,
     marginBottom: 6
+  },
+  compactHelperText: {
+    flex: 1,
+    minWidth: 200,
+    fontSize: 12,
+    marginBottom: 0
   },
   inlineControls: {
     flexDirection: 'row',

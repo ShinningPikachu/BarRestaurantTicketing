@@ -12,17 +12,24 @@ interface DraggableTableProps {
   table: TableId;
   position: TablePosition;
   isSelected: boolean;
+  isMobile: boolean;
+  tableWidth: number;
+  tableHeight: number;
   maxX: number;
   maxY: number;
   onSelectTable: (table: TableId) => void;
   onDragMove: (table: TableId, nextPosition: TablePosition) => void;
 }
 
-const TABLE_WIDTH = 120;
-const TABLE_HEIGHT = 74;
-const BOARD_VISIBLE_HEIGHT = 300;
+const DESKTOP_TABLE_WIDTH = 120;
+const DESKTOP_TABLE_HEIGHT = 74;
+const DESKTOP_BOARD_VISIBLE_HEIGHT = 300;
+const MOBILE_TABLE_WIDTH = 86;
+const MOBILE_TABLE_HEIGHT = 54;
+const MOBILE_BOARD_VISIBLE_HEIGHT = 190;
 const BOARD_PADDING = 12;
-const TABLE_GAP = 12;
+const DESKTOP_TABLE_GAP = 12;
+const MOBILE_TABLE_GAP = 8;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -32,6 +39,9 @@ function DraggableTable({
   table,
   position,
   isSelected,
+  isMobile,
+  tableWidth,
+  tableHeight,
   maxX,
   maxY,
   onSelectTable,
@@ -105,14 +115,17 @@ function DraggableTable({
       {...panResponder.panHandlers}
       style={[
         styles.tableNode,
+        isMobile && styles.mobileTableNode,
         isDragging && styles.tableNodeDragging,
         isSelected && styles.tableNodeSelected,
         {
+          width: tableWidth,
+          height: tableHeight,
           transform: [{ translateX: livePosition.x }, { translateY: livePosition.y }],
         },
       ]}
     >
-      <Text selectable={false} style={[styles.tableNodeText, isSelected && styles.tableNodeTextSelected]}>
+      <Text selectable={false} style={[styles.tableNodeText, isMobile && styles.mobileTableNodeText, isSelected && styles.tableNodeTextSelected]}>
         {`M${table.number}`}
       </Text>
     </Animated.View>
@@ -120,6 +133,7 @@ function DraggableTable({
 }
 
 interface TableZoneGroupProps {
+  layout?: 'desktop' | 'mobile';
   zone: TableZone;
   numbers: number[];
   selectedTable: TableId;
@@ -128,21 +142,26 @@ interface TableZoneGroupProps {
   onRemoveTable: (table: TableId) => void;
 }
 
-export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, onAddTable, onRemoveTable }: TableZoneGroupProps): React.JSX.Element {
+export function TableZoneGroup({ layout = 'desktop', zone, numbers, selectedTable, onSelectTable, onAddTable, onRemoveTable }: TableZoneGroupProps): React.JSX.Element {
   const [boardWidth, setBoardWidth] = useState(300);
   const [tablePositions, setTablePositions] = useState<Record<string, TablePosition>>({});
+  const isMobile = layout === 'mobile';
+  const tableWidth = isMobile ? MOBILE_TABLE_WIDTH : DESKTOP_TABLE_WIDTH;
+  const tableHeight = isMobile ? MOBILE_TABLE_HEIGHT : DESKTOP_TABLE_HEIGHT;
+  const boardVisibleHeight = isMobile ? MOBILE_BOARD_VISIBLE_HEIGHT : DESKTOP_BOARD_VISIBLE_HEIGHT;
+  const tableGap = isMobile ? MOBILE_TABLE_GAP : DESKTOP_TABLE_GAP;
 
   const tablesPerRow = Math.max(
     1,
-    Math.floor((boardWidth - BOARD_PADDING * 2 + TABLE_GAP) / (TABLE_WIDTH + TABLE_GAP))
+    Math.floor((boardWidth - BOARD_PADDING * 2 + tableGap) / (tableWidth + tableGap))
   );
   const rowCount = Math.max(1, Math.ceil(numbers.length / tablesPerRow));
   const boardContentHeight = Math.max(
-    BOARD_VISIBLE_HEIGHT,
-    BOARD_PADDING * 2 + rowCount * TABLE_HEIGHT + Math.max(0, rowCount - 1) * TABLE_GAP
+    boardVisibleHeight,
+    BOARD_PADDING * 2 + rowCount * tableHeight + Math.max(0, rowCount - 1) * tableGap
   );
-  const maxX = Math.max(0, boardWidth - TABLE_WIDTH - BOARD_PADDING);
-  const maxY = Math.max(0, boardContentHeight - TABLE_HEIGHT - BOARD_PADDING);
+  const maxX = Math.max(0, boardWidth - tableWidth - BOARD_PADDING);
+  const maxY = Math.max(0, boardContentHeight - tableHeight - BOARD_PADDING);
   const isSelectedInZone = selectedTable.zone === zone;
   const canRemoveSelected = isSelectedInZone && numbers.length > 1;
 
@@ -165,14 +184,14 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
         const column = index % tablesPerRow;
         const row = Math.floor(index / tablesPerRow);
         next[key] = {
-          x: clamp(BOARD_PADDING + column * (TABLE_WIDTH + TABLE_GAP), 0, maxX),
-          y: clamp(BOARD_PADDING + row * (TABLE_HEIGHT + TABLE_GAP), 0, maxY),
+          x: clamp(BOARD_PADDING + column * (tableWidth + tableGap), 0, maxX),
+          y: clamp(BOARD_PADDING + row * (tableHeight + tableGap), 0, maxY),
         };
       });
 
       return next;
     });
-  }, [maxX, maxY, numbers, tablesPerRow, zone]);
+  }, [maxX, maxY, numbers, tableGap, tableHeight, tableWidth, tablesPerRow, zone]);
 
   function handleDragMove(table: TableId, nextPosition: TablePosition): void {
     setTablePositions((previous) => ({
@@ -182,11 +201,11 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
   }
 
   return (
-    <View style={styles.zoneGroup}>
+    <View style={[styles.zoneGroup, isMobile && styles.mobileZoneGroup]}>
       <Text style={styles.zoneHeader}>{`${tableZoneLabel(zone)} (${numbers.length})`}</Text>
-      <Text style={styles.hintText}>Mantén pulsada una mesa y arrástrala para moverla.</Text>
+      {!isMobile ? <Text style={styles.hintText}>Mantén pulsada una mesa y arrástrala para moverla.</Text> : null}
       <ScrollView
-        style={styles.zoneBoard}
+        style={[styles.zoneBoard, isMobile && styles.mobileZoneBoard]}
         contentContainerStyle={[styles.zoneBoardContent, { height: boardContentHeight }]}
         nestedScrollEnabled
         showsVerticalScrollIndicator
@@ -206,6 +225,9 @@ export function TableZoneGroup({ zone, numbers, selectedTable, onSelectTable, on
               table={table}
               position={position}
               isSelected={isSelected}
+              isMobile={isMobile}
+              tableWidth={tableWidth}
+              tableHeight={tableHeight}
               maxX={maxX}
               maxY={maxY}
               onSelectTable={onSelectTable}

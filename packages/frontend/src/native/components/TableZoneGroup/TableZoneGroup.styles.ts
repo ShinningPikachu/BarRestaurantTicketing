@@ -10,6 +10,10 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  mobileZoneGroup: {
+    marginBottom: 8,
+    padding: 8
+  },
   zoneHeader: {
     fontSize: 18,
     fontWeight: '700',
@@ -34,14 +38,16 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
     overflow: 'hidden'
   },
+  mobileZoneBoard: {
+    height: 190,
+    marginBottom: 8
+  },
   zoneBoardContent: {
     position: 'relative',
     width: '100%'
   },
   tableNode: {
     position: 'absolute',
-    width: 120,
-    height: 74,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.borderDark,
@@ -49,6 +55,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     userSelect: 'none'
+  },
+  mobileTableNode: {
+    borderRadius: 7
   },
   tableNodeDragging: {
     opacity: 0.82
@@ -62,6 +71,9 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 24,
     userSelect: 'none'
+  },
+  mobileTableNodeText: {
+    fontSize: 18
   },
   tableNodeTextSelected: {
     color: colors.textLight

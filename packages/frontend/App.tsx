@@ -6,10 +6,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import {
   Alert,
-  Image,
   Platform,
   SafeAreaView,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,11 +15,13 @@ import {
   View
 } from 'react-native';
 import { useTicketingController } from './src/native/controllers';
-import { DesktopPosScreen, MobilePosScreen } from './src/native/components';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
 import { apiService } from './src/native/services';
 import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
+import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
+import { MobileMainScreen } from './src/native/app/MobileMainScreen';
+import { AppSection, MainScreenProps } from './src/native/app/MainScreen.types';
 import {
   centsToCurrency,
   getMenuTitleById
@@ -33,7 +33,6 @@ const MAX_SEARCH_RESULTS = 24;
 const PRODUCT_IMAGE_MAX_SIZE = 512;
 const PRODUCT_IMAGE_QUALITY = 0.82;
 const AUTH_TOKEN_STORAGE_KEY = 'bar-ticketing-auth-token';
-type AppSection = 'home' | 'pos' | 'history' | 'products';
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
 
 interface ExpoLikeGlobal {
@@ -775,214 +774,48 @@ export default function App(): React.JSX.Element {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerBar}>
-        <Text style={styles.header}>TPV Restaurante</Text>
-        <View style={styles.headerActions}>
-          {activeSection !== 'home' ? (
-            <TouchableOpacity style={styles.headerButton} onPress={() => setActiveSection('home')}>
-              <Text style={styles.secondaryButtonText}>Inicio</Text>
-            </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity style={styles.headerButton} onPress={() => void handleLogout()}>
-            <Text style={styles.secondaryButtonText}>Salir</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+  const mainScreenProps: MainScreenProps = {
+    activeSection,
+    setActiveSection,
+    onLogout: () => void handleLogout(),
+    posScreenProps,
+    sessionSummary,
+    filteredPaidTickets,
+    ticketSearchText,
+    setTicketSearchText,
+    refreshSessionSummary,
+    loadTicketHistory,
+    printSimplifiedPaidTicket,
+    downloadTicket,
+    managedCategories,
+    managedMenuItems,
+    productName,
+    setProductName,
+    productCategory,
+    setProductCategory,
+    productPrice,
+    setProductPrice,
+    productCost,
+    setProductCost,
+    productSku,
+    setProductSku,
+    productDescription,
+    setProductDescription,
+    productImageDataUrl,
+    setProductImageDataUrl,
+    importProductsCsv,
+    chooseProductImage,
+    saveNewProduct,
+    updateProductCategory,
+    updateProductPrice,
+    updateProductCost,
+    updateProductImage,
+    removeProductImage,
+    formatDateTime,
+    centsToCurrency,
+  };
 
-      {activeSection === 'home' ? (
-        <View style={styles.homeGrid}>
-          <TouchableOpacity style={styles.homeButton} onPress={() => setActiveSection('pos')}>
-            <Text style={styles.homeButtonTitle}>TPV</Text>
-            <Text style={styles.homeButtonText}>Mesas, menú, pedidos, tickets y pagos.</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.homeButton} onPress={() => setActiveSection('history')}>
-            <Text style={styles.homeButtonTitle}>Historial de tickets</Text>
-            <Text style={styles.homeButtonText}>Buscar tickets pagados y descargar copias.</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.homeButton} onPress={() => setActiveSection('products')}>
-            <Text style={styles.homeButtonTitle}>Productos</Text>
-            <Text style={styles.homeButtonText}>Añadir productos, tipos y cambiar precios.</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {activeSection === 'history' ? (
-        <View style={styles.fullPanel}>
-          <View style={styles.panelHeaderRow}>
-            <Text style={styles.sectionTitle}>Historial de tickets</Text>
-          </View>
-          {sessionSummary ? (
-            <View style={styles.sessionSummaryPanel}>
-              <View style={styles.panelHeaderRow}>
-                <View>
-                  <Text style={styles.itemName}>{`Sesión ${sessionSummary.sessionDate}`}</Text>
-                  <Text style={styles.itemPrice}>
-                    {`${formatDateTime(sessionSummary.startAt)} - ${formatDateTime(sessionSummary.endAt)} · ${sessionSummary.ticketCount} tickets`}
-                  </Text>
-                </View>
-                <View style={styles.historyInlineActions}>
-                  <Text style={styles.totalText}>{centsToCurrency(sessionSummary.totalCents)}</Text>
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void refreshSessionSummary(true)}>
-                    <Text style={styles.secondaryButtonText}>Actualizar totales</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.sessionSummaryGrid}>
-                <Text style={styles.itemPrice}>{`Efectivo: ${centsToCurrency(sessionSummary.paymentTotals.cash)}`}</Text>
-                <Text style={styles.itemPrice}>{`Tarjeta: ${centsToCurrency(sessionSummary.paymentTotals.card)}`}</Text>
-                <Text style={styles.itemPrice}>{`Base: ${centsToCurrency(sessionSummary.taxableBaseCents)}`}</Text>
-                <Text style={styles.itemPrice}>{`IVA: ${centsToCurrency(sessionSummary.vatCents)}`}</Text>
-              </View>
-              <Text style={styles.subTitle}>Productos vendidos</Text>
-              {sessionSummary.items.slice(0, 8).map((item) => (
-                <View key={item.name} style={styles.sessionSummaryRow}>
-                  <Text style={styles.itemPrice}>{`${item.qty}x ${item.name}`}</Text>
-                  <Text style={styles.itemPrice}>{centsToCurrency(item.totalCents)}</Text>
-                </View>
-              ))}
-              {sessionSummary.items.length === 0 ? <Text style={styles.emptyText}>No hay ventas en esta sesión.</Text> : null}
-            </View>
-          ) : null}
-          <View style={styles.historyToolbar}>
-            <TextInput
-              style={[styles.menuSearchInput, styles.historySearchInput]}
-              value={ticketSearchText}
-              onChangeText={setTicketSearchText}
-              placeholder="Buscar por número, mesa, pago o producto"
-              placeholderTextColor="#6B7280"
-            />
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadTicketHistory()}>
-              <Text style={styles.secondaryButtonText}>Actualizar tickets</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.columnScroll}>
-            {filteredPaidTickets.map((ticket) => (
-              <View key={ticket.id} style={styles.historyRow}>
-                <View style={styles.flex1}>
-                  <Text style={styles.itemName}>{ticket.ticketNumber}</Text>
-                  <Text style={styles.itemPrice}>
-                    {`Mesa ${ticket.tableZone}-${ticket.tableNumber} · ${formatDateTime(ticket.createdAt)} · ${ticket.method === 'cash' ? 'Efectivo' : 'Tarjeta'}`}
-                  </Text>
-                  <Text style={styles.itemPrice}>{ticket.items.map((item) => `${item.qty}x ${item.name}`).join(', ')}</Text>
-                </View>
-                <Text style={styles.totalText}>{centsToCurrency(ticket.totalCents)}</Text>
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => void printSimplifiedPaidTicket(ticket)}>
-                  <Text style={styles.secondaryButtonText}>Imprimir</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => void downloadTicket(ticket)}>
-                  <Text style={styles.secondaryButtonText}>PDF</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-            {filteredPaidTickets.length === 0 ? <Text style={styles.emptyText}>No hay tickets.</Text> : null}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {activeSection === 'products' ? (
-        <View style={styles.fullPanel}>
-          <Text style={styles.sectionTitle}>Productos</Text>
-          <View style={styles.panelHeaderRow}>
-            <Text style={styles.helperText}>CSV recomendado: name, price, cost, sku, category, description, available</Text>
-            <TouchableOpacity style={styles.secondaryButton} onPress={importProductsCsv}>
-              <Text style={styles.secondaryButtonText}>Importar CSV</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.productForm}>
-            <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="Nombre" placeholderTextColor="#6B7280" />
-            <TextInput style={styles.formInput} value={productCategory} onChangeText={setProductCategory} placeholder="Tipo / categoría" placeholderTextColor="#6B7280" />
-            <TextInput style={styles.formInput} value={productPrice} onChangeText={setProductPrice} placeholder="Precio" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
-            <TextInput style={styles.formInput} value={productCost} onChangeText={setProductCost} placeholder="Coste interno" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
-            <TextInput style={styles.formInput} value={productSku} onChangeText={setProductSku} placeholder="SKU opcional" placeholderTextColor="#6B7280" />
-            <TextInput style={[styles.formInput, styles.formInputWide]} value={productDescription} onChangeText={setProductDescription} placeholder="Descripción opcional" placeholderTextColor="#6B7280" />
-            <View style={styles.productImagePicker}>
-              {productImageDataUrl ? (
-                <Image source={{ uri: productImageDataUrl }} style={styles.productImagePreview} resizeMode="contain" />
-              ) : (
-                <View style={styles.productImagePlaceholder}>
-                  <Text style={styles.itemPrice}>Imagen</Text>
-                </View>
-              )}
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => void chooseProductImage(setProductImageDataUrl)}>
-                <Text style={styles.secondaryButtonText}>{productImageDataUrl ? 'Cambiar imagen' : Platform.OS === 'web' ? 'Añadir imagen' : 'Hacer foto'}</Text>
-              </TouchableOpacity>
-              {productImageDataUrl ? (
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => setProductImageDataUrl(null)}>
-                  <Text style={styles.secondaryButtonText}>Quitar</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => void saveNewProduct()}>
-              <Text style={styles.primaryButtonText}>Añadir producto</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.menuTypeSelector}>
-            {managedCategories.map((category) => (
-              <TouchableOpacity key={category} style={styles.menuTypeButton} onPress={() => setProductCategory(category)}>
-                <Text style={styles.menuTypeButtonText}>{category}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <ScrollView style={styles.columnScroll}>
-            {managedMenuItems.map((item) => (
-              <View key={item.id} style={styles.productRow}>
-                {item.imageDataUrl ? (
-                  <Image source={{ uri: item.imageDataUrl }} style={styles.productRowImage} resizeMode="contain" />
-                ) : (
-                  <View style={styles.productRowImagePlaceholder}>
-                    <Text style={styles.itemPrice}>Sin imagen</Text>
-                  </View>
-                )}
-                <View style={styles.flex1}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    defaultValue={item.category}
-                    onSubmitEditing={(event) => void updateProductCategory(item, event.nativeEvent.text)}
-                    onEndEditing={(event) => void updateProductCategory(item, event.nativeEvent.text)}
-                    placeholder="Tipo"
-                    placeholderTextColor="#6B7280"
-                  />
-                </View>
-                <TextInput
-                  style={styles.priceInput}
-                  defaultValue={(item.priceCents / 100).toFixed(2)}
-                  keyboardType="decimal-pad"
-                  onSubmitEditing={(event) => void updateProductPrice(item, event.nativeEvent.text)}
-                  onEndEditing={(event) => void updateProductPrice(item, event.nativeEvent.text)}
-                />
-                <TextInput
-                  style={styles.priceInput}
-                  defaultValue={item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : ''}
-                  keyboardType="decimal-pad"
-                  placeholder="Coste"
-                  placeholderTextColor="#6B7280"
-                  onSubmitEditing={(event) => void updateProductCost(item, event.nativeEvent.text)}
-                  onEndEditing={(event) => void updateProductCost(item, event.nativeEvent.text)}
-                />
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => void updateProductImage(item)}>
-                  <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
-                </TouchableOpacity>
-                {item.imageDataUrl ? (
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void removeProductImage(item)}>
-                    <Text style={styles.secondaryButtonText}>Quitar</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {activeSection === 'pos' && useMobilePosLayout ? (
-        <MobilePosScreen {...posScreenProps} />
-      ) : null}
-
-      {activeSection === 'pos' && !useMobilePosLayout ? (
-        <DesktopPosScreen {...posScreenProps} />
-      ) : null}
-    </SafeAreaView>
-  );
+  return useMobilePosLayout
+    ? <MobileMainScreen {...mainScreenProps} />
+    : <DesktopMainScreen {...mainScreenProps} />;
 }

@@ -14,7 +14,7 @@ export const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   mobileCategoryGroup: {
-    padding: 10
+    padding: 8
   },
   categoryHeader: {
     fontSize: 18,
@@ -49,8 +49,8 @@ export const styles = StyleSheet.create({
     width: '48%',
     flexGrow: 1,
     flexBasis: '48%',
-    paddingHorizontal: 10,
-    paddingVertical: 10
+    paddingHorizontal: 8,
+    paddingVertical: 8
   },
   itemImage: {
     width: '100%',
@@ -60,7 +60,7 @@ export const styles = StyleSheet.create({
     marginBottom: 8
   },
   mobileItemImage: {
-    height: 92,
+    height: 72,
     marginBottom: 6
   },
   itemName: {
@@ -71,8 +71,8 @@ export const styles = StyleSheet.create({
     marginBottom: 4
   },
   mobileItemName: {
-    minHeight: 40,
-    fontSize: 15
+    minHeight: 34,
+    fontSize: 14
   },
   itemPrice: {
     fontSize: 17,

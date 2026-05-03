@@ -8,6 +8,15 @@ This is a monorepo with three workspaces:
 - `packages/frontend`: Expo React Native app for desktop web and phone/tablet.
 - `packages/shared`: Shared TypeScript types/constants.
 
+The frontend has separate main screens for computer and mobile:
+
+- Computer: `packages/frontend/src/native/app/DesktopMainScreen.tsx`
+- Computer styles: `packages/frontend/src/native/app/DesktopMain.styles.ts`
+- Mobile: `packages/frontend/src/native/app/MobileMainScreen.tsx`
+- Mobile styles: `packages/frontend/src/native/app/MobileMain.styles.ts`
+
+Shared state and API wiring stay in `packages/frontend/App.tsx`.
+
 ## Requirements
 
 - Node.js 18 or newer.
@@ -76,6 +85,11 @@ Phone Expo TPV: scan the QR code from the Expo server on port 8082
 ```
 
 Use the computer URL for the desktop POS. Scan the Expo QR code for the mobile POS.
+
+The root helper forces separate screen modes:
+
+- Desktop port `8081` runs with `EXPO_PUBLIC_TPV_SCREEN=desktop`.
+- Phone port `8082` runs with `EXPO_PUBLIC_TPV_SCREEN=mobile`.
 
 ## Run Separately
 
