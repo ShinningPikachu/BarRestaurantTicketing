@@ -71,13 +71,42 @@ async function parseOrThrow<T>(response: Response, message: string): Promise<T> 
 }
 
 export class ApiService {
+  private authToken: string | null = null;
+
+  setAuthToken(token: string | null): void {
+    this.authToken = token;
+  }
+
+  async login(accessCode: string): Promise<{ token: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode })
+    });
+    const result = await parseOrThrow<{ token: string }>(response, 'Failed to login');
+    this.setAuthToken(result.token);
+    return result;
+  }
+
+  private request(path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    if (this.authToken) {
+      headers.set('Authorization', `Bearer ${this.authToken}`);
+    }
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    });
+  }
+
   async fetchTables(): Promise<BackendTable[]> {
-    const response = await fetch(`${API_BASE_URL}/tables`);
+    const response = await this.request('/tables');
     return parseOrThrow<BackendTable[]>(response, 'Failed to fetch tables');
   }
 
   async addTable(zone: string): Promise<BackendTable> {
-    const response = await fetch(`${API_BASE_URL}/tables`, {
+    const response = await this.request('/tables', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ zone })
@@ -86,19 +115,19 @@ export class ApiService {
   }
 
   async deleteTable(zone: string, number: number): Promise<{ ok: boolean }> {
-    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(zone)}/${number}`, {
+    const response = await this.request(`/tables/${encodeURIComponent(zone)}/${number}`, {
       method: 'DELETE'
     });
     return parseOrThrow<{ ok: boolean }>(response, 'Failed to delete table');
   }
 
   async fetchTableWorkflow(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableZone)}/${tableNumber}/workflow`);
+    const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/workflow`);
     return parseOrThrow<TableWorkflow>(response, 'Failed to fetch table workflow');
   }
 
   async addPreOrderMenuItem(tableNumber: number, tableZone: string, menuItemId: number): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableZone)}/${tableNumber}/preorder/items`, {
+    const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/preorder/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ menuItemId })
@@ -112,7 +141,7 @@ export class ApiService {
     itemId: number,
     payload: { qty?: number; unitPriceCents?: number }
   ): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableZone)}/${tableNumber}/preorder/items/${itemId}`, {
+    const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/preorder/items/${itemId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -121,26 +150,26 @@ export class ApiService {
   }
 
   async clearPreOrder(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableZone)}/${tableNumber}/preorder/clear`, {
+    const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/preorder/clear`, {
       method: 'POST'
     });
     return parseOrThrow<TableWorkflow>(response, 'Failed to clear pre-order');
   }
 
   async sendTablePreOrderToKitchen(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableZone)}/${tableNumber}/send-to-kitchen`, {
+    const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/send-to-kitchen`, {
       method: 'POST'
     });
     return parseOrThrow<TableWorkflow>(response, 'Failed to send pre-order to kitchen');
   }
 
   async fetchOrders(): Promise<Order[]> {
-    const response = await fetch(`${API_BASE_URL}/orders`);
+    const response = await this.request('/orders');
     return parseOrThrow<Order[]>(response, 'Failed to fetch orders');
   }
 
   async createOrder(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/orders`, {
+    const response = await this.request('/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableNumber, tableZone })
@@ -149,14 +178,14 @@ export class ApiService {
   }
 
   async moveConfirmedItemToPreOrder(orderId: string, itemId: number): Promise<TableWorkflow> {
-    const response = await fetch(`${API_BASE_URL}/orders/${orderId}/items/${itemId}/move-to-preorder`, {
+    const response = await this.request(`/orders/${orderId}/items/${itemId}/move-to-preorder`, {
       method: 'POST'
     });
     return parseOrThrow<TableWorkflow>(response, 'Failed to move confirmed item to pre-order');
   }
 
   async deleteOrder(orderId: string): Promise<{ ok: boolean }> {
-    const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, { method: 'DELETE' });
+    const response = await this.request(`/orders/${orderId}`, { method: 'DELETE' });
     return parseOrThrow<{ ok: boolean }>(response, 'Failed to delete order');
   }
 
@@ -166,7 +195,7 @@ export class ApiService {
     method: PaymentMethod,
     splitPeople?: number
   ): Promise<PaymentResult> {
-    const response = await fetch(`${API_BASE_URL}/orders/pay-table`, {
+    const response = await this.request('/orders/pay-table', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableNumber, tableZone, method, splitPeople })
@@ -180,7 +209,7 @@ export class ApiService {
     method: PaymentMethod,
     items: Array<{ orderId: string; itemId: number; qty: number }>
   ): Promise<PaymentResult> {
-    const response = await fetch(`${API_BASE_URL}/orders/pay-items`, {
+    const response = await this.request('/orders/pay-items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableNumber, tableZone, method, items })
@@ -189,12 +218,12 @@ export class ApiService {
   }
 
   async fetchMenu(): Promise<MenuItem[]> {
-    const response = await fetch(`${API_BASE_URL}/menu`);
+    const response = await this.request('/menu');
     return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu');
   }
 
   async fetchManageMenu(): Promise<MenuItem[]> {
-    const response = await fetch(`${API_BASE_URL}/menu/manage/all`);
+    const response = await this.request('/menu/manage/all');
     return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu for management');
   }
 
@@ -208,7 +237,7 @@ export class ApiService {
     imageDataUrl?: string | null;
     available?: boolean;
   }): Promise<MenuItem> {
-    const response = await fetch(`${API_BASE_URL}/menu`, {
+    const response = await this.request('/menu', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -229,7 +258,7 @@ export class ApiService {
       available?: boolean;
     }
   ): Promise<MenuItem> {
-    const response = await fetch(`${API_BASE_URL}/menu/${id}`, {
+    const response = await this.request(`/menu/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -238,7 +267,7 @@ export class ApiService {
   }
 
   async importMenuCsv(csv: string): Promise<{ created: number; updated: number; total: number }> {
-    const response = await fetch(`${API_BASE_URL}/menu/import/csv`, {
+    const response = await this.request('/menu/import/csv', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ csv })
@@ -247,12 +276,12 @@ export class ApiService {
   }
 
   async fetchPaidTickets(): Promise<PaidTicket[]> {
-    const response = await fetch(`${API_BASE_URL}/tickets`);
+    const response = await this.request('/tickets');
     return parseOrThrow<PaidTicket[]>(response, 'Failed to fetch paid tickets');
   }
 
   async fetchSessionSummary(): Promise<SessionSummary> {
-    const response = await fetch(`${API_BASE_URL}/tickets/summary/session`);
+    const response = await this.request('/tickets/summary/session');
     return parseOrThrow<SessionSummary>(response, 'Failed to fetch session summary');
   }
 
@@ -279,7 +308,7 @@ export class ApiService {
     printerName?: string;
     usbDevice?: string;
   }): Promise<{ printed: boolean }> {
-    const response = await fetch(`${API_BASE_URL}/printers/xprinter/ticket`, {
+    const response = await this.request('/printers/xprinter/ticket', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -293,7 +322,7 @@ export class ApiService {
     printerName?: string;
     usbDevice?: string;
   } = {}): Promise<{ opened: boolean }> {
-    const response = await fetch(`${API_BASE_URL}/printers/xprinter/drawer`, {
+    const response = await this.request('/printers/xprinter/drawer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

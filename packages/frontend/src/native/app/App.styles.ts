@@ -30,6 +30,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
   header: {
     color: colors.text,
     fontSize: 20,
@@ -40,6 +45,37 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     fontWeight: '600'
+  },
+  loginScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  loginPanel: {
+    width: '100%',
+    maxWidth: 380,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    padding: 18
+  },
+  loginTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8
+  },
+  loginInput: {
+    borderColor: colors.inputBorder,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: colors.inputBackground,
+    color: colors.inputText,
+    marginBottom: 12,
+    fontSize: 18
   },
   columnsContent: {
     flexGrow: 1,

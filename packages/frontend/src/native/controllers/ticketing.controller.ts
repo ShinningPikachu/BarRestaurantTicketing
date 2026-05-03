@@ -7,7 +7,7 @@ import { useTicketController } from './ticket.controller';
 import { useWorkflowController } from './workflow.controller';
 import { logger } from '../utils/logger';
 
-export function useTicketingController() {
+export function useTicketingController(enabled = true) {
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
 
@@ -25,7 +25,14 @@ export function useTicketingController() {
 
   // Initialization - separated for clarity
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
     const initializeApp = async () => {
+      setLoading(true);
       try {
         logger.debug({}, 'Initializing application');
         
@@ -42,11 +49,11 @@ export function useTicketingController() {
         logger.info({}, 'Application initialized successfully');
       } catch (error) {
         logger.error({ error }, 'Initialization failed');
-        if (mountedRef.current) {
+        if (mountedRef.current && active) {
           Alert.alert('Error de inicialización', 'No se pudieron cargar los datos de la aplicación.');
         }
       } finally {
-        if (mountedRef.current) {
+        if (mountedRef.current && active) {
           setLoading(false);
         }
       }
@@ -55,9 +62,9 @@ export function useTicketingController() {
     initializeApp();
 
     return () => {
-      mountedRef.current = false;
+      active = false;
     };
-  }, []);
+  }, [enabled]);
 
   // Table selection - with workflow refresh
   async function selectTable(table: TableId): Promise<void> {

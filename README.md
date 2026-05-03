@@ -24,6 +24,25 @@ Optional:
 - Expo Go on a phone/tablet for the mobile POS.
 - A browser for the desktop POS.
 
+## Login
+
+The POS requires a login code on both computer and mobile screens. The backend also protects `/api/*` routes, so people on the same network cannot use the API without logging in.
+
+Default development access code:
+
+```text
+1234
+```
+
+For real use, set your own code in `.env`:
+
+```env
+POS_ACCESS_CODE=ChangeThisCode
+POS_AUTH_TOKEN=ChangeThisLongRandomToken
+```
+
+Use the same `.env` when running `npm run dev`, because the backend reads these values.
+
 ## Quick Start
 
 Install dependencies from the repo root:
@@ -93,6 +112,9 @@ Example `.env`:
 ```env
 PORT=3000
 DATABASE_URL=file:./dev.db
+
+POS_ACCESS_CODE=ChangeThisCode
+POS_AUTH_TOKEN=ChangeThisLongRandomToken
 
 EXPO_PUBLIC_TICKET_TRADE_NAME=Your Restaurant Name
 EXPO_PUBLIC_TICKET_BUSINESS_NAME=Your Legal Business Name

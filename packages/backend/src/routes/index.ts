@@ -5,10 +5,14 @@ import menuRouter from './menu';
 import tablesRouter from './tables';
 import ticketsRouter from './tickets';
 import printersRouter from './printers';
+import authRouter from './auth';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 router.use('/health', healthRouter);
+router.use('/api/auth', authRouter);
+router.use('/api', requireAuth);
 router.use('/api/orders', ordersRouter);
 router.use('/api/menu', menuRouter);
 router.use('/api/tables', tablesRouter);

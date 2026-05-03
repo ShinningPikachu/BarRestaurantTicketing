@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
@@ -31,7 +32,9 @@ const MIN_SEARCH_LENGTH = 2;
 const MAX_SEARCH_RESULTS = 24;
 const PRODUCT_IMAGE_MAX_SIZE = 512;
 const PRODUCT_IMAGE_QUALITY = 0.82;
+const AUTH_TOKEN_STORAGE_KEY = 'bar-ticketing-auth-token';
 type AppSection = 'home' | 'pos' | 'history' | 'products';
+type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
 
 interface ExpoLikeGlobal {
   process?: {
@@ -201,7 +204,10 @@ function buildPaidTicketHtml(ticket: PaidTicket): string {
 }
 
 export default function App(): React.JSX.Element {
-  const { state, actions } = useTicketingController();
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [accessCode, setAccessCode] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const { state, actions } = useTicketingController(authStatus === 'signedIn');
   const { width } = useWindowDimensions();
   const [activeSection, setActiveSection] = useState<AppSection>('home');
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
@@ -227,6 +233,21 @@ export default function App(): React.JSX.Element {
     preorderTotal,
     priceDraftByItemId
   } = state;
+
+  useEffect(() => {
+    async function restoreLogin(): Promise<void> {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token) {
+        apiService.setAuthToken(token);
+        setAuthStatus('signedIn');
+        return;
+      }
+
+      setAuthStatus('signedOut');
+    }
+
+    void restoreLogin();
+  }, []);
   const menuCategories = useMemo(() => Array.from(menuByCategory.keys()), [menuByCategory]);
   const visibleMenuCategory = selectedMenuCategory && menuByCategory.has(selectedMenuCategory)
     ? selectedMenuCategory
@@ -314,6 +335,34 @@ export default function App(): React.JSX.Element {
     } catch {
       Alert.alert('Error', 'No se pudo cargar el resumen de sesión.');
     }
+  }
+
+  async function handleLogin(): Promise<void> {
+    const trimmedCode = accessCode.trim();
+    if (!trimmedCode) {
+      Alert.alert('Código requerido', 'Introduce el código de acceso.');
+      return;
+    }
+
+    setLoginLoading(true);
+    try {
+      const result = await apiService.login(trimmedCode);
+      await AsyncStorage.setItem(AUTH_TOKEN_STORAGE_KEY, result.token);
+      setAccessCode('');
+      setActiveSection('home');
+      setAuthStatus('signedIn');
+    } catch {
+      Alert.alert('Acceso denegado', 'El código de acceso no es correcto.');
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleLogout(): Promise<void> {
+    apiService.setAuthToken(null);
+    await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    setActiveSection('home');
+    setAuthStatus('signedOut');
   }
 
   async function loadManagedProducts(): Promise<void> {
@@ -680,6 +729,42 @@ export default function App(): React.JSX.Element {
     }
   }, [activeSection]);
 
+  if (authStatus === 'checking') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <Text style={styles.title}>Comprobando acceso...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (authStatus === 'signedOut') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loginScreen}>
+          <View style={styles.loginPanel}>
+            <Text style={styles.loginTitle}>TPV Restaurante</Text>
+            <Text style={styles.helperText}>Introduce el código de acceso para continuar.</Text>
+            <TextInput
+              style={styles.loginInput}
+              value={accessCode}
+              onChangeText={setAccessCode}
+              placeholder="Código de acceso"
+              placeholderTextColor="#6B7280"
+              secureTextEntry
+              autoFocus
+              onSubmitEditing={() => void handleLogin()}
+            />
+            <TouchableOpacity style={styles.primaryButton} onPress={() => void handleLogin()} disabled={loginLoading}>
+              <Text style={styles.primaryButtonText}>{loginLoading ? 'Entrando...' : 'Entrar'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -694,11 +779,16 @@ export default function App(): React.JSX.Element {
     <SafeAreaView style={styles.container}>
       <View style={styles.headerBar}>
         <Text style={styles.header}>TPV Restaurante</Text>
-        {activeSection !== 'home' ? (
-          <TouchableOpacity style={styles.headerButton} onPress={() => setActiveSection('home')}>
-            <Text style={styles.secondaryButtonText}>Inicio</Text>
+        <View style={styles.headerActions}>
+          {activeSection !== 'home' ? (
+            <TouchableOpacity style={styles.headerButton} onPress={() => setActiveSection('home')}>
+              <Text style={styles.secondaryButtonText}>Inicio</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.headerButton} onPress={() => void handleLogout()}>
+            <Text style={styles.secondaryButtonText}>Salir</Text>
           </TouchableOpacity>
-        ) : null}
+        </View>
       </View>
 
       {activeSection === 'home' ? (

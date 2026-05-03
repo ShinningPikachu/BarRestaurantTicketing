@@ -13,4 +13,8 @@ export const config = {
     usbDevice: process.env.XPRINTER_USB_DEVICE || '',
     openDrawer: process.env.XPRINTER_OPEN_DRAWER === 'true',
   },
+  auth: {
+    accessCode: process.env.POS_ACCESS_CODE || '1234',
+    sessionToken: process.env.POS_AUTH_TOKEN || `pos-token-${process.env.POS_ACCESS_CODE || '1234'}`,
+  },
 } as const;
