@@ -756,6 +756,15 @@ export const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: colors.surfaceAlt
   },
+  preorderEditableRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch'
+  },
+  preorderMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
   confirmedPreorderRow: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -920,7 +929,10 @@ export const styles = StyleSheet.create({
   },
   priceQuickActions: {
     flexDirection: 'row',
-    gap: 4
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 4,
+    width: '100%'
   },
   priceQuickButton: {
     backgroundColor: colors.surface,

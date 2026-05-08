@@ -34,6 +34,15 @@ interface ConfirmedItemRow {
   item: OrderItem;
 }
 
+const PRICE_ADJUSTMENTS = [
+  { label: '+0.10', deltaCents: 10 },
+  { label: '+0.50', deltaCents: 50 },
+  { label: '+1.00', deltaCents: 100 },
+  { label: '-0.10', deltaCents: -10 },
+  { label: '-0.50', deltaCents: -50 },
+  { label: '-1.00', deltaCents: -100 }
+];
+
 export function OrderSection({
   selectedTable,
   preorderItems,
@@ -209,40 +218,45 @@ export function OrderSection({
             ? getMenuTitleById(menuByCategory, item.menuItemId)
             : item.name;
           return (
-            <View style={styles.preorderRow}>
-              <View style={styles.flex1}>
-                <Text style={styles.itemName}>{title}</Text>
-                <Text style={styles.itemPrice}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
-              </View>
+            <View style={[styles.preorderRow, styles.preorderEditableRow]}>
+              <View style={styles.preorderMainRow}>
+                <View style={styles.flex1}>
+                  <Text style={styles.itemName}>{title}</Text>
+                  <Text style={styles.itemPrice}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
+                </View>
 
-              <View style={styles.qtyGroup}>
-                <TouchableOpacity style={styles.qtyButton} onPress={() => onRemovePendingItem(item.id)}>
-                  <Text style={styles.qtyButtonText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyText}>{item.qty}</Text>
-                <TouchableOpacity style={styles.qtyButton} onPress={() => onAddPendingItem(item.id)}>
-                  <Text style={styles.qtyButtonText}>+</Text>
-                </TouchableOpacity>
-              </View>
+                <View style={styles.qtyGroup}>
+                  <TouchableOpacity style={styles.qtyButton} onPress={() => onRemovePendingItem(item.id)}>
+                    <Text style={styles.qtyButtonText}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyText}>{item.qty}</Text>
+                  <TouchableOpacity style={styles.qtyButton} onPress={() => onAddPendingItem(item.id)}>
+                    <Text style={styles.qtyButtonText}>+</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <TextInput
-                style={styles.priceInput}
-                keyboardType="decimal-pad"
-                value={priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
-                selectTextOnFocus
-                placeholder="0.00"
-                onChangeText={(value) => onUpdatePriceDraft(item.id, value)}
-                onBlur={() => onCommitPriceDraft(item.id)}
-                onSubmitEditing={() => onCommitPriceDraft(item.id)}
-              />
+                <TextInput
+                  style={styles.priceInput}
+                  keyboardType="decimal-pad"
+                  value={priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
+                  selectTextOnFocus
+                  placeholder="0.00"
+                  onChangeText={(value) => onUpdatePriceDraft(item.id, value)}
+                  onBlur={() => onCommitPriceDraft(item.id)}
+                  onSubmitEditing={() => onCommitPriceDraft(item.id)}
+                />
+              </View>
 
               <View style={styles.priceQuickActions}>
-                <TouchableOpacity style={styles.priceQuickButton} onPress={() => onAdjustItemPrice(item.id, 50)}>
-                  <Text style={styles.priceQuickButtonText}>+0.50</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.priceQuickButton} onPress={() => onAdjustItemPrice(item.id, 100)}>
-                  <Text style={styles.priceQuickButtonText}>+1.00</Text>
-                </TouchableOpacity>
+                {PRICE_ADJUSTMENTS.map((adjustment) => (
+                  <TouchableOpacity
+                    key={adjustment.label}
+                    style={styles.priceQuickButton}
+                    onPress={() => onAdjustItemPrice(item.id, adjustment.deltaCents)}
+                  >
+                    <Text style={styles.priceQuickButtonText}>{adjustment.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           );
