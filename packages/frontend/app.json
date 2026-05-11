@@ -10,6 +10,9 @@
       }
     },
     "android": {
+      "package": "com.barrestaurantticketing.pos",
+      "versionCode": 1,
+      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA"
       ]

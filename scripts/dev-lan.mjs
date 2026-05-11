@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function loadEnvFile(filePath) {
@@ -38,7 +38,14 @@ function loadEnvFile(filePath) {
 loadEnvFile(resolve(process.cwd(), '.env'));
 
 function getLanIp() {
-  const interfaces = os.networkInterfaces();
+  let interfaces;
+  try {
+    interfaces = os.networkInterfaces();
+  } catch (error) {
+    console.warn(`Could not inspect network interfaces: ${error.message}`);
+    return 'localhost';
+  }
+
   const candidates = [];
 
   for (const [name, addresses] of Object.entries(interfaces)) {
@@ -61,35 +68,68 @@ const backendPort = process.env.PORT || '3000';
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${getLanIp()}:${backendPort}/api`;
 const desktopPort = process.env.DESKTOP_EXPO_PORT || '8081';
 const phonePort = process.env.PHONE_EXPO_PORT || '8082';
+const cacheRoot = resolve(process.cwd(), '.cache', 'expo');
+const desktopExpoHome = resolve(cacheRoot, 'desktop');
+const phoneExpoHome = resolve(cacheRoot, 'phone');
 
-const childProcesses = [
-  spawn(npmCommand, ['run', 'dev', '-w', 'backend'], {
-    stdio: 'inherit',
-    env: process.env,
-  }),
-  spawn(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', desktopPort], {
+mkdirSync(desktopExpoHome, { recursive: true });
+mkdirSync(phoneExpoHome, { recursive: true });
+
+let shuttingDown = false;
+const childProcesses = [];
+
+function spawnChild(command, args, options) {
+  const child = spawn(command, args, options);
+  childProcesses.push(child);
+  attachExitHandler(child);
+  return child;
+}
+
+function attachExitHandler(child) {
+  child.on('exit', (code, signal) => {
+    if (shuttingDown) {
+      return;
+    }
+    if (code !== 0 && signal !== 'SIGINT') {
+      shutdown(code ?? 1);
+    }
+  });
+}
+
+spawnChild(npmCommand, ['run', 'dev', '-w', 'backend'], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', desktopPort], {
+  stdio: 'inherit',
+  env: {
+    ...process.env,
+    EXPO_HOME: desktopExpoHome,
+    EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
+    EXPO_PUBLIC_TPV_SCREEN: 'desktop',
+  },
+});
+
+setTimeout(() => {
+  if (shuttingDown) {
+    return;
+  }
+
+  spawnChild(npmCommand, ['run', 'dev:phone', '-w', 'frontend', '--', '--port', phonePort], {
     stdio: 'inherit',
     env: {
       ...process.env,
-      EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
-      EXPO_PUBLIC_TPV_SCREEN: 'desktop',
-    },
-  }),
-  spawn(npmCommand, ['run', 'dev:phone', '-w', 'frontend', '--', '--port', phonePort], {
-    stdio: 'inherit',
-    env: {
-      ...process.env,
+      EXPO_HOME: phoneExpoHome,
       EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
       EXPO_PUBLIC_TPV_SCREEN: 'mobile',
     },
-  }),
-];
+  });
+}, 1500);
 
 console.log(`\nBackend API shared by both screens: ${apiBaseUrl}`);
 console.log(`Computer web TPV: http://localhost:${desktopPort}`);
 console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
-
-let shuttingDown = false;
 
 function shutdown(exitCode = 0) {
   if (shuttingDown) {
@@ -102,17 +142,6 @@ function shutdown(exitCode = 0) {
     }
   }
   process.exitCode = exitCode;
-}
-
-for (const child of childProcesses) {
-  child.on('exit', (code, signal) => {
-    if (shuttingDown) {
-      return;
-    }
-    if (code !== 0 && signal !== 'SIGINT') {
-      shutdown(code ?? 1);
-    }
-  });
 }
 
 process.on('SIGINT', () => shutdown(0));

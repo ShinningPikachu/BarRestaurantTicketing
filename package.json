@@ -8,6 +8,7 @@
     "bootstrap": "npm install",
     "build": "npm run -w backend build && npm run -w frontend build && npm run -w shared build",
     "dev": "node scripts/dev-lan.mjs",
+    "android:apk": "node scripts/build-android-apk.mjs",
     "test": "npm run -w backend test",
     "check:fast": "npm run -w backend test && npm run -w shared build && npm run -w frontend typecheck",
     "check": "npm run -w backend test && npm run -w backend build && npm run -w shared build && npm run -w frontend build"

@@ -43,6 +43,7 @@ packages/*/build
 
 # Caches and temp files
 .cache/
+.gradle/
 .parcel-cache/
 .next/
 tmp/
@@ -55,3 +56,4 @@ tmp/
 packages/frontend/.expo/
 packages/frontend/dist/
 packages/frontend/build/
+packages/frontend/android/

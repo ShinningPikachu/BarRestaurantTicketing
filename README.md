@@ -117,6 +117,65 @@ If using a physical phone, the phone must reach the backend. Set the API URL to 
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run -w frontend dev:phone
 ```
 
+## Install Android App
+
+You can build a local Android APK so the phone opens the POS as a normal installed app instead of scanning the Expo QR code.
+
+Prerequisites:
+
+- Java 17.
+- Android Studio or Android SDK command-line tools.
+- Android SDK Platform/Build Tools for API 36.
+- Android NDK `27.1.12297006`.
+- Accepted Android SDK licenses.
+- `adb` for USB installation.
+
+If Android Studio is installed, open `Settings > Languages & Frameworks > Android SDK > SDK Tools`, install the Android SDK Command-line Tools and NDK, then accept licenses. On Ubuntu/Debian, install the command-line tools first if `sdkmanager` is not available:
+
+```bash
+sudo apt install google-android-cmdline-tools-13.0-installer
+sudo env JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/android-sdk/cmdline-tools/13.0/bin/sdkmanager --licenses
+sudo env JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/android-sdk/cmdline-tools/13.0/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
+```
+
+The Android app still needs the backend running on the computer:
+
+```bash
+npm run -w backend dev
+```
+
+Build the APK from the repo root:
+
+```bash
+npm run android:apk
+```
+
+The build script uses your computer LAN IP automatically and bakes this URL into the app:
+
+```text
+http://YOUR_COMPUTER_LAN_IP:3000/api
+```
+
+If you want to force a specific backend URL, set it before building:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run android:apk
+```
+
+The generated APK is:
+
+```text
+packages/frontend/android/app/build/outputs/apk/release/app-release.apk
+```
+
+Install it on a connected Android phone with USB debugging enabled:
+
+```bash
+adb install -r packages/frontend/android/app/build/outputs/apk/release/app-release.apk
+```
+
+The phone and computer must stay on the same network, and the computer firewall must allow the backend port, usually `3000`.
+
 ## Environment
 
 The root `npm run dev` script reads a root `.env` file if present.

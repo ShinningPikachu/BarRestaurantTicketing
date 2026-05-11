@@ -7,6 +7,8 @@
     "dev": "expo start",
     "dev:phone": "expo start --lan",
     "android": "expo run:android",
+    "android:prebuild": "expo prebuild --platform android",
+    "android:apk": "node ../../scripts/build-android-apk.mjs",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "web:desktop": "expo start --web",
