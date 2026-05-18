@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Install BarRestaurantTicketing
+Comment=Prepare BarRestaurantTicketing and create desktop buttons
+Exec=/home/jinhenglin/Documents/BarRestaurantTicketing/Install_BarRestaurantTicketing.sh
+Path=/home/jinhenglin/Documents/BarRestaurantTicketing
+Terminal=true
+Categories=Office;Utility;

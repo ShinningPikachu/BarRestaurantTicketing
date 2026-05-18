@@ -93,6 +93,19 @@ The root helper forces separate screen modes:
 
 ## Clickable Local Launcher
 
+For a normal user, run the installer once:
+
+```text
+Install_BarRestaurantTicketing.desktop
+```
+
+It prepares the app, installs npm libraries, prepares Prisma/database files, and creates two desktop buttons:
+
+```text
+Start BarRestaurantTicketing
+Stop BarRestaurantTicketing
+```
+
 On Linux desktops, you can start the local POS without typing terminal commands:
 
 ```text
