@@ -23,14 +23,6 @@ export class ApiRequestError extends Error {
   }
 }
 
-interface ExpoLikeGlobal {
-  process?: {
-    env?: {
-      EXPO_PUBLIC_API_BASE_URL?: string;
-    };
-  };
-}
-
 function defaultApiBaseUrl(): string {
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3000/api';
@@ -38,8 +30,12 @@ function defaultApiBaseUrl(): string {
   return 'http://localhost:3000/api';
 }
 
-const envBaseUrl = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_API_BASE_URL;
+const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 const API_BASE_URL = (envBaseUrl || defaultApiBaseUrl()).replace(/\/$/, '');
+
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
 
 async function parseOrThrow<T>(response: Response, message: string): Promise<T> {
   const json = await response.json().catch(() => undefined);

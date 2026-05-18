@@ -18,6 +18,7 @@ import { useTicketingController } from './src/native/controllers';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
 import { apiService } from './src/native/services';
+import { ApiRequestError, getApiBaseUrl } from './src/native/services/api';
 import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
 import { MobileMainScreen } from './src/native/app/MobileMainScreen';
@@ -350,8 +351,15 @@ export default function App(): React.JSX.Element {
       setAccessCode('');
       setActiveSection('home');
       setAuthStatus('signedIn');
-    } catch {
-      Alert.alert('Acceso denegado', 'El código de acceso no es correcto.');
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === 'INVALID_LOGIN') {
+        Alert.alert('Acceso denegado', 'El código de acceso no es correcto.');
+      } else {
+        Alert.alert(
+          'No se pudo conectar',
+          `El teléfono no puede conectar con el servidor.\n\nServidor configurado:\n${getApiBaseUrl()}\n\nComprueba que la aplicación esté abierta en el ordenador y que el teléfono esté en la misma red Wi-Fi.`
+        );
+      }
     } finally {
       setLoginLoading(false);
     }
@@ -745,6 +753,7 @@ export default function App(): React.JSX.Element {
           <View style={styles.loginPanel}>
             <Text style={styles.loginTitle}>TPV Restaurante</Text>
             <Text style={styles.helperText}>Introduce el código de acceso para continuar.</Text>
+            <Text style={styles.helperText}>{`Servidor: ${getApiBaseUrl()}`}</Text>
             <TextInput
               style={styles.loginInput}
               value={accessCode}

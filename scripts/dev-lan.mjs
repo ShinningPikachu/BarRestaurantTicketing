@@ -118,6 +118,7 @@ spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', 
   stdio: 'inherit',
   env: {
     ...process.env,
+    BROWSER: 'none',
     EXPO_HOME: desktopExpoHome,
     EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
     EXPO_PUBLIC_TPV_SCREEN: 'desktop',

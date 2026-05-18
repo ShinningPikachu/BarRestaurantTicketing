@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -92,6 +92,32 @@ function run(command, args, options = {}) {
 
     child.on('error', reject);
   });
+}
+
+function ensureAndroidCleartextTraffic() {
+  const manifestPath = resolve(androidDir, 'app/src/main/AndroidManifest.xml');
+  if (!existsSync(manifestPath)) {
+    console.warn(`Android manifest was not found at ${manifestPath}`);
+    return;
+  }
+
+  const manifest = readFileSync(manifestPath, 'utf8');
+  if (manifest.includes('android:usesCleartextTraffic=')) {
+    return;
+  }
+
+  const updatedManifest = manifest.replace(
+    /<application\b/,
+    '<application android:usesCleartextTraffic="true"'
+  );
+
+  if (updatedManifest === manifest) {
+    console.warn('Could not add android:usesCleartextTraffic to AndroidManifest.xml');
+    return;
+  }
+
+  writeFileSync(manifestPath, updatedManifest, 'utf8');
+  console.log('Enabled Android cleartext HTTP traffic for local backend access.');
 }
 
 loadEnvFile(resolve(repoRoot, '.env'));
@@ -209,6 +235,8 @@ await run(npmCommand, ['run', 'android:prebuild', '-w', 'frontend'], {
   cwd: repoRoot,
   env: buildEnv,
 });
+
+ensureAndroidCleartextTraffic();
 
 await run(gradleCommand, ['assembleRelease'], {
   cwd: androidDir,
