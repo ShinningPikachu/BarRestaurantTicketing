@@ -9,6 +9,13 @@ import { TableZoneGroup } from '../TableZoneGroup/TableZoneGroup';
 type MenuLayout = 'desktop' | 'mobile';
 type MobileTpvView = 'tables' | 'menu' | 'ticket';
 
+const MOBILE_PRICE_ADJUSTMENTS = [
+  { label: '-0,50', deltaCents: -50 },
+  { label: '-0,10', deltaCents: -10 },
+  { label: '+0,10', deltaCents: 10 },
+  { label: '+0,50', deltaCents: 50 },
+];
+
 interface ConfirmedItemRow {
   key: string;
   orderId: string;
@@ -162,19 +169,45 @@ function MobilePreorderItem({
     : item.name;
 
   return (
-    <View style={styles.mobileOrderItem}>
-      <View style={styles.flex1}>
-        <Text style={styles.mobileOrderItemName} numberOfLines={2}>{title}</Text>
-        <Text style={styles.mobileOrderItemPrice}>{orderProps.formatPrice(item.unitPriceCents * item.qty)}</Text>
+    <View style={[styles.mobileOrderItem, styles.mobileEditableOrderItem]}>
+      <View style={styles.mobilePreorderMainRow}>
+        <View style={styles.flex1}>
+          <Text style={styles.mobileOrderItemName} numberOfLines={2}>{title}</Text>
+          <Text style={styles.mobileOrderItemPrice}>{orderProps.formatPrice(item.unitPriceCents * item.qty)}</Text>
+        </View>
+        <View style={styles.qtyGroup}>
+          <TouchableOpacity style={[styles.qtyButton, styles.mobileQtyButton]} onPress={() => orderProps.onRemovePendingItem(item.id)}>
+            <Text style={styles.mobileQtyButtonText}>-</Text>
+          </TouchableOpacity>
+          <Text style={styles.mobileQtyText}>{item.qty}</Text>
+          <TouchableOpacity style={[styles.qtyButton, styles.mobileQtyButton]} onPress={() => orderProps.onAddPendingItem(item.id)}>
+            <Text style={styles.mobileQtyButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.qtyGroup}>
-        <TouchableOpacity style={[styles.qtyButton, styles.mobileQtyButton]} onPress={() => orderProps.onRemovePendingItem(item.id)}>
-          <Text style={styles.mobileQtyButtonText}>-</Text>
-        </TouchableOpacity>
-        <Text style={styles.mobileQtyText}>{item.qty}</Text>
-        <TouchableOpacity style={[styles.qtyButton, styles.mobileQtyButton]} onPress={() => orderProps.onAddPendingItem(item.id)}>
-          <Text style={styles.mobileQtyButtonText}>+</Text>
-        </TouchableOpacity>
+      <View style={styles.mobilePriceEditRow}>
+        <TextInput
+          style={[styles.priceInput, styles.mobilePriceInput]}
+          keyboardType="decimal-pad"
+          value={orderProps.priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
+          selectTextOnFocus
+          placeholder="0.00"
+          placeholderTextColor="#6B7280"
+          onChangeText={(value) => orderProps.onUpdatePriceDraft(item.id, value)}
+          onBlur={() => orderProps.onCommitPriceDraft(item.id)}
+          onSubmitEditing={() => orderProps.onCommitPriceDraft(item.id)}
+        />
+        <View style={styles.mobilePriceQuickActions}>
+          {MOBILE_PRICE_ADJUSTMENTS.map((adjustment) => (
+            <TouchableOpacity
+              key={adjustment.label}
+              style={styles.mobilePriceQuickButton}
+              onPress={() => orderProps.onAdjustItemPrice(item.id, adjustment.deltaCents)}
+            >
+              <Text style={styles.mobilePriceQuickButtonText}>{adjustment.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     </View>
   );

@@ -343,6 +343,49 @@ export const styles = StyleSheet.create({
     paddingVertical: 7,
     marginBottom: 6
   },
+  mobileEditableOrderItem: {
+    flexDirection: 'column',
+    alignItems: 'stretch'
+  },
+  mobilePreorderMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  mobilePriceEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%'
+  },
+  mobilePriceInput: {
+    width: 70,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    fontSize: 13
+  },
+  mobilePriceQuickActions: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 4
+  },
+  mobilePriceQuickButton: {
+    minWidth: 44,
+    minHeight: 32,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6
+  },
+  mobilePriceQuickButtonText: {
+    color: colors.buttonSecondaryText,
+    fontWeight: '700',
+    fontSize: 11
+  },
   mobileStickyActions: {
     flexDirection: 'row',
     gap: 6,
