@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Stop BarRestaurantTicketing
+Comment=Stop the local BarRestaurantTicketing POS application
+Exec=/home/jinhenglin/Documents/BarRestaurantTicketing/Stop_BarRestaurantTicketing.sh
+Path=/home/jinhenglin/Documents/BarRestaurantTicketing
+Terminal=true
+Categories=Office;Utility;

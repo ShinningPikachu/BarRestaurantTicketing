@@ -91,6 +91,76 @@ The root helper forces separate screen modes:
 - Desktop port `8081` runs with `EXPO_PUBLIC_TPV_SCREEN=desktop`.
 - Phone port `8082` runs with `EXPO_PUBLIC_TPV_SCREEN=mobile`.
 
+## Clickable Local Launcher
+
+On Linux desktops, you can start the local POS without typing terminal commands:
+
+```text
+Start_BarRestaurantTicketing.desktop
+```
+
+Double-click it from the repository folder and choose to run it if your file manager asks. It installs missing npm libraries when needed, opens a terminal window, starts the backend and frontend, then opens the desktop POS at:
+
+```text
+http://localhost:8081
+```
+
+Keep the terminal window open while using the app. Press `Ctrl+C` in that window to stop it.
+
+If the POS is already running, double-clicking the same start icon again only opens or focuses the existing POS screen. It does not start a second copy. If someone accidentally closes only the POS browser window, double-click the start icon again to reopen it.
+
+If the app keeps running or you closed the terminal window, double-click:
+
+```text
+Stop_BarRestaurantTicketing.desktop
+```
+
+You can also stop it from the repo root with:
+
+```bash
+npm run stop
+```
+
+## Single-File Linux Package
+
+You can also create one movable executable file:
+
+```bash
+npm run package:linux
+```
+
+This creates:
+
+```text
+.dist/BarRestaurantTicketing-linux.run
+```
+
+Move that one `.run` file to another Linux computer and double-click it, or run:
+
+```bash
+./BarRestaurantTicketing-linux.run
+```
+
+On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, checks for Node.js 18+ and npm, installs the npm libraries, prepares Prisma, and opens the desktop POS at `http://localhost:8081`.
+
+If the portable app is already running, opening the `.run` file again only opens or focuses the POS screen. It will not start a duplicate backend/frontend server.
+
+To stop a portable app started from the `.run` file, run:
+
+```bash
+./BarRestaurantTicketing-linux.run --stop
+```
+
+After the first launch, the installed folder also contains `Stop_BarRestaurantTicketing.desktop`.
+
+If you want the package to include the already-installed `node_modules` folder for a more offline-friendly bundle, run:
+
+```bash
+npm run package:linux:offline
+```
+
+That file will be much larger and is best used on a similar Linux system.
+
 ## Run Separately
 
 Backend only:

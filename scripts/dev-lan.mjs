@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function loadEnvFile(filePath) {
@@ -69,6 +69,7 @@ const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${getLanIp()}
 const desktopPort = process.env.DESKTOP_EXPO_PORT || '8081';
 const phonePort = process.env.PHONE_EXPO_PORT || '8082';
 const cacheRoot = resolve(process.cwd(), '.cache', 'expo');
+const pidFile = resolve(process.cwd(), '.cache', 'bar-restaurant-ticketing.pids');
 const desktopExpoHome = resolve(cacheRoot, 'desktop');
 const phoneExpoHome = resolve(cacheRoot, 'phone');
 
@@ -78,9 +79,21 @@ mkdirSync(phoneExpoHome, { recursive: true });
 let shuttingDown = false;
 const childProcesses = [];
 
+function writePidFile() {
+  const pids = childProcesses
+    .map((child) => child.pid)
+    .filter(Boolean);
+
+  writeFileSync(pidFile, `${pids.join('\n')}\n`, 'utf8');
+}
+
 function spawnChild(command, args, options) {
-  const child = spawn(command, args, options);
+  const child = spawn(command, args, {
+    ...options,
+    detached: process.platform !== 'win32',
+  });
   childProcesses.push(child);
+  writePidFile();
   attachExitHandler(child);
   return child;
 }
@@ -138,9 +151,18 @@ function shutdown(exitCode = 0) {
   shuttingDown = true;
   for (const child of childProcesses) {
     if (!child.killed) {
-      child.kill('SIGINT');
+      try {
+        if (process.platform === 'win32') {
+          child.kill('SIGINT');
+        } else {
+          process.kill(-child.pid, 'SIGINT');
+        }
+      } catch {
+        child.kill('SIGINT');
+      }
     }
   }
+  rmSync(pidFile, { force: true });
   process.exitCode = exitCode;
 }
 
