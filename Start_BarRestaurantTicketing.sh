@@ -3,6 +3,7 @@ set -u
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DESKTOP_URL="${DESKTOP_URL:-http://localhost:8081}"
+REQUIRED_NODE_VERSION="20.19.4"
 
 cd "$APP_DIR" || exit 1
 
@@ -12,7 +13,15 @@ echo
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is not installed or is not available in PATH."
-  echo "Install Node.js 18 or newer, then run this launcher again."
+  echo "Install Node.js $REQUIRED_NODE_VERSION or newer, then run this launcher again."
+  echo
+  read -r -p "Press Enter to close this window..."
+  exit 1
+fi
+
+if ! node -e "const required = '$REQUIRED_NODE_VERSION'.split('.').map(Number); const current = process.versions.node.split('.').map(Number); process.exit(current[0] > required[0] || (current[0] === required[0] && (current[1] > required[1] || (current[1] === required[1] && current[2] >= required[2]))) ? 0 : 1)" >/dev/null 2>&1; then
+  echo "Node.js $REQUIRED_NODE_VERSION or newer is required. Current version:"
+  node --version
   echo
   read -r -p "Press Enter to close this window..."
   exit 1

@@ -3,6 +3,7 @@ set -u
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="BarRestaurantTicketing"
+REQUIRED_NODE_VERSION="20.19.4"
 
 cd "$APP_DIR" || exit 1
 
@@ -26,12 +27,12 @@ fail() {
 }
 
 if ! command -v node >/dev/null 2>&1; then
-  fail "Node.js is required. Install Node.js 18 or newer, then run this installer again."
+  fail "Node.js is required. Install Node.js $REQUIRED_NODE_VERSION or newer, then run this installer again."
 fi
 
-if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 18 ? 0 : 1)" >/dev/null 2>&1; then
+if ! node -e "const required = '$REQUIRED_NODE_VERSION'.split('.').map(Number); const current = process.versions.node.split('.').map(Number); process.exit(current[0] > required[0] || (current[0] === required[0] && (current[1] > required[1] || (current[1] === required[1] && current[2] >= required[2]))) ? 0 : 1)" >/dev/null 2>&1; then
   node --version
-  fail "Node.js 18 or newer is required."
+  fail "Node.js $REQUIRED_NODE_VERSION or newer is required."
 fi
 
 if ! command -v npm >/dev/null 2>&1; then

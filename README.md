@@ -19,8 +19,8 @@ Shared state and API wiring stay in `packages/frontend/App.tsx`.
 
 ## Requirements
 
-- Node.js 18 or newer.
-- npm 9 or newer.
+- Node.js 20.19.4 or newer.
+- npm 10 or newer.
 - A computer on the same network as any phone/tablet using the POS.
 - For database persistence: Prisma with the included SQLite setup.
 - For receipt printing: one of these printer paths:
@@ -154,7 +154,7 @@ Move that one `.run` file to another Linux computer and double-click it, or run:
 ./BarRestaurantTicketing-linux.run
 ```
 
-On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, checks for Node.js 18+ and npm, installs the npm libraries, prepares Prisma, and opens the desktop POS at `http://localhost:8081`.
+On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, checks for Node.js 20.19.4+ and npm, installs the npm libraries, prepares Prisma, and opens the desktop POS at `http://localhost:8081`.
 
 If the portable app is already running, opening the `.run` file again only opens or focuses the POS screen. It will not start a duplicate backend/frontend server.
 

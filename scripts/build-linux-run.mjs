@@ -11,6 +11,7 @@ const appDir = join(stagingDir, 'app');
 const payloadPath = join(distDir, 'BarRestaurantTicketing-payload.tar.gz');
 const outputPath = join(distDir, 'BarRestaurantTicketing-linux.run');
 const includeNodeModules = process.argv.includes('--include-node-modules');
+const requiredNodeVersion = '20.19.4';
 
 const excludedNames = new Set([
   '.git',
@@ -72,12 +73,12 @@ if ! command -v base64 >/dev/null 2>&1; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js is required. Install Node.js 18 or newer, then run this file again."
+  echo "Node.js is required. Install Node.js ${requiredNodeVersion} or newer, then run this file again."
   exit 1
 fi
 
-if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 18 ? 0 : 1)" >/dev/null 2>&1; then
-  echo "Node.js 18 or newer is required. Current version:"
+if ! node -e "const required = '${requiredNodeVersion}'.split('.').map(Number); const current = process.versions.node.split('.').map(Number); process.exit(current[0] > required[0] || (current[0] === required[0] && (current[1] > required[1] || (current[1] === required[1] && current[2] >= required[2]))) ? 0 : 1)" >/dev/null 2>&1; then
+  echo "Node.js ${requiredNodeVersion} or newer is required. Current version:"
   node --version
   exit 1
 fi
@@ -212,4 +213,4 @@ console.log('');
 console.log('Move this single file to another Linux computer and run it:');
 console.log(`  ${outputPath}`);
 console.log('');
-console.log('First launch checks Node/npm, installs npm libraries, prepares Prisma, and starts the app.');
+console.log(`First launch checks Node.js ${requiredNodeVersion}+/npm, installs npm libraries, prepares Prisma, and starts the app.`);
