@@ -493,6 +493,38 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  function removeProduct(item: MenuItem): void {
+    const message = `Se eliminará "${item.name}" del menú. Los tickets y pedidos existentes conservarán sus datos. Esta acción no se puede deshacer.`;
+    const onConfirm = () => {
+      void (async () => {
+        try {
+          await apiService.deleteMenuItem(item.id);
+          await loadManagedProducts();
+          await actions.reloadMenu();
+        } catch {
+          Alert.alert('Error', 'No se pudo eliminar el producto.');
+        }
+      })();
+    };
+
+    if (Platform.OS === 'web') {
+      const webConfirm = (globalThis as typeof globalThis & { confirm?: (prompt: string) => boolean }).confirm;
+      if (!webConfirm || webConfirm(message)) {
+        onConfirm();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Eliminar producto',
+      message,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: onConfirm },
+      ]
+    );
+  }
+
   async function updateProductPrice(item: MenuItem, value: string): Promise<void> {
     const priceCents = parsePriceToCents(value);
     if (priceCents === null) {
@@ -830,6 +862,7 @@ export default function App(): React.JSX.Element {
     updateProductCost,
     updateProductImage,
     removeProductImage,
+    removeProduct,
     formatDateTime,
     centsToCurrency,
   };

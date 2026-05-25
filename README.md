@@ -99,6 +99,14 @@ The root helper forces separate screen modes:
 - Desktop port `8081` runs with `EXPO_PUBLIC_TPV_SCREEN=desktop`.
 - Phone port `8082` runs with `EXPO_PUBLIC_TPV_SCREEN=mobile`.
 
+The combined POS launcher disables the optional standalone React Native DevTools application so ordinary Linux launches do not try to install an Electron/Chromium debugging binary. It still prints an Expo Go QR code for the phone POS. To enable native DevTools while developing, start it explicitly:
+
+```bash
+BAR_TICKETING_ENABLE_NATIVE_DEVTOOLS=1 npm run dev
+```
+
+On Linux, the downloaded React Native DevTools Electron application may require system-admin configuration of its Chromium sandbox helper before it can open. The web desktop POS remains available through normal browser developer tools.
+
 ## Clickable Local Launcher
 
 For a normal user, run the installer once:

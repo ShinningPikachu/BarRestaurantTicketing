@@ -186,6 +186,9 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
                     <Text style={styles.secondaryButtonText}>Quitar</Text>
                   </TouchableOpacity>
                 ) : null}
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => props.removeProduct(item)}>
+                  <Text style={styles.secondaryButtonText}>Eliminar</Text>
+                </TouchableOpacity>
               </View>
             ))}
           </ScrollView>
@@ -196,4 +199,3 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
     </SafeAreaView>
   );
 }
-

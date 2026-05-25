@@ -2,6 +2,7 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { printExpoGoLink } from './expo-terminal.mjs';
 import { ensureRuntimeEnv } from './runtime-env.mjs';
 
 function loadEnvFile(filePath) {
@@ -67,13 +68,17 @@ function getLanIp() {
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const backendPort = process.env.PORT || '3000';
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${getLanIp()}:${backendPort}/api`;
+const lanIp = getLanIp();
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${lanIp}:${backendPort}/api`;
 const desktopPort = process.env.DESKTOP_EXPO_PORT || '8081';
 const phonePort = process.env.PHONE_EXPO_PORT || '8082';
+const phoneExpoUrl = `exp://${lanIp}:${phonePort}`;
 const cacheRoot = resolve(process.cwd(), '.cache', 'expo');
 const pidFile = resolve(process.cwd(), '.cache', 'bar-restaurant-ticketing.pids');
 const desktopExpoHome = resolve(cacheRoot, 'desktop');
 const phoneExpoHome = resolve(cacheRoot, 'phone');
+const enableNativeDevTools = process.env.BAR_TICKETING_ENABLE_NATIVE_DEVTOOLS === '1';
+const expoDevToolsArgs = enableNativeDevTools ? [] : ['--without-native-devtools'];
 
 mkdirSync(desktopExpoHome, { recursive: true });
 mkdirSync(phoneExpoHome, { recursive: true });
@@ -116,7 +121,7 @@ spawnChild(npmCommand, ['run', 'dev', '-w', 'backend'], {
   env: process.env,
 });
 
-spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', desktopPort], {
+spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', desktopPort, ...expoDevToolsArgs], {
   stdio: 'inherit',
   env: {
     ...process.env,
@@ -133,7 +138,7 @@ setTimeout(() => {
     return;
   }
 
-  spawnChild(npmCommand, ['run', 'dev:phone', '-w', 'frontend', '--', '--port', phonePort], {
+  spawnChild(npmCommand, ['run', 'dev:phone', '-w', 'frontend', '--', '--port', phonePort, ...expoDevToolsArgs], {
     stdio: 'inherit',
     env: {
       ...process.env,
@@ -143,11 +148,18 @@ setTimeout(() => {
       EXPO_PUBLIC_TPV_SCREEN: 'mobile',
     },
   });
+
+  if (!enableNativeDevTools) {
+    printExpoGoLink(phoneExpoUrl);
+  }
 }, 1500);
 
 console.log(`\nBackend API shared by both screens: ${apiBaseUrl}`);
 console.log(`Computer web TPV: http://localhost:${desktopPort}`);
 console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
+if (!enableNativeDevTools) {
+  console.log('Native React DevTools disabled for the combined POS launcher. Set BAR_TICKETING_ENABLE_NATIVE_DEVTOOLS=1 to enable them.\n');
+}
 if (runtimeEnv.accessCode) {
   console.log(`POS access code: ${runtimeEnv.accessCode}\n`);
 }

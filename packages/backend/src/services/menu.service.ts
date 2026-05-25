@@ -69,6 +69,19 @@ export class MenuService {
     });
   }
 
+  async deleteMenuItem(id: number) {
+    return prisma.$transaction(async (tx) => {
+      const linkFilter = { menuItemId: id };
+      const unlinkData = { menuItemId: null };
+
+      await tx.orderItem.updateMany({ where: linkFilter, data: unlinkData });
+      await tx.preOrderItem.updateMany({ where: linkFilter, data: unlinkData });
+      await tx.kitchenTicketItem.updateMany({ where: linkFilter, data: unlinkData });
+
+      return tx.menuItem.delete({ where: { id } });
+    });
+  }
+
   async importMenuItems(items: MenuImportItem[]) {
     let created = 0;
     let updated = 0;

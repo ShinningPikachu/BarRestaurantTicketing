@@ -42,7 +42,7 @@ export interface MainScreenProps {
   updateProductCost: (item: MenuItem, value: string) => Promise<void>;
   updateProductImage: (item: MenuItem) => Promise<void>;
   removeProductImage: (item: MenuItem) => Promise<void>;
+  removeProduct: (item: MenuItem) => void;
   formatDateTime: (value: string) => string;
   centsToCurrency: (cents: number) => string;
 }
-

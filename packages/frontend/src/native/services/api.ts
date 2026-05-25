@@ -271,6 +271,13 @@ export class ApiService {
     return parseOrThrow<MenuItem>(response, 'Failed to update menu item');
   }
 
+  async deleteMenuItem(id: number): Promise<{ ok: boolean }> {
+    const response = await this.request(`/menu/${id}`, {
+      method: 'DELETE'
+    });
+    return parseOrThrow<{ ok: boolean }>(response, 'Failed to delete menu item');
+  }
+
   async importMenuCsv(csv: string): Promise<{ created: number; updated: number; total: number }> {
     const response = await this.request('/menu/import/csv', {
       method: 'POST',

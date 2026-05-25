@@ -140,6 +140,20 @@ router.patch(
   }
 );
 
+router.delete(
+  '/:id',
+  validateParams(menuItemParamsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await menuService.deleteMenuItem(Number(req.params.id));
+      res.json(successResponse({ ok: true }));
+    } catch (error) {
+      logger.error({ error }, 'Failed to delete menu item');
+      next(error);
+    }
+  }
+);
+
 router.get('/category/:category', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { category } = req.params;

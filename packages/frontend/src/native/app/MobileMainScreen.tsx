@@ -271,6 +271,9 @@ function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
                     <Text style={styles.secondaryButtonText}>Quitar</Text>
                   </TouchableOpacity>
                 ) : null}
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => props.removeProduct(item)}>
+                  <Text style={styles.secondaryButtonText}>Eliminar producto</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
