@@ -8,6 +8,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const frontendDir = resolve(repoRoot, 'packages/frontend');
 const androidDir = resolve(frontendDir, 'android');
 const gradleUserHome = resolve(repoRoot, '.gradle');
+const requiredNodeVersion = '20.19.4';
+const maxNodeMajor = 22;
 const requiredSdkPackages = [
   ['platforms/android-36', 'platforms;android-36'],
   ['build-tools/35.0.0', 'build-tools;35.0.0'],
@@ -46,6 +48,23 @@ function loadEnvFile(filePath) {
       process.env[key] = value;
     }
   }
+}
+
+function assertSupportedNodeVersion() {
+  const current = process.versions.node.split('.').map(Number);
+  const required = requiredNodeVersion.split('.').map(Number);
+  const highEnough = current[0] > required[0]
+    || (current[0] === required[0]
+      && (current[1] > required[1] || (current[1] === required[1] && current[2] >= required[2])));
+
+  if (highEnough && current[0] <= maxNodeMajor) {
+    return;
+  }
+
+  console.error(`Node.js ${requiredNodeVersion} through ${maxNodeMajor}.x is required for the Android build.`);
+  console.error(`Current Node.js version: ${process.version}`);
+  console.error('Install/use Node 20 LTS, then reinstall dependencies and rebuild.');
+  process.exit(1);
 }
 
 function getLanIp() {
@@ -120,6 +139,7 @@ function ensureAndroidCleartextTraffic() {
   console.log('Enabled Android cleartext HTTP traffic for local backend access.');
 }
 
+assertSupportedNodeVersion();
 loadEnvFile(resolve(repoRoot, '.env'));
 loadEnvFile(resolve(frontendDir, '.env'));
 
@@ -231,7 +251,7 @@ if (missingSdkPackages.length > 0) {
   process.exit(1);
 }
 
-await run(npmCommand, ['run', 'android:prebuild', '-w', 'frontend'], {
+await run(npmCommand, ['run', 'android:prebuild', '-w', 'frontend', '--', '--clean'], {
   cwd: repoRoot,
   env: buildEnv,
 });
