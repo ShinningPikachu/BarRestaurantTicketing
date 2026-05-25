@@ -2,6 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+const appRoot = process.cwd();
+
 function loadEnvFile(filePath) {
   if (!existsSync(filePath)) {
     return;
@@ -54,6 +56,21 @@ function pidIsAlive(pid) {
   }
 }
 
+function getCommandLine(pid) {
+  try {
+    return execFileSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function commandLooksLikeThisApp(pid) {
+  const commandLine = getCommandLine(pid);
+  return commandLine.includes(appRoot)
+    || commandLine.includes('BarRestaurantTicketing')
+    || commandLine.includes('bar-restaurant-ticketing');
+}
+
 function findPidsByPort(port) {
   if (commandExists('lsof')) {
     try {
@@ -84,14 +101,16 @@ const ports = [
 ];
 
 if (existsSync(pidFile)) {
-  const livePids = parsePids(readFileSync(pidFile, 'utf8')).filter(pidIsAlive);
+  const livePids = parsePids(readFileSync(pidFile, 'utf8')).filter((pid) => (
+    pidIsAlive(pid) && commandLooksLikeThisApp(pid)
+  ));
   if (livePids.length > 0) {
     process.exit(0);
   }
 }
 
 for (const port of ports) {
-  if (findPidsByPort(port).length > 0) {
+  if (findPidsByPort(port).some(commandLooksLikeThisApp)) {
     process.exit(0);
   }
 }

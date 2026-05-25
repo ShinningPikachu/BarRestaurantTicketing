@@ -46,6 +46,8 @@ if [ ! -d "$APP_DIR/node_modules" ]; then
   fi
 fi
 
+node scripts/ensure-runtime-env.mjs
+
 if node scripts/is-running.mjs >/dev/null 2>&1; then
   echo
   echo "The application is already running."

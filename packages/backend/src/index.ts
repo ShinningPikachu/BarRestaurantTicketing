@@ -8,7 +8,16 @@ import { logger } from './utils/logger';
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || config.corsOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
+}));
 app.use(express.json({ limit: '2mb' }));
 
 // Routes
@@ -18,6 +27,9 @@ app.use(routes);
 app.use(errorHandler);
 
 // Start server
-app.listen(config.port, () => {
-  logger.info({ port: config.port }, `Backend listening on http://localhost:${config.port}`);
+app.listen(config.port, config.host, () => {
+  logger.info(
+    { host: config.host, port: config.port },
+    `Backend listening on http://${config.host}:${config.port}`
+  );
 });

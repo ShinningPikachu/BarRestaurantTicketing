@@ -17,7 +17,7 @@ import {
 import { useTicketingController } from './src/native/controllers';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
-import { apiService } from './src/native/services';
+import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl } from './src/native/services/api';
 import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
@@ -235,6 +235,13 @@ export default function App(): React.JSX.Element {
   } = state;
 
   useEffect(() => {
+    setApiUnauthorizedHandler(() => {
+      apiService.setAuthToken(null);
+      void AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      setAuthStatus('signedOut');
+      setActiveSection('home');
+    });
+
     async function restoreLogin(): Promise<void> {
       const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
       if (token) {
@@ -247,6 +254,8 @@ export default function App(): React.JSX.Element {
     }
 
     void restoreLogin();
+
+    return () => setApiUnauthorizedHandler(null);
   }, []);
   const menuCategories = useMemo(() => Array.from(menuByCategory.keys()), [menuByCategory]);
   const visibleMenuCategory = selectedMenuCategory && menuByCategory.has(selectedMenuCategory)
@@ -637,10 +646,11 @@ export default function App(): React.JSX.Element {
 
   async function openCashDrawer(): Promise<void> {
     try {
-      await apiService.openXprinterCashDrawer();
+      await apiService.openXprinterCashDrawer(getOptionalXprinterTarget());
       Alert.alert('Caja abierta', 'Se ha enviado la orden de apertura a la caja.');
-    } catch {
-      Alert.alert('Error', 'No se pudo abrir la caja.');
+    } catch (error) {
+      const details = error instanceof ApiRequestError ? `\n\n${error.message}` : '';
+      Alert.alert('Error', `No se pudo abrir la caja.${details}`);
     }
   }
 

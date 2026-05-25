@@ -1,8 +1,13 @@
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
+  host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'development',
   isDev: process.env.NODE_ENV !== 'production',
   logLevel: process.env.LOG_LEVEL || 'info',
+  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:8081,http://127.0.0.1:8081')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   database: {
     url: process.env.DATABASE_URL || 'file:./dev.db',
   },

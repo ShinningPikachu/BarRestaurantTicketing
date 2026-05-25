@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validation';
+import { ApiError } from '../middleware/errorHandler.js';
 import { successResponse } from '../types/api';
-import { xprinterService } from '../services/xprinter.service.js';
+import { PrinterTransportError, xprinterService } from '../services/xprinter.service.js';
 
 const router = Router();
 
@@ -44,6 +45,13 @@ const xprinterTargetSchema = z.object({
   usbDevice: z.string().trim().optional(),
 }).optional();
 
+function toPrinterApiError(error: unknown): unknown {
+  if (error instanceof PrinterTransportError) {
+    return new ApiError(503, error.message, error.code);
+  }
+  return error;
+}
+
 router.post(
   '/xprinter/ticket',
   validateBody(xprinterTicketSchema),
@@ -58,7 +66,7 @@ router.post(
       });
       res.json(successResponse({ printed: true }));
     } catch (error) {
-      next(error);
+      next(toPrinterApiError(error));
     }
   }
 );
@@ -77,7 +85,7 @@ router.post(
       });
       res.json(successResponse({ opened: true }));
     } catch (error) {
-      next(error);
+      next(toPrinterApiError(error));
     }
   }
 );

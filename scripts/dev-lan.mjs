@@ -2,6 +2,7 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { ensureRuntimeEnv } from './runtime-env.mjs';
 
 function loadEnvFile(filePath) {
   if (!existsSync(filePath)) {
@@ -35,6 +36,7 @@ function loadEnvFile(filePath) {
   }
 }
 
+const runtimeEnv = ensureRuntimeEnv(resolve(process.cwd(), '.env'));
 loadEnvFile(resolve(process.cwd(), '.env'));
 
 function getLanIp() {
@@ -120,6 +122,7 @@ spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', 
     ...process.env,
     BROWSER: 'none',
     EXPO_HOME: desktopExpoHome,
+    __UNSAFE_EXPO_HOME_DIRECTORY: desktopExpoHome,
     EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
     EXPO_PUBLIC_TPV_SCREEN: 'desktop',
   },
@@ -135,6 +138,7 @@ setTimeout(() => {
     env: {
       ...process.env,
       EXPO_HOME: phoneExpoHome,
+      __UNSAFE_EXPO_HOME_DIRECTORY: phoneExpoHome,
       EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
       EXPO_PUBLIC_TPV_SCREEN: 'mobile',
     },
@@ -144,6 +148,9 @@ setTimeout(() => {
 console.log(`\nBackend API shared by both screens: ${apiBaseUrl}`);
 console.log(`Computer web TPV: http://localhost:${desktopPort}`);
 console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
+if (runtimeEnv.accessCode) {
+  console.log(`POS access code: ${runtimeEnv.accessCode}\n`);
+}
 
 function shutdown(exitCode = 0) {
   if (shuttingDown) {

@@ -171,6 +171,8 @@ if [ ! -d "$INSTALL_DIR/node_modules" ]; then
   npm install
 fi
 
+node scripts/ensure-runtime-env.mjs
+
 echo "Preparing local database tools..."
 npm run -w backend prisma:generate
 

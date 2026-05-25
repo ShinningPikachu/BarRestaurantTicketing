@@ -4,14 +4,14 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "dev": "expo start",
-    "dev:phone": "expo start --lan",
+    "dev": "node ../../scripts/expo-start.mjs default",
+    "dev:phone": "node ../../scripts/expo-start.mjs phone --lan",
     "android": "expo run:android",
     "android:prebuild": "expo prebuild --platform android",
     "android:apk": "node ../../scripts/build-android-apk.mjs",
     "ios": "expo run:ios",
-    "web": "expo start --web",
-    "web:desktop": "expo start --web",
+    "web": "node ../../scripts/expo-start.mjs default --web",
+    "web:desktop": "node ../../scripts/expo-start.mjs desktop --web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "expo export --platform web"
   },

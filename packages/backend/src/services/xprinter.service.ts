@@ -32,6 +32,16 @@ export interface XprinterTicketPayload {
   openCashDrawer?: boolean | null;
 }
 
+export class PrinterTransportError extends Error {
+  constructor(
+    message: string,
+    public code = 'PRINTER_UNAVAILABLE'
+  ) {
+    super(message);
+    this.name = 'PrinterTransportError';
+  }
+}
+
 function normalizeReceiptText(value: string): string {
   return value
     .normalize('NFD')
@@ -196,12 +206,26 @@ function writeToSystemPrinter(buffer: Buffer, printerName: string): Promise<void
     child.stderr.on('data', (chunk) => {
       stderr += String(chunk);
     });
-    child.once('error', reject);
+    child.once('error', (error) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        reject(new PrinterTransportError('The CUPS lp command is not available on this machine.', 'PRINTER_COMMAND_UNAVAILABLE'));
+        return;
+      }
+      reject(error);
+    });
     child.once('close', (code) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(stderr.trim() || `lp exited with code ${code}`));
+        const lpError = stderr.trim() || `lp exited with code ${code}`;
+        if (/printer or class does not exist/i.test(lpError)) {
+          reject(new PrinterTransportError(
+            `The configured system printer "${printerName}" does not exist. Install it in CUPS or configure XPRINTER_HOST/XPRINTER_USB_DEVICE instead.`,
+            'PRINTER_NOT_FOUND'
+          ));
+          return;
+        }
+        reject(new PrinterTransportError(lpError));
       }
     });
 

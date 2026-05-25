@@ -11,6 +11,12 @@ interface ApiResponse<T = unknown> {
   };
 }
 
+let unauthorizedHandler: (() => void | Promise<void>) | null = null;
+
+export function setApiUnauthorizedHandler(handler: (() => void | Promise<void>) | null): void {
+  unauthorizedHandler = handler;
+}
+
 export class ApiRequestError extends Error {
   status: number;
   code?: string;
@@ -46,6 +52,9 @@ async function parseOrThrow<T>(response: Response, message: string): Promise<T> 
     const errorMessage = apiError?.message ? `${message}: ${apiError.message}` : `${message} (${response.status})`;
 
     logger.error({ status: response.status, error: apiError }, errorMessage);
+    if (response.status === 401 && apiError?.code === 'UNAUTHORIZED') {
+      void unauthorizedHandler?.();
+    }
     throw new ApiRequestError(errorMessage, response.status, apiError?.code);
   }
 

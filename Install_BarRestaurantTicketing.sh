@@ -93,6 +93,8 @@ npm install || fail "Library installation failed. Check the messages above."
 echo "Preparing Prisma client..."
 npm run -w backend prisma:generate || fail "Prisma setup failed. Check the messages above."
 
+node scripts/ensure-runtime-env.mjs || fail "Runtime settings setup failed."
+
 if [ ! -f "$APP_DIR/packages/backend/prisma/dev.db" ]; then
   echo "Creating local database..."
   npm run -w backend prisma:migrate:dev || fail "Database setup failed. Check the messages above."
