@@ -12,7 +12,6 @@ const requiredNodeVersion = '20.19.4';
 const maxNodeMajor = 22;
 const requiredSdkPackages = [
   ['platforms/android-36', 'platforms;android-36'],
-  ['build-tools/35.0.0', 'build-tools;35.0.0'],
   ['build-tools/36.0.0', 'build-tools;36.0.0'],
   ['cmake/3.22.1', 'cmake;3.22.1'],
   ['ndk/27.1.12297006', 'ndk;27.1.12297006'],

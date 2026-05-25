@@ -88,8 +88,8 @@ if command -v gio >/dev/null 2>&1; then
   gio set "$DESKTOP_DIR/Stop BarRestaurantTicketing.desktop" metadata::trusted true >/dev/null 2>&1 || true
 fi
 
-echo "Installing application libraries..."
-npm install || fail "Library installation failed. Check the messages above."
+echo "Installing exact application libraries from package-lock.json..."
+npm ci || fail "Library installation failed. Check the messages above."
 
 echo "Preparing Prisma client..."
 npm run -w backend prisma:generate || fail "Prisma setup failed. Check the messages above."

@@ -37,8 +37,8 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if [ ! -d "$APP_DIR/node_modules" ]; then
-  echo "Installing application libraries. This can take a few minutes..."
-  npm install
+  echo "Installing exact application libraries from package-lock.json. This can take a few minutes..."
+  npm ci
   if [ "$?" -ne 0 ]; then
     echo
     echo "Library installation failed. Check the messages above."

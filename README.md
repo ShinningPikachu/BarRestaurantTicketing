@@ -19,7 +19,7 @@ Shared state and API wiring stay in `packages/frontend/App.tsx`.
 
 ## Requirements
 
-- Node.js 20.19.4 or newer.
+- Node.js 20.19.4 through 22.x.
 - npm 10 or newer.
 - A computer on the same network as any phone/tablet using the POS.
 - For database persistence: Prisma with the included SQLite setup.
@@ -54,17 +54,16 @@ Use the same `.env` when running `npm run dev`, because the backend reads these 
 
 ## Quick Start
 
-Install dependencies from the repo root:
+Install the exact dependencies committed in `package-lock.json` and generate the Prisma client from the repo root:
 
 ```bash
-npm install
+npm run bootstrap
 ```
 
-Create and prepare the local SQLite database:
+Create and seed the local SQLite database:
 
 ```bash
 cd packages/backend
-npm run prisma:generate
 npm run prisma:migrate:dev
 npm run seed
 cd ../..
@@ -99,7 +98,7 @@ For a normal user, run the installer once:
 Install_BarRestaurantTicketing.desktop
 ```
 
-It prepares the app, installs npm libraries, prepares Prisma/database files, and creates two desktop buttons:
+It prepares the app, installs the exact npm libraries from `package-lock.json`, prepares Prisma/database files, and creates two desktop buttons:
 
 ```text
 Start BarRestaurantTicketing
@@ -112,7 +111,7 @@ On Linux desktops, you can start the local POS without typing terminal commands:
 Start_BarRestaurantTicketing.desktop
 ```
 
-Double-click it from the repository folder and choose to run it if your file manager asks. It installs missing npm libraries when needed, opens a terminal window, starts the backend and frontend, then opens the desktop POS at:
+Double-click it from the repository folder and choose to run it if your file manager asks. It installs missing locked npm libraries when needed, opens a terminal window, starts the backend and frontend, then opens the desktop POS at:
 
 ```text
 http://localhost:8081
@@ -154,7 +153,7 @@ Move that one `.run` file to another Linux computer and double-click it, or run:
 ./BarRestaurantTicketing-linux.run
 ```
 
-On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, checks for Node.js 20.19.4+ and npm, installs the npm libraries, prepares Prisma, and opens the desktop POS at `http://localhost:8081`.
+On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, checks for Node.js 20.19.4 through 22.x and npm, installs the exact libraries from `package-lock.json`, prepares Prisma, and opens the desktop POS at `http://localhost:8081`. Local `.env` credentials are not included in the portable package; configure them on the destination computer.
 
 If the portable app is already running, opening the `.run` file again only opens or focuses the POS screen. It will not start a duplicate backend/frontend server.
 
@@ -172,7 +171,7 @@ If you want the package to include the already-installed `node_modules` folder f
 npm run package:linux:offline
 ```
 
-That file will be much larger and is best used on a similar Linux system.
+That file will be much larger and is best used on a similar Linux system with the same CPU architecture. For different computers or architectures, use `npm run package:linux` so dependencies install cleanly on the destination computer.
 
 ## Run Separately
 
@@ -218,7 +217,7 @@ If Android Studio is installed, open `Settings > Languages & Frameworks > Androi
 ```bash
 sudo apt install google-android-cmdline-tools-13.0-installer
 sudo env JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/android-sdk/cmdline-tools/13.0/bin/sdkmanager --licenses
-sudo env JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/android-sdk/cmdline-tools/13.0/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
+sudo env JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/android-sdk/cmdline-tools/13.0/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
 ```
 
 The Android app still needs the backend running on the computer:

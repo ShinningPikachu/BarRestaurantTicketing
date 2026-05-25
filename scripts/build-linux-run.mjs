@@ -12,6 +12,7 @@ const payloadPath = join(distDir, 'BarRestaurantTicketing-payload.tar.gz');
 const outputPath = join(distDir, 'BarRestaurantTicketing-linux.run');
 const includeNodeModules = process.argv.includes('--include-node-modules');
 const requiredNodeVersion = '20.19.4';
+const maxNodeMajor = '22';
 
 const excludedNames = new Set([
   '.git',
@@ -23,6 +24,7 @@ const excludedNames = new Set([
   '.expo',
   '.expo-shared',
   '.expo-target',
+  '.env',
   'android',
   'build',
   'dist',
@@ -73,12 +75,12 @@ if ! command -v base64 >/dev/null 2>&1; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js is required. Install Node.js ${requiredNodeVersion} or newer, then run this file again."
+  echo "Node.js is required. Install Node.js ${requiredNodeVersion} through ${maxNodeMajor}.x, then run this file again."
   exit 1
 fi
 
-if ! node -e "const required = '${requiredNodeVersion}'.split('.').map(Number); const current = process.versions.node.split('.').map(Number); process.exit(current[0] > required[0] || (current[0] === required[0] && (current[1] > required[1] || (current[1] === required[1] && current[2] >= required[2]))) ? 0 : 1)" >/dev/null 2>&1; then
-  echo "Node.js ${requiredNodeVersion} or newer is required. Current version:"
+if ! node -e "const required = '${requiredNodeVersion}'.split('.').map(Number); const maxMajor = Number('${maxNodeMajor}'); const current = process.versions.node.split('.').map(Number); const highEnough = current[0] > required[0] || (current[0] === required[0] && (current[1] > required[1] || (current[1] === required[1] && current[2] >= required[2]))); process.exit(highEnough && current[0] <= maxMajor ? 0 : 1)" >/dev/null 2>&1; then
+  echo "Node.js ${requiredNodeVersion} through ${maxNodeMajor}.x is required. Current version:"
   node --version
   exit 1
 fi
@@ -167,8 +169,8 @@ DESKTOP
 chmod +x "$INSTALL_DIR/Start_BarRestaurantTicketing.sh" "$INSTALL_DIR/Stop_BarRestaurantTicketing.sh" "$INSTALL_DIR/Start_BarRestaurantTicketing.desktop" "$INSTALL_DIR/Stop_BarRestaurantTicketing.desktop"
 
 if [ ! -d "$INSTALL_DIR/node_modules" ]; then
-  echo "Installing application libraries. This can take a few minutes..."
-  npm install
+  echo "Installing exact application libraries from package-lock.json. This can take a few minutes..."
+  npm ci
 fi
 
 node scripts/ensure-runtime-env.mjs
@@ -215,4 +217,4 @@ console.log('');
 console.log('Move this single file to another Linux computer and run it:');
 console.log(`  ${outputPath}`);
 console.log('');
-console.log(`First launch checks Node.js ${requiredNodeVersion}+/npm, installs npm libraries, prepares Prisma, and starts the app.`);
+console.log(`First launch checks Node.js ${requiredNodeVersion} through ${maxNodeMajor}.x/npm, installs exact locked npm libraries, prepares Prisma, and starts the app.`);
