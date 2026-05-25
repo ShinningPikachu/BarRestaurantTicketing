@@ -2,7 +2,7 @@
   "name": "bar-restaurant-ticketing",
   "private": true,
   "engines": {
-    "node": ">=20.19.4",
+    "node": ">=20.19.4 <23",
     "npm": ">=10"
   },
   "workspaces": [
