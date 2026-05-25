@@ -12,6 +12,11 @@ clear
 echo "Starting BarRestaurantTicketing..."
 echo
 
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  . "$HOME/.nvm/nvm.sh"
+  nvm use --silent >/dev/null 2>&1 || nvm use --silent default >/dev/null 2>&1 || true
+fi
+
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is not installed or is not available in PATH."
   echo "Install Node.js $REQUIRED_NODE_VERSION through $MAX_NODE_MAJOR.x, then run this launcher again."

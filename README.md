@@ -33,6 +33,15 @@ Optional:
 - Expo Go on a phone/tablet for the mobile POS.
 - A browser for the desktop POS.
 
+When using `nvm`, activate the project's preferred Node.js line with:
+
+```bash
+nvm install
+nvm use
+```
+
+The desktop installer and start launcher also activate this `.nvmrc` version automatically when `nvm` is installed.
+
 ## Login
 
 The POS requires a login code on both computer and mobile screens. The backend also protects `/api/*` routes, so people on the same network cannot use the API without logging in.

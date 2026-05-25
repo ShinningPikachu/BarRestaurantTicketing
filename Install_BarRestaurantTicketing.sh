@@ -12,6 +12,11 @@ clear
 echo "Installing $APP_NAME..."
 echo
 
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  . "$HOME/.nvm/nvm.sh"
+  nvm use --silent >/dev/null 2>&1 || nvm use --silent default >/dev/null 2>&1 || true
+fi
+
 pause_before_close() {
   if [ "${BAR_TICKETING_NONINTERACTIVE:-}" = "1" ]; then
     return

@@ -64,6 +64,11 @@ DESKTOP_URL="\${DESKTOP_URL:-http://localhost:8081}"
 echo "Preparing $APP_NAME..."
 echo
 
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  . "$HOME/.nvm/nvm.sh"
+  nvm use --silent default >/dev/null 2>&1 || true
+fi
+
 if ! command -v tar >/dev/null 2>&1; then
   echo "tar is required to unpack this application."
   exit 1
