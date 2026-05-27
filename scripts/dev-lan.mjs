@@ -1,8 +1,9 @@
 import os from 'node:os';
+import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { printExpoGoLink } from './expo-terminal.mjs';
+import { printExpoGoLink, printInstalledAppPairingCode } from './expo-terminal.mjs';
 import { ensureRuntimeEnv } from './runtime-env.mjs';
 
 function loadEnvFile(filePath) {
@@ -70,6 +71,7 @@ const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const backendPort = process.env.PORT || '3000';
 const lanIp = getLanIp();
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${lanIp}:${backendPort}/api`;
+const pairingApiBaseUrl = `http://${lanIp}:${backendPort}/api`;
 const desktopPort = process.env.DESKTOP_EXPO_PORT || '8081';
 const phonePort = process.env.PHONE_EXPO_PORT || '8082';
 const phoneExpoUrl = `exp://${lanIp}:${phonePort}`;
@@ -79,6 +81,44 @@ const desktopExpoHome = resolve(cacheRoot, 'desktop');
 const phoneExpoHome = resolve(cacheRoot, 'phone');
 const enableNativeDevTools = process.env.BAR_TICKETING_ENABLE_NATIVE_DEVTOOLS === '1';
 const expoDevToolsArgs = enableNativeDevTools ? [] : ['--without-native-devtools'];
+
+function verifyPortAvailable(label, port) {
+  return new Promise((resolvePort, reject) => {
+    const server = net.createServer();
+
+    server.once('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        reject(new Error(`${label} port ${port} is already in use.`));
+        return;
+      }
+      reject(error);
+    });
+
+    server.listen(Number(port), '0.0.0.0', () => {
+      server.close(resolvePort);
+    });
+  });
+}
+
+const configuredPorts = [
+  { label: 'Backend API', port: backendPort },
+  { label: 'Desktop POS', port: desktopPort },
+  { label: 'Phone POS', port: phonePort },
+];
+const distinctPorts = new Set(configuredPorts.map(({ port }) => String(port)));
+
+if (distinctPorts.size !== configuredPorts.length) {
+  console.error('Cannot start BarRestaurantTicketing because backend, desktop, and phone ports must be different.');
+  process.exit(1);
+}
+
+try {
+  await Promise.all(configuredPorts.map(({ label, port }) => verifyPortAvailable(label, port)));
+} catch (error) {
+  console.error(`Cannot start BarRestaurantTicketing: ${error.message}`);
+  console.error('If a previous application window was closed unexpectedly, run `npm run stop`, then start again.');
+  process.exit(1);
+}
 
 mkdirSync(desktopExpoHome, { recursive: true });
 mkdirSync(phoneExpoHome, { recursive: true });
@@ -157,6 +197,7 @@ setTimeout(() => {
 console.log(`\nBackend API shared by both screens: ${apiBaseUrl}`);
 console.log(`Computer web TPV: http://localhost:${desktopPort}`);
 console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
+printInstalledAppPairingCode(pairingApiBaseUrl);
 if (!enableNativeDevTools) {
   console.log('Native React DevTools disabled for the combined POS launcher. Set BAR_TICKETING_ENABLE_NATIVE_DEVTOOLS=1 to enable them.\n');
 }

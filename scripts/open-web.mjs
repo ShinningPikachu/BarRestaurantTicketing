@@ -35,7 +35,8 @@ function loadEnvFile(filePath) {
 }
 
 function commandExists(command) {
-  return spawnSync('command', ['-v', command], { shell: true, stdio: 'ignore' }).status === 0;
+  const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
+  return spawnSync(lookupCommand, [command], { stdio: 'ignore' }).status === 0;
 }
 
 function getProcessList() {

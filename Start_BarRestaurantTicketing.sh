@@ -54,7 +54,10 @@ fi
 
 node scripts/ensure-runtime-env.mjs
 
-if node scripts/is-running.mjs >/dev/null 2>&1; then
+RUNNING_MESSAGE="$(node scripts/is-running.mjs 2>&1)"
+RUNNING_STATUS=$?
+
+if [ "$RUNNING_STATUS" -eq 0 ]; then
   echo
   echo "The application is already running."
   echo "Opening the POS screen..."
@@ -62,6 +65,22 @@ if node scripts/is-running.mjs >/dev/null 2>&1; then
   echo
   sleep 2
   exit 0
+fi
+
+if [ "$RUNNING_STATUS" -eq 2 ]; then
+  echo
+  echo "Restarting an incomplete previous application start..."
+  node scripts/stop-local.mjs
+  sleep 1
+fi
+
+if [ "$RUNNING_STATUS" -eq 3 ]; then
+  echo
+  echo "$RUNNING_MESSAGE"
+  echo "Close the program using that port, or change the ports in .env."
+  echo
+  read -r -p "Press Enter to close this window..."
+  exit 1
 fi
 
 if [ ! -f "$APP_DIR/packages/backend/prisma/dev.db" ]; then

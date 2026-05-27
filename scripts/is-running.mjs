@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const appRoot = process.cwd();
@@ -37,7 +37,8 @@ function loadEnvFile(filePath) {
 }
 
 function commandExists(command) {
-  return spawnSync('command', ['-v', command], { shell: true, stdio: 'ignore' }).status === 0;
+  const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
+  return spawnSync(lookupCommand, [command], { stdio: 'ignore' }).status === 0;
 }
 
 function parsePids(text) {
@@ -64,11 +65,25 @@ function getCommandLine(pid) {
   }
 }
 
+function workingDirectoryLooksLikeThisApp(pid) {
+  if (process.platform !== 'linux') {
+    return false;
+  }
+
+  try {
+    const workingDirectory = resolve(readlinkSync(`/proc/${pid}/cwd`));
+    return workingDirectory === appRoot || workingDirectory.startsWith(`${appRoot}/`);
+  } catch {
+    return false;
+  }
+}
+
 function commandLooksLikeThisApp(pid) {
   const commandLine = getCommandLine(pid);
   return commandLine.includes(appRoot)
     || commandLine.includes('BarRestaurantTicketing')
-    || commandLine.includes('bar-restaurant-ticketing');
+    || commandLine.includes('bar-restaurant-ticketing')
+    || workingDirectoryLooksLikeThisApp(pid);
 }
 
 function findPidsByPort(port) {
@@ -95,24 +110,41 @@ loadEnvFile(resolve(process.cwd(), '.env'));
 
 const pidFile = resolve(process.cwd(), '.cache', 'bar-restaurant-ticketing.pids');
 const ports = [
-  process.env.PORT || '3000',
-  process.env.DESKTOP_EXPO_PORT || '8081',
-  process.env.PHONE_EXPO_PORT || '8082',
+  { label: 'backend API', port: process.env.PORT || '3000' },
+  { label: 'desktop POS', port: process.env.DESKTOP_EXPO_PORT || '8081' },
+  { label: 'phone POS', port: process.env.PHONE_EXPO_PORT || '8082' },
 ];
 
-if (existsSync(pidFile)) {
-  const livePids = parsePids(readFileSync(pidFile, 'utf8')).filter((pid) => (
-    pidIsAlive(pid) && commandLooksLikeThisApp(pid)
-  ));
-  if (livePids.length > 0) {
-    process.exit(0);
-  }
+const pidFileHasAppProcess = existsSync(pidFile) && parsePids(readFileSync(pidFile, 'utf8')).some((pid) => (
+  pidIsAlive(pid) && commandLooksLikeThisApp(pid)
+));
+
+const portOwners = ports.map(({ label, port }) => {
+  const pids = findPidsByPort(port);
+  return {
+    label,
+    port,
+    pids,
+    hasAppProcess: pids.some(commandLooksLikeThisApp),
+  };
+});
+
+if (portOwners.every(({ hasAppProcess }) => hasAppProcess)) {
+  process.exit(0);
 }
 
-for (const port of ports) {
-  if (findPidsByPort(port).some(commandLooksLikeThisApp)) {
-    process.exit(0);
-  }
+if (pidFileHasAppProcess || portOwners.some(({ hasAppProcess }) => hasAppProcess)) {
+  console.error('A previous BarRestaurantTicketing start is incomplete and needs to be restarted.');
+  process.exit(2);
+}
+
+const occupiedPorts = portOwners.filter(({ pids }) => pids.length > 0);
+if (occupiedPorts.length > 0) {
+  const details = occupiedPorts
+    .map(({ label, port }) => `${label} port ${port}`)
+    .join(', ');
+  console.error(`Cannot start BarRestaurantTicketing because another program is using ${details}.`);
+  process.exit(3);
 }
 
 process.exit(1);

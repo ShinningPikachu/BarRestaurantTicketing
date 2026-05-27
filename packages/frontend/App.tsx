@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import {
   Alert,
+  BackHandler,
+  Modal,
   Platform,
   SafeAreaView,
   Text,
@@ -18,7 +21,7 @@ import { useTicketingController } from './src/native/controllers';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
-import { ApiRequestError, getApiBaseUrl } from './src/native/services/api';
+import { ApiRequestError, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
 import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
 import { MobileMainScreen } from './src/native/app/MobileMainScreen';
@@ -34,6 +37,7 @@ const MAX_SEARCH_RESULTS = 24;
 const PRODUCT_IMAGE_MAX_SIZE = 512;
 const PRODUCT_IMAGE_QUALITY = 0.82;
 const AUTH_TOKEN_STORAGE_KEY = 'bar-ticketing-auth-token';
+const API_BASE_URL_STORAGE_KEY = 'bar-ticketing-api-base-url';
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
 
 interface ExpoLikeGlobal {
@@ -207,9 +211,17 @@ export default function App(): React.JSX.Element {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [accessCode, setAccessCode] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [, requestCameraPermission] = useCameraPermissions();
+  const [configuredApiBaseUrl, setConfiguredApiBaseUrl] = useState(getApiBaseUrl());
+  const [apiBaseUrlDraft, setApiBaseUrlDraft] = useState(getApiBaseUrl());
+  const [isConnectionModalVisible, setIsConnectionModalVisible] = useState(false);
+  const [isPairingScannerVisible, setIsPairingScannerVisible] = useState(false);
+  const [isSavingConnection, setIsSavingConnection] = useState(false);
+  const [isHandlingPairScan, setIsHandlingPairScan] = useState(false);
   const { state, actions } = useTicketingController(authStatus === 'signedIn');
   const { width } = useWindowDimensions();
   const [activeSection, setActiveSection] = useState<AppSection>('home');
+  const [sectionHistory, setSectionHistory] = useState<AppSection[]>([]);
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
   const [menuSearchText, setMenuSearchText] = useState('');
   const [paidTickets, setPaidTickets] = useState<PaidTicket[]>([]);
@@ -234,15 +246,109 @@ export default function App(): React.JSX.Element {
     priceDraftByItemId
   } = state;
 
+  function resetNavigation(): void {
+    setSectionHistory([]);
+    setActiveSection('home');
+  }
+
+  function navigateToSection(section: AppSection): void {
+    if (section === activeSection) {
+      return;
+    }
+
+    setSectionHistory((previous) => [...previous, activeSection].slice(-12));
+    setActiveSection(section);
+  }
+
+  function goHome(): void {
+    resetNavigation();
+  }
+
+  function goBack(): void {
+    if (activeSection === 'home') {
+      return;
+    }
+
+    const previousSection = sectionHistory[sectionHistory.length - 1] ?? 'home';
+    setSectionHistory((previous) => previous.slice(0, -1));
+    setActiveSection(previousSection);
+  }
+
+  function openConnectionSetup(): void {
+    setApiBaseUrlDraft(configuredApiBaseUrl);
+    setIsPairingScannerVisible(false);
+    setIsHandlingPairScan(false);
+    setIsConnectionModalVisible(true);
+  }
+
+  async function beginPairingScan(): Promise<void> {
+    const permission = await requestCameraPermission();
+    if (!permission.granted) {
+      Alert.alert('Permiso de cámara', 'Activa la cámara para escanear el código del ordenador.');
+      return;
+    }
+
+    setIsHandlingPairScan(false);
+    setIsPairingScannerVisible(true);
+  }
+
+  async function saveConnection(value: string): Promise<void> {
+    setIsSavingConnection(true);
+    try {
+      const normalizedUrl = await testApiConnection(value);
+      setApiBaseUrl(normalizedUrl);
+      await AsyncStorage.setItem(API_BASE_URL_STORAGE_KEY, normalizedUrl);
+      apiService.setAuthToken(null);
+      await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      setConfiguredApiBaseUrl(normalizedUrl);
+      setApiBaseUrlDraft(normalizedUrl);
+      setIsPairingScannerVisible(false);
+      setIsConnectionModalVisible(false);
+      resetNavigation();
+      setAuthStatus('signedOut');
+      Alert.alert('Ordenador conectado', 'Introduce el código de acceso del TPV para continuar.');
+    } catch {
+      setIsHandlingPairScan(false);
+      Alert.alert(
+        'No se encuentra el ordenador',
+        'Comprueba que el TPV esté abierto en el ordenador y que teléfono y ordenador estén en la misma red Wi-Fi.'
+      );
+    } finally {
+      setIsSavingConnection(false);
+    }
+  }
+
+  function handlePairingCodeScanned(result: BarcodeScanningResult): void {
+    if (isHandlingPairScan) {
+      return;
+    }
+
+    setIsHandlingPairScan(true);
+    setIsPairingScannerVisible(false);
+    setApiBaseUrlDraft(result.data);
+    void saveConnection(result.data);
+  }
+
   useEffect(() => {
     setApiUnauthorizedHandler(() => {
       apiService.setAuthToken(null);
       void AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
       setAuthStatus('signedOut');
-      setActiveSection('home');
+      resetNavigation();
     });
 
     async function restoreLogin(): Promise<void> {
+      const savedApiBaseUrl = await AsyncStorage.getItem(API_BASE_URL_STORAGE_KEY);
+      if (savedApiBaseUrl) {
+        try {
+          const restoredUrl = setApiBaseUrl(savedApiBaseUrl);
+          setConfiguredApiBaseUrl(restoredUrl);
+          setApiBaseUrlDraft(restoredUrl);
+        } catch {
+          await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY);
+        }
+      }
+
       const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
       if (token) {
         apiService.setAuthToken(token);
@@ -321,6 +427,19 @@ export default function App(): React.JSX.Element {
     }
   }, [selectedMenuCategory, visibleMenuCategory]);
 
+  useEffect(() => {
+    if (Platform.OS === 'web' || authStatus !== 'signedIn' || activeSection === 'home' || activeSection === 'pos') {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack();
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [activeSection, authStatus, sectionHistory]);
+
   async function loadTicketHistory(): Promise<void> {
     try {
       setPaidTickets(await apiService.fetchPaidTickets());
@@ -358,7 +477,7 @@ export default function App(): React.JSX.Element {
       const result = await apiService.login(trimmedCode);
       await AsyncStorage.setItem(AUTH_TOKEN_STORAGE_KEY, result.token);
       setAccessCode('');
-      setActiveSection('home');
+      resetNavigation();
       setAuthStatus('signedIn');
     } catch (error) {
       if (error instanceof ApiRequestError && error.code === 'INVALID_LOGIN') {
@@ -377,7 +496,7 @@ export default function App(): React.JSX.Element {
   async function handleLogout(): Promise<void> {
     apiService.setAuthToken(null);
     await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-    setActiveSection('home');
+    resetNavigation();
     setAuthStatus('signedOut');
   }
 
@@ -765,6 +884,7 @@ export default function App(): React.JSX.Element {
     onOpenCashDrawer: () => {
       void openCashDrawer();
     },
+    onExit: goBack,
     formatPrice: centsToCurrency,
   };
 
@@ -778,6 +898,57 @@ export default function App(): React.JSX.Element {
     }
   }, [activeSection]);
 
+  const connectionModal = (
+    <Modal
+      visible={isConnectionModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setIsConnectionModalVisible(false)}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.modalPanel, styles.connectionPanel]}>
+          <Text style={styles.modalTitle}>Conectar con el ordenador</Text>
+          <Text style={styles.helperText}>
+            En el ordenador, abre el TPV. En la terminal de inicio aparece el código de emparejamiento.
+          </Text>
+          <TextInput
+            style={styles.connectionInput}
+            value={apiBaseUrlDraft}
+            onChangeText={setApiBaseUrlDraft}
+            placeholder="http://192.168.1.50:3000/api"
+            placeholderTextColor="#6B7280"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          {isPairingScannerVisible ? (
+            <View style={styles.scannerFrame}>
+              <CameraView
+                style={styles.scannerCamera}
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={isHandlingPairScan ? undefined : handlePairingCodeScanned}
+              />
+              <Text style={styles.scannerHelp}>Apunta al código QR mostrado en el ordenador.</Text>
+            </View>
+          ) : null}
+          <View style={styles.connectionActions}>
+            {Platform.OS !== 'web' ? (
+              <TouchableOpacity style={styles.primaryButton} onPress={() => void beginPairingScan()} disabled={isSavingConnection}>
+                <Text style={styles.primaryButtonText}>Escanear QR</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => void saveConnection(apiBaseUrlDraft)} disabled={isSavingConnection}>
+              <Text style={styles.secondaryButtonText}>{isSavingConnection ? 'Comprobando...' : 'Conectar manualmente'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setIsConnectionModalVisible(false)}>
+              <Text style={styles.secondaryButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (authStatus === 'checking') {
     return (
       <SafeAreaView style={styles.container}>
@@ -790,44 +961,60 @@ export default function App(): React.JSX.Element {
 
   if (authStatus === 'signedOut') {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loginScreen}>
-          <View style={styles.loginPanel}>
-            <Text style={styles.loginTitle}>TPV Restaurante</Text>
-            <Text style={styles.helperText}>Introduce el código de acceso para continuar.</Text>
-            <Text style={styles.helperText}>{`Servidor: ${getApiBaseUrl()}`}</Text>
-            <TextInput
-              style={styles.loginInput}
-              value={accessCode}
-              onChangeText={setAccessCode}
-              placeholder="Código de acceso"
-              placeholderTextColor="#6B7280"
-              secureTextEntry
-              autoFocus
-              onSubmitEditing={() => void handleLogin()}
-            />
-            <TouchableOpacity style={styles.primaryButton} onPress={() => void handleLogin()} disabled={loginLoading}>
-              <Text style={styles.primaryButtonText}>{loginLoading ? 'Entrando...' : 'Entrar'}</Text>
-            </TouchableOpacity>
+      <>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loginScreen}>
+            <View style={styles.loginPanel}>
+              <Text style={styles.loginTitle}>TPV Restaurante</Text>
+              <Text style={styles.helperText}>Introduce el código de acceso para continuar.</Text>
+              <Text style={styles.helperText}>{`Servidor: ${configuredApiBaseUrl}`}</Text>
+              <TextInput
+                style={styles.loginInput}
+                value={accessCode}
+                onChangeText={setAccessCode}
+                placeholder="Código de acceso"
+                placeholderTextColor="#6B7280"
+                secureTextEntry
+                autoFocus
+                onSubmitEditing={() => void handleLogin()}
+              />
+              <TouchableOpacity style={styles.primaryButton} onPress={() => void handleLogin()} disabled={loginLoading}>
+                <Text style={styles.primaryButtonText}>{loginLoading ? 'Entrando...' : 'Entrar'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.connectionSetupButton} onPress={openConnectionSetup}>
+                <Text style={styles.secondaryButtonText}>Conectar con otro ordenador</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+        {connectionModal}
+      </>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          <Text style={styles.title}>Cargando...</Text>
-        </View>
-      </SafeAreaView>
+      <>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.centered}>
+            <Text style={styles.title}>Cargando...</Text>
+            <Text style={styles.loadingConnectionHelp}>Si has cambiado de red, conecta el teléfono de nuevo.</Text>
+            <TouchableOpacity style={styles.connectionSetupButton} onPress={openConnectionSetup}>
+              <Text style={styles.secondaryButtonText}>Conectar con otro ordenador</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+        {connectionModal}
+      </>
     );
   }
 
   const mainScreenProps: MainScreenProps = {
     activeSection,
-    setActiveSection,
+    setActiveSection: navigateToSection,
+    goBack,
+    goHome,
+    onConfigureConnection: openConnectionSetup,
     onLogout: () => void handleLogout(),
     posScreenProps,
     sessionSummary,
@@ -867,7 +1054,12 @@ export default function App(): React.JSX.Element {
     centsToCurrency,
   };
 
-  return useMobilePosLayout
-    ? <MobileMainScreen {...mainScreenProps} />
-    : <DesktopMainScreen {...mainScreenProps} />;
+  return (
+    <>
+      {useMobilePosLayout
+        ? <MobileMainScreen {...mainScreenProps} />
+        : <DesktopMainScreen {...mainScreenProps} />}
+      {connectionModal}
+    </>
+  );
 }

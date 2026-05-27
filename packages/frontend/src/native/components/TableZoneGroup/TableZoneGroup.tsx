@@ -21,14 +21,14 @@ interface DraggableTableProps {
   onDragMove: (table: TableId, nextPosition: TablePosition) => void;
 }
 
-const DESKTOP_TABLE_WIDTH = 120;
-const DESKTOP_TABLE_HEIGHT = 74;
-const DESKTOP_BOARD_VISIBLE_HEIGHT = 300;
+const DESKTOP_TABLE_WIDTH = 94;
+const DESKTOP_TABLE_HEIGHT = 62;
+const DESKTOP_BOARD_VISIBLE_HEIGHT = 176;
 const MOBILE_TABLE_WIDTH = 86;
 const MOBILE_TABLE_HEIGHT = 54;
 const MOBILE_BOARD_VISIBLE_HEIGHT = 190;
 const BOARD_PADDING = 12;
-const DESKTOP_TABLE_GAP = 12;
+const DESKTOP_TABLE_GAP = 8;
 const MOBILE_TABLE_GAP = 8;
 
 function clamp(value: number, min: number, max: number): number {

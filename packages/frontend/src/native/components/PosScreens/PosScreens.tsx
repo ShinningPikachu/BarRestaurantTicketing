@@ -1,5 +1,5 @@
-import React, { ComponentProps, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { ComponentProps, useEffect, useState } from 'react';
+import { Alert, BackHandler, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { styles } from '../../app/App.styles';
 import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
@@ -41,6 +41,7 @@ export interface PosScreenProps {
   onRemoveTable: (table: TableId) => void;
   onAddMenuItem: (menuId: number) => void;
   onOpenCashDrawer: () => void;
+  onExit?: () => void;
   formatPrice: (cents: number) => string;
 }
 
@@ -554,6 +555,32 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
 export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
   const [activeView, setActiveView] = useState<MobileTpvView>('tables');
+  const selectedItemCount = props.orderSectionProps.preorderItems.reduce((total, item) => total + item.qty, 0);
+
+  function handleBack(): void {
+    if (activeView === 'ticket') {
+      setActiveView('menu');
+      return;
+    }
+    if (activeView === 'menu') {
+      setActiveView('tables');
+      return;
+    }
+    props.onExit?.();
+  }
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [activeView, props.onExit]);
 
   function handleSelectTable(table: TableId): void {
     props.onSelectTable(table);
@@ -562,16 +589,15 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
 
   function handleAddMenuItem(menuId: number): void {
     props.onAddMenuItem(menuId);
-    setActiveView('ticket');
   }
 
   return (
     <View style={styles.mobilePosScreen}>
       <View style={styles.mobileViewSwitch}>
         {([
-          ['tables', 'Mesas'],
-          ['menu', 'Menú'],
-          ['ticket', 'Ticket'],
+          ['tables', 'Mesa'],
+          ['menu', 'Carta'],
+          ['ticket', selectedItemCount > 0 ? `Cuenta (${selectedItemCount})` : 'Cuenta'],
         ] as Array<[MobileTpvView, string]>).map(([view, label]) => (
           <TouchableOpacity
             key={view}
@@ -590,14 +616,20 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
           {`Mesa ${tableZoneLabel(props.selectedTable.zone)}-${props.selectedTable.number}`}
         </Text>
         <Text style={styles.mobileContextText}>
-          {activeView === 'tables' ? 'Cambiar mesa' : activeView === 'menu' ? 'Añadir productos' : 'Revisar y cobrar'}
+          {activeView === 'tables'
+            ? 'Selecciona una mesa'
+            : activeView === 'menu'
+              ? `${selectedItemCount} por enviar`
+              : 'Revisar y cobrar'}
         </Text>
       </View>
 
       {activeView === 'tables' ? (
         <View style={styles.mobileSinglePanel}>
           <View style={styles.mobilePanelHeader}>
-            <Text style={styles.mobilePanelTitle}>Mesas</Text>
+            <TouchableOpacity style={styles.mobileBackButton} onPress={handleBack}>
+              <Text style={styles.compactButtonText}>Atras: inicio</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.mobilePanelAction}
               onPress={() => props.onAddTable(props.selectedTable.zone)}
@@ -621,14 +653,14 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
       {activeView === 'menu' ? (
         <View style={styles.mobileSinglePanel}>
           <View style={styles.mobilePanelHeader}>
-            <Text style={styles.mobilePanelTitle}>Menú</Text>
-            <TouchableOpacity
-              style={styles.mobilePanelAction}
-              onPress={() => setActiveView('ticket')}
-            >
-              <Text style={styles.compactButtonText}>Ver ticket</Text>
+            <TouchableOpacity style={styles.mobileBackButton} onPress={handleBack}>
+              <Text style={styles.compactButtonText}>Atras: mesas</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mobilePanelAction} onPress={() => setActiveView('ticket')}>
+              <Text style={styles.compactButtonText}>{`Ver cuenta (${selectedItemCount})`}</Text>
             </TouchableOpacity>
           </View>
+          <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
           <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
             <MenuSelector
               layout="mobile"
@@ -651,10 +683,17 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
       {activeView === 'ticket' ? (
         <View style={styles.mobileSinglePanel}>
           <View style={styles.mobilePanelHeader}>
-            <Text style={styles.mobilePanelTitle}>Ticket</Text>
-            <TouchableOpacity style={styles.mobilePanelAction} onPress={props.onOpenCashDrawer}>
-              <Text style={styles.compactButtonText}>Abrir caja</Text>
+            <TouchableOpacity style={styles.mobileBackButton} onPress={handleBack}>
+              <Text style={styles.compactButtonText}>Atras: carta</Text>
             </TouchableOpacity>
+            <View style={styles.mobilePanelActions}>
+              <TouchableOpacity style={styles.mobilePanelAction} onPress={() => setActiveView('menu')}>
+                <Text style={styles.compactButtonText}>+ Productos</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mobilePanelAction} onPress={props.onOpenCashDrawer}>
+                <Text style={styles.compactButtonText}>Caja</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <MobileOrderSummary orderProps={props.orderSectionProps} />
         </View>
@@ -665,55 +704,63 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
 
 export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.columnsScroll}
-      contentContainerStyle={styles.columnsContent}
-    >
-      <View style={styles.columns}>
-        <View style={[styles.column, styles.tablesColumn]}>
-          <Text style={styles.sectionTitle}>Mesas</Text>
-          <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
-            <TableSelector
-              tables={props.tables}
-              selectedTable={props.selectedTable}
-              onSelectTable={props.onSelectTable}
-              onAddTable={props.onAddTable}
-              onRemoveTable={props.onRemoveTable}
-            />
-          </ScrollView>
+    <View style={styles.desktopWorkspace}>
+      <View style={styles.desktopContextBar}>
+        <View style={styles.flex1}>
+          <Text style={styles.desktopContextTitle}>
+            {`Mesa ${tableZoneLabel(props.selectedTable.zone)}-${props.selectedTable.number}`}
+          </Text>
+          <Text style={styles.desktopContextText}>Selecciona productos, confirma el pedido y cobra desde la cuenta.</Text>
         </View>
-
-        <View style={[styles.column, styles.menuColumn]}>
-          <Text style={styles.sectionTitle}>Menú</Text>
-          <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
-            <MenuSelector
-              layout="desktop"
-              menuCategories={props.menuCategories}
-              visibleMenuCategory={props.visibleMenuCategory}
-              menuSearchText={props.menuSearchText}
-              normalizedMenuSearch={props.normalizedMenuSearch}
-              displayedMenuCategory={props.displayedMenuCategory}
-              displayedMenuItems={props.displayedMenuItems}
-              minSearchLength={props.minSearchLength}
-              onMenuSearchTextChange={props.onMenuSearchTextChange}
-              onSelectMenuCategory={props.onSelectMenuCategory}
-              onAddMenuItem={props.onAddMenuItem}
-              formatPrice={props.formatPrice}
-            />
-          </ScrollView>
-        </View>
-
-        <View style={[styles.column, styles.ticketColumn]}>
-          <View style={styles.drawerActionRow}>
-            <TouchableOpacity style={styles.secondaryButton} onPress={props.onOpenCashDrawer}>
-              <Text style={styles.secondaryButtonText}>Abrir caja</Text>
-            </TouchableOpacity>
-          </View>
-          <OrderSection {...props.orderSectionProps} />
-        </View>
+        <TouchableOpacity style={styles.secondaryButton} onPress={props.onOpenCashDrawer}>
+          <Text style={styles.secondaryButtonText}>Abrir caja</Text>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator
+        style={styles.columnsScroll}
+        contentContainerStyle={styles.columnsContent}
+      >
+        <View style={styles.columns}>
+          <View style={[styles.column, styles.tablesColumn]}>
+            <Text style={styles.sectionTitle}>Mesas</Text>
+            <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
+              <TableSelector
+                tables={props.tables}
+                selectedTable={props.selectedTable}
+                onSelectTable={props.onSelectTable}
+                onAddTable={props.onAddTable}
+                onRemoveTable={props.onRemoveTable}
+              />
+            </ScrollView>
+          </View>
+
+          <View style={[styles.column, styles.menuColumn]}>
+            <Text style={styles.sectionTitle}>Carta</Text>
+            <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
+              <MenuSelector
+                layout="desktop"
+                menuCategories={props.menuCategories}
+                visibleMenuCategory={props.visibleMenuCategory}
+                menuSearchText={props.menuSearchText}
+                normalizedMenuSearch={props.normalizedMenuSearch}
+                displayedMenuCategory={props.displayedMenuCategory}
+                displayedMenuItems={props.displayedMenuItems}
+                minSearchLength={props.minSearchLength}
+                onMenuSearchTextChange={props.onMenuSearchTextChange}
+                onSelectMenuCategory={props.onSelectMenuCategory}
+                onAddMenuItem={props.onAddMenuItem}
+                formatPrice={props.formatPrice}
+              />
+            </ScrollView>
+          </View>
+
+          <View style={[styles.column, styles.ticketColumn]}>
+            <OrderSection {...props.orderSectionProps} />
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

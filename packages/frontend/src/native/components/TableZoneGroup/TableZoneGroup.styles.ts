@@ -3,10 +3,10 @@ import { colors } from '../../theme';
 
 export const styles = StyleSheet.create({
   zoneGroup: {
-    marginBottom: 16,
+    marginBottom: 10,
     backgroundColor: colors.surface,
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     borderWidth: 1,
     borderColor: colors.border
   },
@@ -15,27 +15,27 @@ export const styles = StyleSheet.create({
     padding: 8
   },
   zoneHeader: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
     marginBottom: 6,
     paddingLeft: 2
   },
   hintText: {
-    fontSize: 15,
+    fontSize: 12,
     color: colors.textTertiary,
-    marginBottom: 8,
+    marginBottom: 6,
     paddingLeft: 2
   },
   zoneBoard: {
     position: 'relative',
     width: '100%',
-    height: 300,
+    height: 176,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.zoneTable,
-    marginBottom: 10,
+    marginBottom: 7,
     overflow: 'hidden'
   },
   mobileZoneBoard: {
@@ -69,7 +69,7 @@ export const styles = StyleSheet.create({
   tableNodeText: {
     color: colors.text,
     fontWeight: '700',
-    fontSize: 24,
+    fontSize: 20,
     userSelect: 'none'
   },
   mobileTableNodeText: {
@@ -80,7 +80,8 @@ export const styles = StyleSheet.create({
   },
   addTableButton: {
     width: '100%',
-    paddingVertical: 12,
+    paddingVertical: 9,
+    minHeight: 42,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -90,11 +91,12 @@ export const styles = StyleSheet.create({
   addTableButtonText: {
     color: colors.buttonSecondaryText,
     fontWeight: '700',
-    fontSize: 16
+    fontSize: 14
   },
   removeSelectedButton: {
     width: '100%',
-    paddingVertical: 12,
+    paddingVertical: 9,
+    minHeight: 42,
     borderRadius: 8,
     backgroundColor: colors.error,
     alignItems: 'center',
@@ -106,6 +108,6 @@ export const styles = StyleSheet.create({
   removeSelectedButtonText: {
     color: colors.textLight,
     fontWeight: '700',
-    fontSize: 16
+    fontSize: 14
   }
 });

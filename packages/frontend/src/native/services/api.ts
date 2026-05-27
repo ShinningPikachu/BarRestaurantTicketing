@@ -37,10 +37,45 @@ function defaultApiBaseUrl(): string {
 }
 
 const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-const API_BASE_URL = (envBaseUrl || defaultApiBaseUrl()).replace(/\/$/, '');
+let apiBaseUrl = (envBaseUrl || defaultApiBaseUrl()).replace(/\/$/, '');
 
 export function getApiBaseUrl(): string {
-  return API_BASE_URL;
+  return apiBaseUrl;
+}
+
+export function normalizeApiBaseUrl(value: string): string {
+  const input = value.trim();
+  const candidate = /^https?:\/\//i.test(input) ? input : `http://${input}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('Dirección del ordenador no válida.');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('Dirección del ordenador no válida.');
+  }
+
+  const trimmedPath = parsed.pathname.replace(/\/+$/, '');
+  const apiPath = trimmedPath.endsWith('/api') ? trimmedPath : `${trimmedPath}/api`;
+  return `${parsed.protocol}//${parsed.host}${apiPath}`.replace(/\/$/, '');
+}
+
+export function setApiBaseUrl(value: string): string {
+  apiBaseUrl = normalizeApiBaseUrl(value);
+  return apiBaseUrl;
+}
+
+export async function testApiConnection(value: string): Promise<string> {
+  const normalized = normalizeApiBaseUrl(value);
+  const backendBase = normalized.replace(/\/api$/, '');
+  const response = await fetch(`${backendBase}/health`);
+  if (!response.ok) {
+    throw new Error(`El servidor devolvió ${response.status}.`);
+  }
+  return normalized;
 }
 
 async function parseOrThrow<T>(response: Response, message: string): Promise<T> {
@@ -83,7 +118,7 @@ export class ApiService {
   }
 
   async login(accessCode: string): Promise<{ token: string }> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${apiBaseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ accessCode })
@@ -99,7 +134,7 @@ export class ApiService {
       headers.set('Authorization', `Bearer ${this.authToken}`);
     }
 
-    return fetch(`${API_BASE_URL}${path}`, {
+    return fetch(`${apiBaseUrl}${path}`, {
       ...init,
       headers,
     });

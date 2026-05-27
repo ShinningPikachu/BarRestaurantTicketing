@@ -26,9 +26,14 @@ function MobileHeader(props: MainScreenProps): React.JSX.Element {
         <Text style={styles.headerSubtitle}>{screenSubtitles[props.activeSection]}</Text>
       </View>
       <View style={styles.headerActions}>
-        {props.activeSection !== 'home' ? (
-          <TouchableOpacity style={styles.headerButton} onPress={() => props.setActiveSection('home')}>
-            <Text style={styles.secondaryButtonText}>Inicio</Text>
+        {props.activeSection === 'home' || props.activeSection === 'pos' ? (
+          <TouchableOpacity style={styles.headerButton} onPress={props.onConfigureConnection}>
+            <Text style={styles.secondaryButtonText}>Conectar</Text>
+          </TouchableOpacity>
+        ) : null}
+        {props.activeSection !== 'home' && props.activeSection !== 'pos' ? (
+          <TouchableOpacity style={styles.headerButton} onPress={props.goBack}>
+            <Text style={styles.secondaryButtonText}>Atras</Text>
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity style={styles.headerButton} onPress={props.onLogout}>
@@ -42,11 +47,14 @@ function MobileHeader(props: MainScreenProps): React.JSX.Element {
 function MobileBottomTabs({
   activeSection,
   setActiveSection,
+  goHome,
 }: {
   activeSection: AppSection;
   setActiveSection: (section: AppSection) => void;
+  goHome: () => void;
 }): React.JSX.Element {
   const tabs: Array<{ section: AppSection; label: string }> = [
+    { section: 'home', label: 'Inicio' },
     { section: 'pos', label: 'TPV' },
     { section: 'history', label: 'Tickets' },
     { section: 'products', label: 'Productos' },
@@ -60,7 +68,7 @@ function MobileBottomTabs({
           <TouchableOpacity
             key={tab.section}
             style={[styles.bottomTabButton, isSelected && styles.bottomTabButtonSelected]}
-            onPress={() => setActiveSection(tab.section)}
+            onPress={() => tab.section === 'home' ? goHome() : setActiveSection(tab.section)}
             activeOpacity={0.8}
           >
             <Text style={[styles.bottomTabText, isSelected && styles.bottomTabTextSelected]}>{tab.label}</Text>
@@ -293,7 +301,7 @@ export function MobileMainScreen(props: MainScreenProps): React.JSX.Element {
         {props.activeSection === 'products' ? <MobileProductsScreen {...props} /> : null}
         {props.activeSection === 'pos' ? <MobilePosScreen {...props.posScreenProps} /> : null}
       </View>
-      <MobileBottomTabs activeSection={props.activeSection} setActiveSection={props.setActiveSection} />
+      <MobileBottomTabs activeSection={props.activeSection} setActiveSection={props.setActiveSection} goHome={props.goHome} />
     </SafeAreaView>
   );
 }

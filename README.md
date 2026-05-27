@@ -249,13 +249,17 @@ Build the APK from the repo root:
 npm run android:apk
 ```
 
-The build script uses your computer LAN IP automatically and bakes this URL into the app:
+This command activates the Node.js version from `.nvmrc` automatically when `nvm` is installed, even if your terminal currently opens with Node.js 24.
+
+The build script uses your computer LAN IP as the first connection address:
 
 ```text
 http://YOUR_COMPUTER_LAN_IP:3000/api
 ```
 
-If you want to force a specific backend URL, set it before building:
+The installed Android app can later be paired with a different computer address without rebuilding it. After installing an APK that includes this pairing feature once, start the computer TPV normally, tap `Conectar` in the Android app, and scan the pairing QR shown in the computer startup terminal. Pairing stores only the local server address; the POS login code is still required.
+
+If you want to force the initial backend URL, set it before building:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run android:apk
@@ -481,7 +485,23 @@ npm run prisma:studio
 
 ### Phone Cannot Connect To Backend
 
-Use the computer LAN IP, not `localhost`, for `EXPO_PUBLIC_API_BASE_URL`.
+The Android phone connects to the computer through its local network IP address. That address can change when you move to a different Wi-Fi network, restart a router, use a hotspot, or receive a new DHCP lease. An APK built with an old address cannot reach the computer until it is paired again.
+
+For the installed Android app:
+
+1. Start BarRestaurantTicketing on the computer.
+2. Keep phone and computer on the same Wi-Fi network.
+3. In the phone app, tap `Conectar`.
+4. Scan the `Installed Android app` QR code printed in the computer startup terminal.
+5. Log in with the POS access code.
+
+You can also type the pairing address manually in the phone app, for example:
+
+```text
+http://192.168.1.50:3000/api
+```
+
+For Expo Go development, use the computer LAN IP, not `localhost`, for `EXPO_PUBLIC_API_BASE_URL`.
 
 Example:
 
@@ -516,6 +536,15 @@ npm run seed
 ```
 
 ### Port Already In Use
+
+If a previous BarRestaurantTicketing terminal was closed without stopping its services, stop the leftover local servers and start again:
+
+```bash
+npm run stop
+npm run dev
+```
+
+The desktop start icon now detects an incomplete previous start and restarts it automatically. If another program uses one of the required ports, it stops with a clear message instead of opening only part of the POS.
 
 Override ports:
 

@@ -13,7 +13,7 @@ export const mobileStyles = StyleSheet.create({
     minHeight: 0
   },
   headerBar: {
-    minHeight: 38,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -47,7 +47,9 @@ export const mobileStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 7
+    minHeight: 44,
+    paddingVertical: 7,
+    justifyContent: 'center'
   },
   bottomTabs: {
     flexDirection: 'row',
@@ -92,18 +94,19 @@ export const mobileStyles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.surface,
     padding: 12,
-    minHeight: 86,
+    minHeight: 104,
     justifyContent: 'center'
   },
   homeButtonTitle: {
     color: colors.text,
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '700',
     marginBottom: 4
   },
   homeButtonText: {
     color: colors.textSecondary,
-    fontSize: 13
+    fontSize: 14,
+    lineHeight: 20
   },
   fullPanel: {
     flex: 1,
@@ -162,6 +165,7 @@ export const mobileStyles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -177,6 +181,7 @@ export const mobileStyles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -314,7 +319,8 @@ export const mobileStyles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: colors.inputBackground,
     color: colors.inputText,
-    fontSize: 13
+    fontSize: 14,
+    minHeight: 44
   },
   formInputWide: {
     flex: 1
@@ -338,7 +344,8 @@ export const mobileStyles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     color: colors.inputText,
     textAlign: 'center',
-    fontSize: 13
+    fontSize: 13,
+    minHeight: 42
   },
   productImagePicker: {
     flexDirection: 'row',

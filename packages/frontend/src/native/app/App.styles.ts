@@ -57,6 +57,12 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600'
   },
+  loadingConnectionHelp: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 10,
+    textAlign: 'center'
+  },
   loginScreen: {
     flex: 1,
     alignItems: 'center',
@@ -88,6 +94,17 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 18
   },
+  connectionSetupButton: {
+    marginTop: 10,
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   columnsContent: {
     flexGrow: 1,
     width: '100%',
@@ -97,26 +114,26 @@ export const styles = StyleSheet.create({
     flex: 1
   },
   tablesColumn: {
-    flex: 1.55,
+    flex: 0.72,
     flexBasis: 0,
-    minWidth: 560
+    minWidth: 292
   },
   menuColumn: {
-    flex: 0.8,
+    flex: 0.92,
     flexBasis: 0,
-    minWidth: 290
+    minWidth: 312
   },
   ticketColumn: {
-    flex: 0.9,
+    flex: 1.28,
     flexBasis: 0,
-    minWidth: 330
+    minWidth: 410
   },
   columns: {
     flex: 1,
     flexDirection: 'row',
-    gap: 14,
+    gap: 10,
     width: '100%',
-    minWidth: 1220
+    minWidth: 1040
   },
   column: {
     flex: 1,
@@ -125,7 +142,33 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14
+    padding: 10
+  },
+  desktopWorkspace: {
+    flex: 1,
+    minHeight: 0,
+    gap: 10
+  },
+  desktopContextBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  desktopContextTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  desktopContextText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 2
   },
   mobilePosScreen: {
     flex: 1,
@@ -143,7 +186,7 @@ export const styles = StyleSheet.create({
   },
   mobileViewButton: {
     flex: 1,
-    minHeight: 36,
+    minHeight: 44,
     borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
@@ -181,8 +224,24 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 7
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    minHeight: 42,
+    justifyContent: 'center'
+  },
+  mobileBackButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 10,
+    minHeight: 42,
+    justifyContent: 'center'
+  },
+  mobilePanelActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5
   },
   mobilePanelScroll: {
     flex: 1,
@@ -230,6 +289,12 @@ export const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '700'
+  },
+  mobileGuidanceText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 7
   },
   mobilePanelTitle: {
     color: colors.text,
@@ -1031,6 +1096,7 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 11,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -1041,6 +1107,7 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 11,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -1124,6 +1191,46 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
     padding: 14
+  },
+  connectionPanel: {
+    maxWidth: 470
+  },
+  connectionInput: {
+    minHeight: 48,
+    borderColor: colors.inputBorder,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.inputBackground,
+    color: colors.inputText,
+    fontSize: 15,
+    marginTop: 8,
+    marginBottom: 12
+  },
+  connectionActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10
+  },
+  scannerFrame: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceAlt,
+    marginBottom: 6
+  },
+  scannerCamera: {
+    height: 250,
+    width: '100%'
+  },
+  scannerHelp: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 8
   },
   modalHeader: {
     flexDirection: 'row',

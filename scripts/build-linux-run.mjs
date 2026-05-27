@@ -108,11 +108,28 @@ fi
 
 if [ -d "$INSTALL_DIR" ]; then
   cd "$INSTALL_DIR"
-  if node scripts/is-running.mjs >/dev/null 2>&1; then
+  set +e
+  RUNNING_MESSAGE="$(node scripts/is-running.mjs 2>&1)"
+  RUNNING_STATUS=$?
+  set -e
+
+  if [ "$RUNNING_STATUS" -eq 0 ]; then
     echo "$APP_NAME is already running."
     echo "Opening the POS screen..."
     DESKTOP_URL="$DESKTOP_URL" node scripts/open-web.mjs
     exit 0
+  fi
+
+  if [ "$RUNNING_STATUS" -eq 2 ]; then
+    echo "Restarting an incomplete previous application start..."
+    node scripts/stop-local.mjs
+    sleep 1
+  fi
+
+  if [ "$RUNNING_STATUS" -eq 3 ]; then
+    echo "$RUNNING_MESSAGE"
+    echo "Close the program using that port, or change the ports in .env."
+    exit 1
   fi
 fi
 

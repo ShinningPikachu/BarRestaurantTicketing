@@ -9,18 +9,53 @@ export const desktopStyles = StyleSheet.create({
     paddingTop: 12
   },
   headerBar: {
-    minHeight: 44,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    marginBottom: 12
+    marginBottom: 12,
+    gap: 16
   },
   header: {
     color: colors.text,
     fontSize: 20,
     fontWeight: '700'
+  },
+  headerSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 2
+  },
+  mainNavigation: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8
+  },
+  navigationButton: {
+    minWidth: 110,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.buttonSecondary,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  navigationButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark
+  },
+  navigationButtonText: {
+    color: colors.buttonSecondaryText,
+    fontSize: 15,
+    fontWeight: '700'
+  },
+  navigationButtonTextSelected: {
+    color: colors.textLight
   },
   headerActions: {
     flexDirection: 'row',
@@ -33,7 +68,9 @@ export const desktopStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center'
   },
   homeGrid: {
     flex: 1,
@@ -47,18 +84,19 @@ export const desktopStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.surface,
-    padding: 18,
+    padding: 24,
     justifyContent: 'center'
   },
   homeButtonTitle: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
     marginBottom: 8
   },
   homeButtonText: {
     color: colors.textSecondary,
-    fontSize: 14
+    fontSize: 16,
+    lineHeight: 24
   },
   fullPanel: {
     flex: 1,
@@ -130,7 +168,8 @@ export const desktopStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 13,
+    paddingVertical: 12,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -316,4 +355,3 @@ export const desktopStyles = StyleSheet.create({
     fontSize: 16
   }
 });
-

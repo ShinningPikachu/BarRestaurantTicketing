@@ -4,14 +4,44 @@ import { DesktopPosScreen } from '../components';
 import { MainScreenProps } from './MainScreen.types';
 import { desktopStyles as styles } from './DesktopMain.styles';
 
+const navigationItems = [
+  { section: 'pos', label: 'Venta' },
+  { section: 'history', label: 'Tickets' },
+  { section: 'products', label: 'Productos' },
+] as const;
+
 export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerBar}>
-        <Text style={styles.header}>TPV Restaurante</Text>
+        <View>
+          <Text style={styles.header}>TPV Restaurante</Text>
+          <Text style={styles.headerSubtitle}>Venta y gestion del servicio</Text>
+        </View>
+        <View style={styles.mainNavigation}>
+          {navigationItems.map((item) => {
+            const selected = props.activeSection === item.section;
+            return (
+              <TouchableOpacity
+                key={item.section}
+                style={[styles.navigationButton, selected && styles.navigationButtonSelected]}
+                onPress={() => props.setActiveSection(item.section)}
+              >
+                <Text style={[styles.navigationButtonText, selected && styles.navigationButtonTextSelected]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         <View style={styles.headerActions}>
           {props.activeSection !== 'home' ? (
-            <TouchableOpacity style={styles.headerButton} onPress={() => props.setActiveSection('home')}>
+            <TouchableOpacity style={styles.headerButton} onPress={props.goBack}>
+              <Text style={styles.secondaryButtonText}>Atras</Text>
+            </TouchableOpacity>
+          ) : null}
+          {props.activeSection !== 'home' ? (
+            <TouchableOpacity style={styles.headerButton} onPress={props.goHome}>
               <Text style={styles.secondaryButtonText}>Inicio</Text>
             </TouchableOpacity>
           ) : null}

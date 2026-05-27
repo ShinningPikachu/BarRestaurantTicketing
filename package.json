@@ -22,7 +22,7 @@
     "stop": "node scripts/stop-local.mjs",
     "package:linux": "node scripts/build-linux-run.mjs",
     "package:linux:offline": "node scripts/build-linux-run.mjs --include-node-modules",
-    "android:apk": "node scripts/build-android-apk.mjs",
+    "android:apk": "bash scripts/build-android-apk.sh",
     "test": "npm run -w backend test",
     "check:fast": "npm run -w backend test && npm run -w shared build && npm run -w frontend typecheck",
     "check": "npm run -w backend test && npm run -w backend build && npm run -w shared build && npm run -w frontend build"

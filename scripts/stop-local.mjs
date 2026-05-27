@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readlinkSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const appRoot = process.cwd();
@@ -30,7 +30,8 @@ function loadEnvFile(filePath) {
 }
 
 function commandExists(command) {
-  return spawnSync('command', ['-v', command], { shell: true, stdio: 'ignore' }).status === 0;
+  const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
+  return spawnSync(lookupCommand, [command], { stdio: 'ignore' }).status === 0;
 }
 
 function parsePids(text) {
@@ -68,11 +69,35 @@ function getCommandLine(pid) {
   }
 }
 
+function workingDirectoryLooksLikeThisApp(pid) {
+  if (process.platform !== 'linux') {
+    return false;
+  }
+
+  try {
+    const workingDirectory = resolve(readlinkSync(`/proc/${pid}/cwd`));
+    return workingDirectory === appRoot || workingDirectory.startsWith(`${appRoot}/`);
+  } catch {
+    return false;
+  }
+}
+
 function commandLooksLikeThisApp(pid) {
   const commandLine = getCommandLine(pid);
   return commandLine.includes(appRoot)
     || commandLine.includes('BarRestaurantTicketing')
-    || commandLine.includes('bar-restaurant-ticketing');
+    || commandLine.includes('bar-restaurant-ticketing')
+    || workingDirectoryLooksLikeThisApp(pid);
+}
+
+function getProcessGroupId(pid) {
+  try {
+    const value = execFileSync('ps', ['-p', String(pid), '-o', 'pgid='], { encoding: 'utf8' }).trim();
+    const processGroupId = Number(value);
+    return Number.isInteger(processGroupId) && processGroupId > 1 ? processGroupId : pid;
+  } catch {
+    return pid;
+  }
 }
 
 function killPid(pid, signal) {
@@ -80,7 +105,7 @@ function killPid(pid, signal) {
     if (process.platform === 'win32') {
       process.kill(pid, signal);
     } else {
-      process.kill(-pid, signal);
+      process.kill(-getProcessGroupId(pid), signal);
     }
     return true;
   } catch {

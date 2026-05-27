@@ -8,6 +8,9 @@ export type PosScreenProps = ComponentProps<typeof DesktopPosScreen> & Component
 export interface MainScreenProps {
   activeSection: AppSection;
   setActiveSection: (section: AppSection) => void;
+  goBack: () => void;
+  goHome: () => void;
+  onConfigureConnection: () => void;
   onLogout: () => void;
   posScreenProps: PosScreenProps;
   sessionSummary: SessionSummary | null;
