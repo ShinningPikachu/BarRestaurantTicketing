@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
+import { getCurrentTableTotal } from '../app/app.helpers';
 import { Order, PaymentMethod, TableId, TableZone } from '../types';
 import { useMenuController } from './menu.controller';
 import { useTableController } from './table.controller';
@@ -22,6 +23,14 @@ export function useTicketingController(enabled = true) {
     () => workflowController.selectors.getTableConfirmedOrders(selectedTable),
     [workflowController.selectors, selectedTable, workflowController.state.orders]
   );
+  const currentTableTotal = useMemo(
+    () => getCurrentTableTotal(workflowController.state.preorderItems, tableConfirmedOrders),
+    [workflowController.state.preorderItems, tableConfirmedOrders]
+  );
+
+  useEffect(() => {
+    tableController.actions.updateTableTotal(selectedTable, currentTableTotal);
+  }, [currentTableTotal, selectedTable.number, selectedTable.zone]);
 
   // Initialization - separated for clarity
   useEffect(() => {
@@ -223,11 +232,13 @@ export function useTicketingController(enabled = true) {
     state: {
       loading,
       tables: tableController.state.tables,
+      tableTotals: tableController.state.tableTotals,
       selectedTable,
       menuByCategory: menuController.state.menuByCategory,
       preorderItems: workflowController.state.preorderItems,
       tableConfirmedOrders,
       preorderTotal: workflowController.state.preorderTotal,
+      currentTableTotal,
       priceDraftByItemId: workflowController.state.priceDraftByItemId,
     },
     actions: {

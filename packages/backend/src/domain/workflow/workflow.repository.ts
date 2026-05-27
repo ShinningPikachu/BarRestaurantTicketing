@@ -19,7 +19,23 @@ export class WorkflowRepository {
   }
 
   async listTables() {
-    return this.client.table.findMany({ orderBy: [{ zone: 'asc' }, { number: 'asc' }] });
+    return this.client.table.findMany({
+      orderBy: [{ zone: 'asc' }, { number: 'asc' }],
+      include: {
+        orders: {
+          where: { status: 'confirmed' },
+          select: { totalCents: true },
+        },
+        preOrderSessions: {
+          where: { status: 'draft' },
+          select: {
+            items: {
+              select: { qty: true, unitPriceCents: true },
+            },
+          },
+        },
+      },
+    });
   }
 
   async getTableByNumberAndZone(number: number, zone: string, tx?: Prisma.TransactionClient) {

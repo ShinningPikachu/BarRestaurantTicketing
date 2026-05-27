@@ -149,27 +149,6 @@ export const styles = StyleSheet.create({
     minHeight: 0,
     gap: 10
   },
-  desktopContextBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 10
-  },
-  desktopContextTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '700'
-  },
-  desktopContextText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: 2
-  },
   mobilePosScreen: {
     flex: 1,
     minHeight: 0,
@@ -271,24 +250,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     marginBottom: 8
-  },
-  mobileContextRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    marginBottom: 0
-  },
-  mobileContextText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700'
   },
   mobileGuidanceText: {
     color: colors.textSecondary,
@@ -456,12 +417,30 @@ export const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 8
   },
-  mobileTicketControls: {
+  mobileCheckoutPanel: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: 6,
-    marginTop: 6,
+    backgroundColor: colors.surface,
+    paddingTop: 8,
+    marginTop: 8,
     gap: 6
+  },
+  mobileCheckoutTotalField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.zoneMenu,
+    paddingHorizontal: 10,
+    paddingVertical: 9
+  },
+  mobileCheckoutTotalLabel: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700'
   },
   mobileTicketActionsRow: {
     flexDirection: 'row',
@@ -486,10 +465,38 @@ export const styles = StyleSheet.create({
   mobilePayBar: {
     flexDirection: 'row',
     gap: 6,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 6,
-    marginTop: 6
+  },
+  mobileOrderPrimaryButton: {
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  mobileOrderSecondaryButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  mobileOrderButtonText: {
+    color: colors.buttonSecondaryText,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center'
+  },
+  mobileOrderPrimaryButtonText: {
+    color: colors.buttonPrimaryText,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center'
   },
   mobileDisabledButton: {
     opacity: 0.45
@@ -1085,11 +1092,71 @@ export const styles = StyleSheet.create({
     marginTop: 6,
     flexWrap: 'wrap'
   },
-  confirmedActionBar: {
+  checkoutPanel: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
+    marginTop: 8,
+    gap: 8
+  },
+  checkoutTotalField: {
+    minHeight: 62,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.zoneMenu,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  checkoutTotalLabel: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '700'
+  },
+  checkoutTotalAmount: {
+    color: colors.text,
+    fontSize: 25,
+    fontWeight: '700'
+  },
+  checkoutActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     flexWrap: 'wrap'
+  },
+  desktopCheckoutPrimaryButton: {
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  desktopCheckoutSecondaryButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  desktopCheckoutPrimaryButtonText: {
+    color: colors.buttonPrimaryText,
+    fontSize: 18,
+    fontWeight: '700'
+  },
+  desktopCheckoutSecondaryButtonText: {
+    color: colors.buttonSecondaryText,
+    fontSize: 18,
+    fontWeight: '700'
   },
   compactPrimaryButton: {
     backgroundColor: colors.buttonPrimary,

@@ -69,11 +69,21 @@ export const styles = StyleSheet.create({
   tableNodeText: {
     color: colors.text,
     fontWeight: '700',
-    fontSize: 20,
+    fontSize: 18,
     userSelect: 'none'
   },
   mobileTableNodeText: {
-    fontSize: 18
+    fontSize: 17
+  },
+  tableAmountText: {
+    color: colors.textTertiary,
+    fontWeight: '700',
+    fontSize: 12,
+    marginTop: 3,
+    userSelect: 'none'
+  },
+  mobileTableAmountText: {
+    fontSize: 11
   },
   tableNodeTextSelected: {
     color: colors.textLight

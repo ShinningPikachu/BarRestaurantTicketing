@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { SelectedTable } from '../app/app.types';
 import { ApiRequestError, apiService, logger } from '../services';
-import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone, tableZoneLabel } from '../types';
+import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone, tableKey, tableZoneLabel } from '../types';
 
 function toKnownZone(zone: string | null | undefined): TableZone | null {
   const normalized = (zone ?? '').trim().toLowerCase();
@@ -61,6 +61,19 @@ function mapTablesByZone(tables: BackendTable[]): Map<TableZone, number[]> {
   return grouped;
 }
 
+function mapTableTotals(tables: BackendTable[]): Map<string, number> {
+  const totals = new Map<string, number>();
+
+  for (const table of tables) {
+    const zone = toKnownZone(table.zone);
+    if (zone) {
+      totals.set(tableKey({ zone, number: table.number }), table.totalCents ?? 0);
+    }
+  }
+
+  return totals;
+}
+
 function confirmDeleteTable(table: TableId, onConfirm: () => void): void {
   const message = `Se eliminará la mesa M${table.number} en ${tableZoneLabel(table.zone)} y todos sus pedidos pendientes. Esta acción no se puede deshacer.`;
 
@@ -88,6 +101,7 @@ function confirmDeleteTable(table: TableId, onConfirm: () => void): void {
 
 export function useTableController() {
   const [tables, setTables] = useState<Map<TableZone, number[]>>(new Map());
+  const [tableTotals, setTableTotals] = useState<Map<string, number>>(new Map());
   const [selectedTable, setSelectedTable] = useState<SelectedTable>({ zone: TableZone.OUTSIDE, number: 1 });
 
   async function loadTables(): Promise<SelectedTable> {
@@ -111,6 +125,7 @@ export function useTableController() {
     const initialTable = getInitialTable(loadedTables);
 
     setTables(loadedTables);
+    setTableTotals(mapTableTotals(ensuredTablesRaw));
     setSelectedTable(initialTable);
 
     return initialTable;
@@ -130,6 +145,7 @@ export function useTableController() {
       const newTable = await apiService.addTable(zone);
       const loadedTables = await apiService.fetchTables();
       setTables(mapTablesByZone(loadedTables));
+      setTableTotals(mapTableTotals(loadedTables));
 
       const nextTable: TableId = {
         zone: normalizeTableZone(newTable.zone ?? zone),
@@ -155,6 +171,7 @@ export function useTableController() {
       const loadedTables = await apiService.fetchTables();
       const groupedTables = mapTablesByZone(loadedTables);
       setTables(groupedTables);
+      setTableTotals(mapTableTotals(loadedTables));
 
       const nextTable = getFirstTableInZone(groupedTables, table.zone) ?? getInitialTable(groupedTables);
       setSelectedTable(nextTable);
@@ -170,6 +187,7 @@ export function useTableController() {
           const loadedTables = await apiService.fetchTables();
           const groupedTables = mapTablesByZone(loadedTables);
           setTables(groupedTables);
+          setTableTotals(mapTableTotals(loadedTables));
 
           const zoneHasSelectedTable = groupedTables.get(selectedTable.zone)?.includes(selectedTable.number) ?? false;
           const nextTable = zoneHasSelectedTable
@@ -188,9 +206,23 @@ export function useTableController() {
     }
   }
 
+  function updateTableTotal(table: TableId, totalCents: number): void {
+    setTableTotals((current) => {
+      const key = tableKey(table);
+      if (current.get(key) === totalCents) {
+        return current;
+      }
+
+      const next = new Map(current);
+      next.set(key, totalCents);
+      return next;
+    });
+  }
+
   return {
     state: {
       tables,
+      tableTotals,
       selectedTable,
     },
     actions: {
@@ -198,6 +230,7 @@ export function useTableController() {
       selectTable,
       addTable,
       removeTable,
+      updateTableTotal,
     }
   };
 }

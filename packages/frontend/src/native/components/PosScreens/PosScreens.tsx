@@ -25,6 +25,7 @@ interface ConfirmedItemRow {
 
 export interface PosScreenProps {
   tables: Map<TableZone, number[]>;
+  tableTotals: Map<string, number>;
   selectedTable: TableId;
   menuCategories: string[];
   visibleMenuCategory: string | null;
@@ -40,7 +41,6 @@ export interface PosScreenProps {
   onAddTable: (zone: TableZone) => void;
   onRemoveTable: (table: TableId) => void;
   onAddMenuItem: (menuId: number) => void;
-  onOpenCashDrawer: () => void;
   onExit?: () => void;
   formatPrice: (cents: number) => string;
 }
@@ -48,13 +48,15 @@ export interface PosScreenProps {
 interface TableSelectorProps {
   layout?: MenuLayout;
   tables: Map<TableZone, number[]>;
+  tableTotals: Map<string, number>;
   selectedTable: TableId;
   onSelectTable: (table: TableId) => void;
   onAddTable: (zone: TableZone) => void;
   onRemoveTable: (table: TableId) => void;
+  formatPrice: (cents: number) => string;
 }
 
-function TableSelector({ layout = 'desktop', tables, selectedTable, onSelectTable, onAddTable, onRemoveTable }: TableSelectorProps): React.JSX.Element {
+function TableSelector({ layout = 'desktop', tables, tableTotals, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableSelectorProps): React.JSX.Element {
   return (
     <>
       {TABLE_ZONES.map((zone: TableZone) => (
@@ -63,10 +65,12 @@ function TableSelector({ layout = 'desktop', tables, selectedTable, onSelectTabl
           layout={layout}
           zone={zone}
           numbers={tables.get(zone) ?? []}
+          tableTotals={tableTotals}
           selectedTable={selectedTable}
           onSelectTable={onSelectTable}
           onAddTable={onAddTable}
           onRemoveTable={onRemoveTable}
+          formatPrice={formatPrice}
         />
       ))}
     </>
@@ -233,10 +237,10 @@ function MobileConfirmedItem({
       </View>
       <Text style={styles.mobileConfirmedQtyText}>{`x${item.qty}`}</Text>
       <TouchableOpacity
-        style={styles.compactSecondaryButton}
+        style={styles.mobileOrderSecondaryButton}
         onPress={() => orderProps.onMoveConfirmedItemToPreOrder(orderId, item)}
       >
-        <Text style={styles.compactButtonText}>Editar</Text>
+        <Text style={styles.mobileOrderButtonText}>Editar</Text>
       </TouchableOpacity>
     </View>
   );
@@ -376,7 +380,6 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             {`${orderProps.preorderItems.length} prepedido · ${confirmedItems.length} cocina`}
           </Text>
         </View>
-        <Text style={styles.mobileOrderTotal}>{orderProps.formatPrice(orderProps.preorderTotal)}</Text>
       </View>
 
       <ScrollView style={styles.mobileOrderScroll} showsVerticalScrollIndicator>
@@ -396,18 +399,18 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
         <View style={styles.mobileStickyActions}>
           <TouchableOpacity
-            style={[styles.compactPrimaryButton, styles.flex1, !hasPreorder && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderPrimaryButton, styles.flex1, !hasPreorder && styles.mobileDisabledButton]}
             onPress={orderProps.onConfirmOrder}
             disabled={!hasPreorder}
           >
-            <Text style={styles.compactPrimaryButtonText}>Enviar a cocina</Text>
+            <Text style={styles.mobileOrderPrimaryButtonText}>Enviar a cocina</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.compactSecondaryButton, styles.flex1, !hasPreorder && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasPreorder && styles.mobileDisabledButton]}
             onPress={orderProps.onClearPreOrder}
             disabled={!hasPreorder}
           >
-            <Text style={styles.compactButtonText}>Limpiar</Text>
+            <Text style={styles.mobileOrderButtonText}>Limpiar</Text>
           </TouchableOpacity>
         </View>
 
@@ -431,21 +434,44 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
         </View>
       </ScrollView>
 
-      <View style={styles.mobileTicketControls}>
+      <View style={styles.mobileCheckoutPanel}>
+        <View style={styles.mobileCheckoutTotalField}>
+          <Text style={styles.mobileCheckoutTotalLabel}>Total de productos</Text>
+          <Text style={styles.mobileOrderTotal}>{orderProps.formatPrice(orderProps.currentTableTotal)}</Text>
+        </View>
         <View style={styles.mobileTicketActionsRow}>
           <TouchableOpacity
-            style={[styles.compactPrimaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderPrimaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={() => orderProps.onPrintTicket()}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.compactPrimaryButtonText}>Imprimir</Text>
+            <Text style={styles.mobileOrderPrimaryButtonText}>Imprimir ticket</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.compactSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={() => setIsAaModalVisible(true)}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.compactButtonText}>AA</Text>
+            <Text style={styles.mobileOrderButtonText}>AA</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.mobileOrderSecondaryButton, styles.flex1]} onPress={orderProps.onOpenCashDrawer}>
+            <Text style={styles.mobileOrderButtonText}>Abrir caja</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.mobilePayBar}>
+          <TouchableOpacity
+            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            onPress={() => orderProps.onPayTicket('cash')}
+            disabled={!hasConfirmed}
+          >
+            <Text style={styles.mobileOrderButtonText}>Pagar efectivo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            onPress={() => orderProps.onPayTicket('card')}
+            disabled={!hasConfirmed}
+          >
+            <Text style={styles.mobileOrderButtonText}>Pagar tarjeta</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.mobileSplitRow}>
@@ -458,30 +484,13 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             placeholder="2"
           />
           <TouchableOpacity
-            style={[styles.compactSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={handlePrintDividedTicket}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.compactButtonText}>Imprimir dividido</Text>
+            <Text style={styles.mobileOrderButtonText}>Imprimir dividido</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.mobilePayBar}>
-        <TouchableOpacity
-          style={[styles.compactPrimaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
-          onPress={() => orderProps.onPayTicket('cash')}
-          disabled={!hasConfirmed}
-        >
-          <Text style={styles.compactPrimaryButtonText}>Pagar efectivo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.compactSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
-          onPress={() => orderProps.onPayTicket('card')}
-          disabled={!hasConfirmed}
-        >
-          <Text style={styles.compactButtonText}>Pagar tarjeta</Text>
-        </TouchableOpacity>
       </View>
 
       <Modal
@@ -497,8 +506,8 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                 <Text style={styles.modalTitle}>Módulo AA</Text>
                 <Text style={styles.mobileOrderItemPrice}>Selecciona productos para este cliente.</Text>
               </View>
-              <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => setIsAaModalVisible(false)}>
-                <Text style={styles.compactButtonText}>Cerrar</Text>
+              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => setIsAaModalVisible(false)}>
+                <Text style={styles.mobileOrderButtonText}>Cerrar</Text>
               </TouchableOpacity>
             </View>
 
@@ -533,17 +542,17 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             </ScrollView>
 
             <View style={styles.mobileAaFooter}>
-              <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => setAaQtyByKey({})}>
-                <Text style={styles.compactButtonText}>Limpiar</Text>
+              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => setAaQtyByKey({})}>
+                <Text style={styles.mobileOrderButtonText}>Limpiar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.compactPrimaryButton} onPress={handlePrintAaTicket}>
-                <Text style={styles.compactPrimaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
+              <TouchableOpacity style={styles.mobileOrderPrimaryButton} onPress={handlePrintAaTicket}>
+                <Text style={styles.mobileOrderPrimaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => handlePayAa('cash')}>
-                <Text style={styles.compactButtonText}>Pagar efectivo</Text>
+              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => handlePayAa('cash')}>
+                <Text style={styles.mobileOrderButtonText}>Pagar efectivo</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => handlePayAa('card')}>
-                <Text style={styles.compactButtonText}>Pagar tarjeta</Text>
+              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => handlePayAa('card')}>
+                <Text style={styles.mobileOrderButtonText}>Pagar tarjeta</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -555,7 +564,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
 export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
   const [activeView, setActiveView] = useState<MobileTpvView>('tables');
-  const selectedItemCount = props.orderSectionProps.preorderItems.reduce((total, item) => total + item.qty, 0);
+  const currentTableTotal = props.orderSectionProps.currentTableTotal;
 
   function handleBack(): void {
     if (activeView === 'ticket') {
@@ -597,7 +606,7 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
         {([
           ['tables', 'Mesa'],
           ['menu', 'Carta'],
-          ['ticket', selectedItemCount > 0 ? `Cuenta (${selectedItemCount})` : 'Cuenta'],
+          ['ticket', `Cuenta ${props.formatPrice(currentTableTotal)}`],
         ] as Array<[MobileTpvView, string]>).map(([view, label]) => (
           <TouchableOpacity
             key={view}
@@ -609,19 +618,6 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
-
-      <View style={styles.mobileContextRow}>
-        <Text style={styles.mobileContextText}>
-          {`Mesa ${tableZoneLabel(props.selectedTable.zone)}-${props.selectedTable.number}`}
-        </Text>
-        <Text style={styles.mobileContextText}>
-          {activeView === 'tables'
-            ? 'Selecciona una mesa'
-            : activeView === 'menu'
-              ? `${selectedItemCount} por enviar`
-              : 'Revisar y cobrar'}
-        </Text>
       </View>
 
       {activeView === 'tables' ? (
@@ -641,10 +637,12 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
             <TableSelector
               layout="mobile"
               tables={props.tables}
+              tableTotals={props.tableTotals}
               selectedTable={props.selectedTable}
               onSelectTable={handleSelectTable}
               onAddTable={props.onAddTable}
               onRemoveTable={props.onRemoveTable}
+              formatPrice={props.formatPrice}
             />
           </ScrollView>
         </View>
@@ -657,7 +655,7 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
               <Text style={styles.compactButtonText}>Atras: mesas</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.mobilePanelAction} onPress={() => setActiveView('ticket')}>
-              <Text style={styles.compactButtonText}>{`Ver cuenta (${selectedItemCount})`}</Text>
+              <Text style={styles.compactButtonText}>{`Cuenta ${props.formatPrice(currentTableTotal)}`}</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
@@ -690,9 +688,6 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
               <TouchableOpacity style={styles.mobilePanelAction} onPress={() => setActiveView('menu')}>
                 <Text style={styles.compactButtonText}>+ Productos</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.mobilePanelAction} onPress={props.onOpenCashDrawer}>
-                <Text style={styles.compactButtonText}>Caja</Text>
-              </TouchableOpacity>
             </View>
           </View>
           <MobileOrderSummary orderProps={props.orderSectionProps} />
@@ -705,17 +700,6 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
 export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
   return (
     <View style={styles.desktopWorkspace}>
-      <View style={styles.desktopContextBar}>
-        <View style={styles.flex1}>
-          <Text style={styles.desktopContextTitle}>
-            {`Mesa ${tableZoneLabel(props.selectedTable.zone)}-${props.selectedTable.number}`}
-          </Text>
-          <Text style={styles.desktopContextText}>Selecciona productos, confirma el pedido y cobra desde la cuenta.</Text>
-        </View>
-        <TouchableOpacity style={styles.secondaryButton} onPress={props.onOpenCashDrawer}>
-          <Text style={styles.secondaryButtonText}>Abrir caja</Text>
-        </TouchableOpacity>
-      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator
@@ -728,10 +712,12 @@ export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
             <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
               <TableSelector
                 tables={props.tables}
+                tableTotals={props.tableTotals}
                 selectedTable={props.selectedTable}
                 onSelectTable={props.onSelectTable}
                 onAddTable={props.onAddTable}
                 onRemoveTable={props.onRemoveTable}
+                formatPrice={props.formatPrice}
               />
             </ScrollView>
           </View>

@@ -238,11 +238,13 @@ export default function App(): React.JSX.Element {
   const {
     loading,
     tables,
+    tableTotals,
     selectedTable,
     menuByCategory,
     preorderItems,
     tableConfirmedOrders,
     preorderTotal,
+    currentTableTotal,
     priceDraftByItemId
   } = state;
 
@@ -811,6 +813,7 @@ export default function App(): React.JSX.Element {
     tableOrders: tableConfirmedOrders,
     menuByCategory,
     preorderTotal,
+    currentTableTotal,
     priceDraftByItemId,
     getMenuTitleById,
     formatPrice: centsToCurrency,
@@ -854,10 +857,14 @@ export default function App(): React.JSX.Element {
     ) => {
       void actions.moveConfirmedItemToPreOrder(orderId, item);
     },
+    onOpenCashDrawer: () => {
+      void openCashDrawer();
+    },
   };
 
   const posScreenProps = {
     tables,
+    tableTotals,
     selectedTable,
     menuCategories,
     visibleMenuCategory,
@@ -880,9 +887,6 @@ export default function App(): React.JSX.Element {
     },
     onAddMenuItem: (menuId: number) => {
       void actions.addMenuItem(menuId);
-    },
-    onOpenCashDrawer: () => {
-      void openCashDrawer();
     },
     onExit: goBack,
     formatPrice: centsToCurrency,

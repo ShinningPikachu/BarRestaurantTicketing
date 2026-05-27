@@ -65,7 +65,14 @@ function getSmallestAvailableTableNumber(existingNumbers: number[]): number {
 export class WorkflowService {
   async listTables() {
     const tables = await workflowRepository.listTables();
-    return tables.filter((table) => VALID_TABLE_ZONES.has((table.zone ?? '').trim().toLowerCase()));
+    return tables
+      .filter((table) => VALID_TABLE_ZONES.has((table.zone ?? '').trim().toLowerCase()))
+      .map(({ orders, preOrderSessions, ...table }) => ({
+        ...table,
+        totalCents: orders.reduce((sum, order) => sum + order.totalCents, 0)
+          + preOrderSessions.flatMap((session) => session.items)
+            .reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0),
+      }));
   }
 
   async addTable(zone: string) {

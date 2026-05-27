@@ -98,6 +98,7 @@ export interface BackendTable {
   zone?: string | null;
   seats?: number | null;
   name?: string | null;
+  totalCents?: number;
 }
 
 export interface TableWorkflow {

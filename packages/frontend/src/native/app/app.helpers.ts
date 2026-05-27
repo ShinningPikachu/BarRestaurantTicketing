@@ -1,5 +1,5 @@
 import { flattenMenuItems } from '../helpers';
-import { MenuItem, PreOrderItem } from '../types';
+import { MenuItem, Order, PreOrderItem } from '../types';
 
 export function centsToCurrency(cents: number): string {
   return new Intl.NumberFormat('es-ES', {
@@ -21,4 +21,16 @@ export function getMenuTitleById(
 
 export function getPreOrderTotal(preorderItems: PreOrderItem[]): number {
   return preorderItems.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0);
+}
+
+export function getCurrentTableTotal(preorderItems: PreOrderItem[], confirmedOrders: Order[]): number {
+  const confirmedTotal = confirmedOrders.reduce(
+    (sum, order) => sum + order.items.reduce(
+      (orderSum, item) => orderSum + item.qty * (item.unitPriceCents ?? 0),
+      0
+    ),
+    0
+  );
+
+  return getPreOrderTotal(preorderItems) + confirmedTotal;
 }

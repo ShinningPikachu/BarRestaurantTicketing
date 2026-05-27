@@ -10,6 +10,7 @@ interface OrderSectionProps {
   tableOrders: Order[];
   menuByCategory: Map<string, MenuItem[]>;
   preorderTotal: number;
+  currentTableTotal: number;
   priceDraftByItemId: Record<number, string>;
   getMenuTitleById: (menuByCategory: Map<string, MenuItem[]>, menuId: number) => string;
   formatPrice: (cents: number) => string;
@@ -25,6 +26,7 @@ interface OrderSectionProps {
   onPaySelectedItems: (method: PaymentMethod, items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
   onRemoveOrder: (orderId: string) => void;
   onMoveConfirmedItemToPreOrder: (orderId: string, item: OrderItem) => void;
+  onOpenCashDrawer: () => void;
 }
 
 interface ConfirmedItemRow {
@@ -49,6 +51,7 @@ export function OrderSection({
   tableOrders,
   menuByCategory,
   preorderTotal,
+  currentTableTotal,
   priceDraftByItemId,
   getMenuTitleById,
   formatPrice,
@@ -63,7 +66,8 @@ export function OrderSection({
   onPayTicket,
   onPaySelectedItems,
   onRemoveOrder,
-  onMoveConfirmedItemToPreOrder
+  onMoveConfirmedItemToPreOrder,
+  onOpenCashDrawer
 }: OrderSectionProps): React.JSX.Element {
   const [aaQtyByKey, setAaQtyByKey] = useState<Record<string, number>>({});
   const [isAaModalVisible, setIsAaModalVisible] = useState(false);
@@ -205,7 +209,7 @@ export function OrderSection({
 
   return (
     <View style={styles.orderSection}>
-      <Text style={styles.sectionTitle}>{`Pedidos mesa ${tableZoneLabel(selectedTable.zone)}-${selectedTable.number}`}</Text>
+      <Text style={styles.sectionTitle}>{`Cuenta mesa ${tableZoneLabel(selectedTable.zone)}-${selectedTable.number}`}</Text>
 
       <Text style={styles.subTitle}>Prepedido</Text>
       <FlatList
@@ -264,7 +268,7 @@ export function OrderSection({
       />
 
       <View style={styles.footerRow}>
-        <Text style={styles.totalText}>{`Total: ${formatPrice(preorderTotal)}`}</Text>
+        <Text style={styles.totalText}>{`Por enviar: ${formatPrice(preorderTotal)}`}</Text>
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.primaryButton} onPress={onConfirmOrder}>
             <Text style={styles.primaryButtonText}>Enviar a cocina</Text>
@@ -277,33 +281,6 @@ export function OrderSection({
 
       <View style={styles.footerRow}>
         <Text style={styles.subTitle}>Pedidos confirmados</Text>
-        <View style={styles.confirmedActionBar}>
-          <TouchableOpacity style={styles.compactPrimaryButton} onPress={() => onPrintTicket()}>
-            <Text style={styles.primaryButtonText}>Imprimir ticket</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactSecondaryButton} onPress={handleOpenAaModal}>
-            <Text style={styles.secondaryButtonText}>AA</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => onPayTicket('cash')}>
-            <Text style={styles.secondaryButtonText}>Pagar efectivo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => onPayTicket('card')}>
-            <Text style={styles.secondaryButtonText}>Pagar tarjeta</Text>
-          </TouchableOpacity>
-          <View style={styles.splitTicketControls}>
-            <Text style={styles.splitTicketLabel}>Comensales</Text>
-            <TextInput
-              style={[styles.smallNumberInput, styles.splitPeopleInput]}
-              keyboardType="number-pad"
-              value={splitPeopleText}
-              onChangeText={setSplitPeopleText}
-              placeholder="2"
-            />
-            <TouchableOpacity style={styles.compactSecondaryButton} onPress={handlePrintDividedTicket}>
-              <Text style={styles.secondaryButtonText}>Imprimir dividido</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
 
       <FlatList
@@ -332,6 +309,43 @@ export function OrderSection({
           </View>
         )}
       />
+
+      <View style={styles.checkoutPanel}>
+        <View style={styles.checkoutTotalField}>
+          <Text style={styles.checkoutTotalLabel}>Total de productos</Text>
+          <Text style={styles.checkoutTotalAmount}>{formatPrice(currentTableTotal)}</Text>
+        </View>
+        <View style={styles.checkoutActions}>
+          <TouchableOpacity style={styles.desktopCheckoutPrimaryButton} onPress={() => onPrintTicket()}>
+            <Text style={styles.desktopCheckoutPrimaryButtonText}>Imprimir ticket</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={handleOpenAaModal}>
+            <Text style={styles.desktopCheckoutSecondaryButtonText}>AA</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={() => onPayTicket('cash')}>
+            <Text style={styles.desktopCheckoutSecondaryButtonText}>Pagar efectivo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={() => onPayTicket('card')}>
+            <Text style={styles.desktopCheckoutSecondaryButtonText}>Pagar tarjeta</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={onOpenCashDrawer}>
+            <Text style={styles.desktopCheckoutSecondaryButtonText}>Abrir caja</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.splitTicketControls}>
+          <Text style={styles.splitTicketLabel}>Cuenta dividida: comensales</Text>
+          <TextInput
+            style={[styles.smallNumberInput, styles.splitPeopleInput]}
+            keyboardType="number-pad"
+            value={splitPeopleText}
+            onChangeText={setSplitPeopleText}
+            placeholder="2"
+          />
+          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={handlePrintDividedTicket}>
+            <Text style={styles.desktopCheckoutSecondaryButtonText}>Imprimir dividido</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <Modal
         visible={isAaModalVisible}

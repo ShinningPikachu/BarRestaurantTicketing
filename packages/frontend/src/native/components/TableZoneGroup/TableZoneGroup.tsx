@@ -10,6 +10,7 @@ interface TablePosition {
 
 interface DraggableTableProps {
   table: TableId;
+  totalCents: number;
   position: TablePosition;
   isSelected: boolean;
   isMobile: boolean;
@@ -19,13 +20,14 @@ interface DraggableTableProps {
   maxY: number;
   onSelectTable: (table: TableId) => void;
   onDragMove: (table: TableId, nextPosition: TablePosition) => void;
+  formatPrice: (cents: number) => string;
 }
 
 const DESKTOP_TABLE_WIDTH = 94;
-const DESKTOP_TABLE_HEIGHT = 62;
+const DESKTOP_TABLE_HEIGHT = 72;
 const DESKTOP_BOARD_VISIBLE_HEIGHT = 176;
 const MOBILE_TABLE_WIDTH = 86;
-const MOBILE_TABLE_HEIGHT = 54;
+const MOBILE_TABLE_HEIGHT = 66;
 const MOBILE_BOARD_VISIBLE_HEIGHT = 190;
 const BOARD_PADDING = 12;
 const DESKTOP_TABLE_GAP = 8;
@@ -37,6 +39,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function DraggableTable({
   table,
+  totalCents,
   position,
   isSelected,
   isMobile,
@@ -46,6 +49,7 @@ function DraggableTable({
   maxY,
   onSelectTable,
   onDragMove,
+  formatPrice,
 }: DraggableTableProps): React.JSX.Element {
   const livePosition = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
   const currentPositionRef = useRef<TablePosition>(position);
@@ -128,6 +132,9 @@ function DraggableTable({
       <Text selectable={false} style={[styles.tableNodeText, isMobile && styles.mobileTableNodeText, isSelected && styles.tableNodeTextSelected]}>
         {`M${table.number}`}
       </Text>
+      <Text selectable={false} style={[styles.tableAmountText, isMobile && styles.mobileTableAmountText, isSelected && styles.tableNodeTextSelected]}>
+        {formatPrice(totalCents)}
+      </Text>
     </Animated.View>
   );
 }
@@ -136,13 +143,15 @@ interface TableZoneGroupProps {
   layout?: 'desktop' | 'mobile';
   zone: TableZone;
   numbers: number[];
+  tableTotals: Map<string, number>;
   selectedTable: TableId;
   onSelectTable: (table: TableId) => void;
   onAddTable: (zone: TableZone) => void;
   onRemoveTable: (table: TableId) => void;
+  formatPrice: (cents: number) => string;
 }
 
-export function TableZoneGroup({ layout = 'desktop', zone, numbers, selectedTable, onSelectTable, onAddTable, onRemoveTable }: TableZoneGroupProps): React.JSX.Element {
+export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableZoneGroupProps): React.JSX.Element {
   const [boardWidth, setBoardWidth] = useState(300);
   const [tablePositions, setTablePositions] = useState<Record<string, TablePosition>>({});
   const isMobile = layout === 'mobile';
@@ -223,6 +232,7 @@ export function TableZoneGroup({ layout = 'desktop', zone, numbers, selectedTabl
             <DraggableTable
               key={key}
               table={table}
+              totalCents={tableTotals.get(key) ?? 0}
               position={position}
               isSelected={isSelected}
               isMobile={isMobile}
@@ -232,6 +242,7 @@ export function TableZoneGroup({ layout = 'desktop', zone, numbers, selectedTabl
               maxY={maxY}
               onSelectTable={onSelectTable}
               onDragMove={handleDragMove}
+              formatPrice={formatPrice}
             />
           );
         })}
