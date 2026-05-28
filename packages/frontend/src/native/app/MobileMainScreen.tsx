@@ -191,22 +191,22 @@ function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
   return (
     <View style={styles.fullPanel}>
       <ScrollView style={styles.columnScroll} contentContainerStyle={styles.productsContent} showsVerticalScrollIndicator>
-        <View style={styles.panelHeaderRow}>
-          <Text style={styles.helperText}>CSV: name, price, cost, sku, category, description, available</Text>
-          <TouchableOpacity style={styles.secondaryButton} onPress={props.importProductsCsv}>
-            <Text style={styles.secondaryButtonText}>Importar CSV</Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.productForm}>
-          <Text style={styles.subTitle}>Nuevo producto</Text>
-          <TextInput style={styles.formInput} value={props.productName} onChangeText={props.setProductName} placeholder="Nombre" placeholderTextColor="#6B7280" />
-          <TextInput style={styles.formInput} value={props.productCategory} onChangeText={props.setProductCategory} placeholder="Tipo / categoria" placeholderTextColor="#6B7280" />
+          <View style={styles.productFormHeader}>
+            <Text style={styles.subTitle}>Nuevo producto</Text>
+            <TouchableOpacity style={styles.compactSecondaryButton} onPress={props.importProductsCsv}>
+              <Text style={styles.secondaryButtonText}>CSV</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.formTwoColumnRow}>
+            <TextInput style={[styles.formInput, styles.formWideInput]} value={props.productName} onChangeText={props.setProductName} placeholder="Nombre" placeholderTextColor="#6B7280" />
+            <TextInput style={[styles.formInput, styles.formCompactInput]} value={props.productCategory} onChangeText={props.setProductCategory} placeholder="Tipo" placeholderTextColor="#6B7280" />
+          </View>
           <View style={styles.formTwoColumnRow}>
             <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productPrice} onChangeText={props.setProductPrice} placeholder="Precio" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
             <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productCost} onChangeText={props.setProductCost} placeholder="Coste" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
+            <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productSku} onChangeText={props.setProductSku} placeholder="SKU" placeholderTextColor="#6B7280" />
           </View>
-          <TextInput style={styles.formInput} value={props.productSku} onChangeText={props.setProductSku} placeholder="SKU opcional" placeholderTextColor="#6B7280" />
           <TextInput style={styles.formInput} value={props.productDescription} onChangeText={props.setProductDescription} placeholder="Descripcion opcional" placeholderTextColor="#6B7280" />
           <View style={styles.productImagePicker}>
             {props.productImageDataUrl ? (
@@ -217,22 +217,22 @@ function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
               </View>
             )}
             <View style={styles.productImageActions}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.chooseProductImage(props.setProductImageDataUrl)}>
-                <Text style={styles.secondaryButtonText}>{props.productImageDataUrl ? 'Cambiar imagen' : Platform.OS === 'web' ? 'Añadir imagen' : 'Hacer foto'}</Text>
+              <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => void props.chooseProductImage(props.setProductImageDataUrl)}>
+                <Text style={styles.secondaryButtonText}>{props.productImageDataUrl ? 'Cambiar' : Platform.OS === 'web' ? 'Imagen' : 'Foto'}</Text>
               </TouchableOpacity>
               {props.productImageDataUrl ? (
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => props.setProductImageDataUrl(null)}>
+                <TouchableOpacity style={styles.compactSecondaryButton} onPress={() => props.setProductImageDataUrl(null)}>
                   <Text style={styles.secondaryButtonText}>Quitar</Text>
                 </TouchableOpacity>
               ) : null}
+              <TouchableOpacity style={[styles.primaryButton, styles.productSaveButton]} onPress={() => void props.saveNewProduct()}>
+                <Text style={styles.primaryButtonText}>Añadir</Text>
+              </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => void props.saveNewProduct()}>
-            <Text style={styles.primaryButtonText}>Añadir producto</Text>
-          </TouchableOpacity>
         </View>
 
-        <Text style={styles.subTitle}>Tipos</Text>
+        <Text style={styles.compactSectionLabel}>Tipos</Text>
         <View style={styles.menuTypeSelector}>
           {props.managedCategories.map((category) => (
             <TouchableOpacity key={category} style={styles.menuTypeButton} onPress={() => props.setProductCategory(category)}>
@@ -241,7 +241,7 @@ function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
           ))}
         </View>
 
-        <Text style={styles.subTitle}>Menu actual</Text>
+        <Text style={styles.compactSectionLabel}>Menu actual</Text>
         {props.managedMenuItems.map((item) => (
           <View key={item.id} style={styles.productRow}>
             {item.imageDataUrl ? (
@@ -252,30 +252,30 @@ function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
               </View>
             )}
             <View style={styles.productRowBody}>
-              <Text style={styles.itemName}>{item.name}</Text>
-              <TextInput
-                style={styles.productCategoryInput}
-                defaultValue={item.category}
-                onSubmitEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
-                onEndEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
-                placeholder="Tipo"
-                placeholderTextColor="#6B7280"
-              />
-              <View style={styles.productEditRow}>
+              <View style={styles.productRowTopLine}>
+                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                <TextInput
+                  style={styles.productCategoryInput}
+                  defaultValue={item.category}
+                  onSubmitEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
+                  onEndEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
+                  placeholder="Tipo"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+              <View style={styles.productRowControls}>
                 <TextInput style={styles.priceInput} defaultValue={(item.priceCents / 100).toFixed(2)} keyboardType="decimal-pad" onSubmitEditing={(event) => void props.updateProductPrice(item, event.nativeEvent.text)} onEndEditing={(event) => void props.updateProductPrice(item, event.nativeEvent.text)} />
                 <TextInput style={styles.priceInput} defaultValue={item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : ''} keyboardType="decimal-pad" placeholder="Coste" placeholderTextColor="#6B7280" onSubmitEditing={(event) => void props.updateProductCost(item, event.nativeEvent.text)} onEndEditing={(event) => void props.updateProductCost(item, event.nativeEvent.text)} />
-              </View>
-              <View style={styles.productEditRow}>
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.updateProductImage(item)}>
-                  <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar imagen' : 'Imagen'}</Text>
+                <TouchableOpacity style={styles.productRowActionButton} onPress={() => void props.updateProductImage(item)}>
+                  <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
                 </TouchableOpacity>
                 {item.imageDataUrl ? (
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.removeProductImage(item)}>
+                  <TouchableOpacity style={styles.productRowActionButton} onPress={() => void props.removeProductImage(item)}>
                     <Text style={styles.secondaryButtonText}>Quitar</Text>
                   </TouchableOpacity>
                 ) : null}
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => props.removeProduct(item)}>
-                  <Text style={styles.secondaryButtonText}>Eliminar producto</Text>
+                <TouchableOpacity style={styles.productRowActionButton} onPress={() => props.removeProduct(item)}>
+                  <Text style={styles.secondaryButtonText}>Eliminar</Text>
                 </TouchableOpacity>
               </View>
             </View>

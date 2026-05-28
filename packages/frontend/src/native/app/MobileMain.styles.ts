@@ -137,13 +137,22 @@ export const mobileStyles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4
   },
+  compactSectionLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+    marginBottom: 4
+  },
   flex1: {
     flex: 1
   },
   itemName: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '600'
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+    minWidth: 0
   },
   itemPrice: {
     color: colors.textSecondary,
@@ -179,9 +188,20 @@ export const mobileStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minHeight: 44,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  compactSecondaryButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 34,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -302,12 +322,18 @@ export const mobileStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
-    padding: 8,
-    gap: 6,
-    marginBottom: 10
+    padding: 6,
+    gap: 5,
+    marginBottom: 6
+  },
+  productFormHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
   },
   productsContent: {
-    paddingBottom: 12
+    paddingBottom: 8
   },
   formInput: {
     minWidth: '100%',
@@ -315,62 +341,70 @@ export const mobileStyles = StyleSheet.create({
     borderColor: colors.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     backgroundColor: colors.inputBackground,
     color: colors.inputText,
-    fontSize: 14,
-    minHeight: 44
+    fontSize: 13,
+    minHeight: 36
   },
   formInputWide: {
     flex: 1
   },
   formTwoColumnRow: {
     flexDirection: 'row',
-    gap: 6
+    gap: 5
   },
   formHalfInput: {
     flex: 1,
     minWidth: 0,
     flexBasis: 0
   },
+  formWideInput: {
+    flex: 1.45,
+    minWidth: 0,
+    flexBasis: 0
+  },
+  formCompactInput: {
+    flex: 1,
+    minWidth: 0,
+    flexBasis: 0
+  },
   priceInput: {
-    width: 72,
+    width: 56,
     borderColor: colors.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 6,
-    paddingVertical: 7,
+    paddingVertical: 5,
     backgroundColor: colors.inputBackground,
     color: colors.inputText,
     textAlign: 'center',
-    fontSize: 13,
-    minHeight: 42
+    fontSize: 12,
+    minHeight: 30
   },
   productImagePicker: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap'
+    gap: 5
   },
   productImageActions: {
     flex: 1,
-    minWidth: 150,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6
+    gap: 5
   },
   productImagePreview: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt
   },
   productImagePlaceholder: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -378,18 +412,23 @@ export const mobileStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  productSaveButton: {
+    flex: 1,
+    minHeight: 34,
+    paddingVertical: 6
+  },
   menuTypeSelector: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10
+    gap: 5,
+    marginBottom: 6
   },
   menuTypeButton: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     backgroundColor: colors.surface
   },
   menuTypeButtonText: {
@@ -399,37 +438,49 @@ export const mobileStyles = StyleSheet.create({
   },
   productRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
+    alignItems: 'center',
+    gap: 5,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
-    padding: 8,
-    marginBottom: 8
+    padding: 5,
+    marginBottom: 5
   },
   productRowBody: {
     flex: 1,
     minWidth: 0,
-    gap: 6
+    gap: 3
+  },
+  productRowTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minWidth: 0
+  },
+  productRowControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 0
   },
   productEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     flexWrap: 'wrap'
   },
   productRowImage: {
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface
   },
   productRowImagePlaceholder: {
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -439,11 +490,22 @@ export const mobileStyles = StyleSheet.create({
   },
   productCategoryInput: {
     minWidth: 0,
-    width: '100%',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    fontSize: 13,
-    marginTop: 4
+    width: 88,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    fontSize: 12,
+    minHeight: 30
+  },
+  productRowActionButton: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   emptyText: {
     color: colors.textTertiary,
