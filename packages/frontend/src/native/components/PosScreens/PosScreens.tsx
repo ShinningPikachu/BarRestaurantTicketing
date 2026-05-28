@@ -232,6 +232,47 @@ function MobilePreorderItem({
   );
 }
 
+function MobileCartaPreorderSidebar({ orderProps }: { orderProps: PosScreenProps['orderSectionProps'] }): React.JSX.Element {
+  const hasItems = orderProps.preorderItems.length > 0;
+
+  return (
+    <View style={styles.mobileCartaSidebar}>
+      <View style={styles.mobileCartaSidebarHeader}>
+        <Text style={styles.mobileCartaSidebarTitle}>Pend.</Text>
+        <Text style={styles.mobileCartaSidebarCount}>{String(orderProps.preorderItems.length)}</Text>
+      </View>
+      <ScrollView style={styles.mobileCartaSidebarList} showsVerticalScrollIndicator={false}>
+        {hasItems ? (
+          orderProps.preorderItems.map((item) => {
+            const title = item.menuItemId
+              ? orderProps.getMenuTitleById(orderProps.menuByCategory, item.menuItemId)
+              : item.name;
+
+            return (
+              <View key={item.id} style={styles.mobileCartaSidebarItem}>
+                <Text style={styles.mobileCartaSidebarQty}>{`x${item.qty}`}</Text>
+                <Text style={styles.mobileCartaSidebarName} numberOfLines={2}>{title}</Text>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={styles.mobileCartaSidebarEmpty}>Sin pendientes</Text>
+        )}
+      </ScrollView>
+      <Text style={styles.mobileCartaSidebarTotal} numberOfLines={1}>
+        {orderProps.formatPrice(orderProps.preorderTotal)}
+      </Text>
+      <TouchableOpacity
+        style={[styles.mobileCartaSidebarSendButton, !hasItems && styles.mobileDisabledButton]}
+        onPress={orderProps.onConfirmOrder}
+        disabled={!hasItems}
+      >
+        <Text style={styles.mobileCartaSidebarSendText}>Enviar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function MobileConfirmedItem({
   item,
   orderId,
@@ -700,23 +741,28 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
 
           <View style={[styles.mobilePagerPage, pageWidth > 0 ? { width: pageWidth } : null]}>
             <View style={styles.mobileSinglePanel}>
-              <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
-              <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
-                <MenuSelector
-                  layout="mobile"
-                  menuCategories={props.menuCategories}
-                  visibleMenuCategory={props.visibleMenuCategory}
-                  menuSearchText={props.menuSearchText}
-                  normalizedMenuSearch={props.normalizedMenuSearch}
-                  displayedMenuCategory={props.displayedMenuCategory}
-                  displayedMenuItems={props.displayedMenuItems}
-                  minSearchLength={props.minSearchLength}
-                  onMenuSearchTextChange={props.onMenuSearchTextChange}
-                  onSelectMenuCategory={props.onSelectMenuCategory}
-                  onAddMenuItem={handleAddMenuItem}
-                  formatPrice={props.formatPrice}
-                />
-              </ScrollView>
+              <View style={styles.mobileCartaLayout}>
+                <MobileCartaPreorderSidebar orderProps={props.orderSectionProps} />
+                <View style={styles.mobileCartaMenuPane}>
+                  <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
+                  <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
+                    <MenuSelector
+                      layout="mobile"
+                      menuCategories={props.menuCategories}
+                      visibleMenuCategory={props.visibleMenuCategory}
+                      menuSearchText={props.menuSearchText}
+                      normalizedMenuSearch={props.normalizedMenuSearch}
+                      displayedMenuCategory={props.displayedMenuCategory}
+                      displayedMenuItems={props.displayedMenuItems}
+                      minSearchLength={props.minSearchLength}
+                      onMenuSearchTextChange={props.onMenuSearchTextChange}
+                      onSelectMenuCategory={props.onSelectMenuCategory}
+                      onAddMenuItem={handleAddMenuItem}
+                      formatPrice={props.formatPrice}
+                    />
+                  </ScrollView>
+                </View>
+              </View>
             </View>
           </View>
 

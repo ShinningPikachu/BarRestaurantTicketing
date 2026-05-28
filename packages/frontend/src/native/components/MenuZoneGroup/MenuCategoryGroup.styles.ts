@@ -14,7 +14,7 @@ export const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   mobileCategoryGroup: {
-    padding: 8
+    padding: 7
   },
   categoryHeader: {
     fontSize: 18,
@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'flex-start',
-    gap: 10
+    gap: 8
   },
   menuItemChip: {
     minWidth: 150,
@@ -46,10 +46,10 @@ export const styles = StyleSheet.create({
   },
   mobileMenuItemChip: {
     minWidth: 0,
-    width: '48%',
+    width: '100%',
     flexGrow: 1,
-    flexBasis: '48%',
-    paddingHorizontal: 8,
+    flexBasis: '100%',
+    paddingHorizontal: 7,
     paddingVertical: 8
   },
   itemImage: {

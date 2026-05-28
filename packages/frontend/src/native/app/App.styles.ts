@@ -242,6 +242,102 @@ export const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0
   },
+  mobileCartaLayout: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+    gap: 6,
+    overflow: 'hidden'
+  },
+  mobileCartaSidebar: {
+    width: 72,
+    flexShrink: 0,
+    minHeight: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    padding: 5
+  },
+  mobileCartaSidebarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginBottom: 5
+  },
+  mobileCartaSidebarTitle: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  mobileCartaSidebarCount: {
+    minWidth: 22,
+    color: colors.primaryDark,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.zoneMenu,
+    paddingHorizontal: 5,
+    paddingVertical: 2
+  },
+  mobileCartaSidebarList: {
+    flex: 1,
+    minHeight: 0
+  },
+  mobileCartaSidebarItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    paddingVertical: 5
+  },
+  mobileCartaSidebarQty: {
+    color: colors.primaryDark,
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  mobileCartaSidebarName: {
+    color: colors.text,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '600'
+  },
+  mobileCartaSidebarEmpty: {
+    color: colors.textTertiary,
+    fontSize: 10,
+    fontStyle: 'italic',
+    lineHeight: 14
+  },
+  mobileCartaSidebarTotal: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 5,
+    marginBottom: 5
+  },
+  mobileCartaSidebarSendButton: {
+    minHeight: 32,
+    borderRadius: 7,
+    backgroundColor: colors.buttonPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4
+  },
+  mobileCartaSidebarSendText: {
+    color: colors.buttonPrimaryText,
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center'
+  },
+  mobileCartaMenuPane: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    minHeight: 0,
+    overflow: 'hidden'
+  },
   mobileTopPanel: {
     flex: 0.9,
     minHeight: 0,
