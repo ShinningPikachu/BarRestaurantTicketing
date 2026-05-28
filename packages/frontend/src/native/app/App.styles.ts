@@ -182,6 +182,22 @@ export const styles = StyleSheet.create({
   mobileViewButtonTextSelected: {
     color: colors.textLight
   },
+  mobilePager: {
+    flex: 1,
+    minHeight: 0
+  },
+  mobilePagerScroll: {
+    flex: 1,
+    minHeight: 0
+  },
+  mobilePagerContent: {
+    alignItems: 'stretch'
+  },
+  mobilePagerPage: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 1
+  },
   mobileSinglePanel: {
     flex: 1,
     minHeight: 0,

@@ -1,5 +1,18 @@
-import React, { ComponentProps, useEffect, useState } from 'react';
-import { Alert, BackHandler, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { ComponentProps, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  BackHandler,
+  LayoutChangeEvent,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { styles } from '../../app/App.styles';
 import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
@@ -8,6 +21,7 @@ import { TableZoneGroup } from '../TableZoneGroup/TableZoneGroup';
 
 type MenuLayout = 'desktop' | 'mobile';
 type MobileTpvView = 'tables' | 'menu' | 'ticket';
+const MOBILE_TPV_VIEWS: MobileTpvView[] = ['tables', 'menu', 'ticket'];
 
 const MOBILE_PRICE_ADJUSTMENTS = [
   { label: '-0,50', deltaCents: -50 },
@@ -564,15 +578,27 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
 export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
   const [activeView, setActiveView] = useState<MobileTpvView>('tables');
+  const [pageWidth, setPageWidth] = useState(0);
+  const pagerRef = useRef<ScrollView>(null);
   const currentTableTotal = props.orderSectionProps.currentTableTotal;
+
+  function goToView(view: MobileTpvView, animated = true): void {
+    setActiveView(view);
+    if (pageWidth > 0) {
+      pagerRef.current?.scrollTo({
+        x: MOBILE_TPV_VIEWS.indexOf(view) * pageWidth,
+        animated,
+      });
+    }
+  }
 
   function handleBack(): void {
     if (activeView === 'ticket') {
-      setActiveView('menu');
+      goToView('menu');
       return;
     }
     if (activeView === 'menu') {
-      setActiveView('tables');
+      goToView('tables');
       return;
     }
     props.onExit?.();
@@ -593,12 +619,36 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
 
   function handleSelectTable(table: TableId): void {
     props.onSelectTable(table);
-    setActiveView('menu');
+    goToView('menu');
   }
 
   function handleAddMenuItem(menuId: number): void {
     props.onAddMenuItem(menuId);
   }
+
+  function handlePagerLayout(event: LayoutChangeEvent): void {
+    const nextWidth = event.nativeEvent.layout.width;
+    setPageWidth(nextWidth);
+  }
+
+  function handlePagerMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>): void {
+    if (pageWidth <= 0) {
+      return;
+    }
+
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    const nextView = MOBILE_TPV_VIEWS[Math.max(0, Math.min(nextIndex, MOBILE_TPV_VIEWS.length - 1))];
+    setActiveView(nextView);
+  }
+
+  useEffect(() => {
+    if (pageWidth > 0) {
+      pagerRef.current?.scrollTo({
+        x: MOBILE_TPV_VIEWS.indexOf(activeView) * pageWidth,
+        animated: false,
+      });
+    }
+  }, [activeView, pageWidth]);
 
   return (
     <View style={styles.mobilePosScreen}>
@@ -611,7 +661,7 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
           <TouchableOpacity
             key={view}
             style={[styles.mobileViewButton, activeView === view && styles.mobileViewButtonSelected]}
-            onPress={() => setActiveView(view)}
+            onPress={() => goToView(view)}
           >
             <Text style={[styles.mobileViewButtonText, activeView === view && styles.mobileViewButtonTextSelected]}>
               {label}
@@ -620,79 +670,63 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
         ))}
       </View>
 
-      {activeView === 'tables' ? (
-        <View style={styles.mobileSinglePanel}>
-          <View style={styles.mobilePanelHeader}>
-            <TouchableOpacity style={styles.mobileBackButton} onPress={handleBack}>
-              <Text style={styles.compactButtonText}>Atras: inicio</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.mobilePanelAction}
-              onPress={() => props.onAddTable(props.selectedTable.zone)}
-            >
-              <Text style={styles.compactButtonText}>+ Mesa aquí</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
-            <TableSelector
-              layout="mobile"
-              tables={props.tables}
-              tableTotals={props.tableTotals}
-              selectedTable={props.selectedTable}
-              onSelectTable={handleSelectTable}
-              onAddTable={props.onAddTable}
-              onRemoveTable={props.onRemoveTable}
-              formatPrice={props.formatPrice}
-            />
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {activeView === 'menu' ? (
-        <View style={styles.mobileSinglePanel}>
-          <View style={styles.mobilePanelHeader}>
-            <TouchableOpacity style={styles.mobileBackButton} onPress={handleBack}>
-              <Text style={styles.compactButtonText}>Atras: mesas</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.mobilePanelAction} onPress={() => setActiveView('ticket')}>
-              <Text style={styles.compactButtonText}>{`Cuenta ${props.formatPrice(currentTableTotal)}`}</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
-          <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
-            <MenuSelector
-              layout="mobile"
-              menuCategories={props.menuCategories}
-              visibleMenuCategory={props.visibleMenuCategory}
-              menuSearchText={props.menuSearchText}
-              normalizedMenuSearch={props.normalizedMenuSearch}
-              displayedMenuCategory={props.displayedMenuCategory}
-              displayedMenuItems={props.displayedMenuItems}
-              minSearchLength={props.minSearchLength}
-              onMenuSearchTextChange={props.onMenuSearchTextChange}
-              onSelectMenuCategory={props.onSelectMenuCategory}
-              onAddMenuItem={handleAddMenuItem}
-              formatPrice={props.formatPrice}
-            />
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {activeView === 'ticket' ? (
-        <View style={styles.mobileSinglePanel}>
-          <View style={styles.mobilePanelHeader}>
-            <TouchableOpacity style={styles.mobileBackButton} onPress={handleBack}>
-              <Text style={styles.compactButtonText}>Atras: carta</Text>
-            </TouchableOpacity>
-            <View style={styles.mobilePanelActions}>
-              <TouchableOpacity style={styles.mobilePanelAction} onPress={() => setActiveView('menu')}>
-                <Text style={styles.compactButtonText}>+ Productos</Text>
-              </TouchableOpacity>
+      <View style={styles.mobilePager} onLayout={handlePagerLayout}>
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.mobilePagerScroll}
+          contentContainerStyle={styles.mobilePagerContent}
+          onMomentumScrollEnd={handlePagerMomentumEnd}
+          scrollEventThrottle={16}
+        >
+          <View style={[styles.mobilePagerPage, pageWidth > 0 ? { width: pageWidth } : null]}>
+            <View style={styles.mobileSinglePanel}>
+              <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
+                <TableSelector
+                  layout="mobile"
+                  tables={props.tables}
+                  tableTotals={props.tableTotals}
+                  selectedTable={props.selectedTable}
+                  onSelectTable={handleSelectTable}
+                  onAddTable={props.onAddTable}
+                  onRemoveTable={props.onRemoveTable}
+                  formatPrice={props.formatPrice}
+                />
+              </ScrollView>
             </View>
           </View>
-          <MobileOrderSummary orderProps={props.orderSectionProps} />
-        </View>
-      ) : null}
+
+          <View style={[styles.mobilePagerPage, pageWidth > 0 ? { width: pageWidth } : null]}>
+            <View style={styles.mobileSinglePanel}>
+              <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
+              <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
+                <MenuSelector
+                  layout="mobile"
+                  menuCategories={props.menuCategories}
+                  visibleMenuCategory={props.visibleMenuCategory}
+                  menuSearchText={props.menuSearchText}
+                  normalizedMenuSearch={props.normalizedMenuSearch}
+                  displayedMenuCategory={props.displayedMenuCategory}
+                  displayedMenuItems={props.displayedMenuItems}
+                  minSearchLength={props.minSearchLength}
+                  onMenuSearchTextChange={props.onMenuSearchTextChange}
+                  onSelectMenuCategory={props.onSelectMenuCategory}
+                  onAddMenuItem={handleAddMenuItem}
+                  formatPrice={props.formatPrice}
+                />
+              </ScrollView>
+            </View>
+          </View>
+
+          <View style={[styles.mobilePagerPage, pageWidth > 0 ? { width: pageWidth } : null]}>
+            <View style={styles.mobileSinglePanel}>
+              <MobileOrderSummary orderProps={props.orderSectionProps} />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }

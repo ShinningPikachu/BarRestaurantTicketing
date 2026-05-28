@@ -28,35 +28,6 @@ export const desktopStyles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2
   },
-  mainNavigation: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8
-  },
-  navigationButton: {
-    minWidth: 110,
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.buttonSecondary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  navigationButtonSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryDark
-  },
-  navigationButtonText: {
-    color: colors.buttonSecondaryText,
-    fontSize: 15,
-    fontWeight: '700'
-  },
-  navigationButtonTextSelected: {
-    color: colors.textLight
-  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',

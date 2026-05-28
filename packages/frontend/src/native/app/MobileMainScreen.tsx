@@ -31,11 +31,6 @@ function MobileHeader(props: MainScreenProps): React.JSX.Element {
             <Text style={styles.secondaryButtonText}>Conectar</Text>
           </TouchableOpacity>
         ) : null}
-        {props.activeSection !== 'home' && props.activeSection !== 'pos' ? (
-          <TouchableOpacity style={styles.headerButton} onPress={props.goBack}>
-            <Text style={styles.secondaryButtonText}>Atras</Text>
-          </TouchableOpacity>
-        ) : null}
         <TouchableOpacity style={styles.headerButton} onPress={props.onLogout}>
           <Text style={styles.secondaryButtonText}>Salir</Text>
         </TouchableOpacity>
