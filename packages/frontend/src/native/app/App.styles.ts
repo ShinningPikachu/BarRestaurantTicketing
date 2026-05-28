@@ -533,9 +533,9 @@ export const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
-    paddingTop: 8,
-    marginTop: 8,
-    gap: 6
+    paddingTop: 6,
+    marginTop: 6,
+    gap: 5
   },
   mobileCheckoutTotalField: {
     flexDirection: 'row',
@@ -546,22 +546,23 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.zoneMenu,
-    paddingHorizontal: 10,
-    paddingVertical: 9
+    paddingHorizontal: 8,
+    paddingVertical: 7
   },
   mobileCheckoutTotalLabel: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700'
   },
   mobileTicketActionsRow: {
     flexDirection: 'row',
-    gap: 6
+    flexWrap: 'wrap',
+    gap: 4
   },
   mobileSplitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 5
   },
   mobileSplitLabel: {
     color: colors.textSecondary,
@@ -569,10 +570,11 @@ export const styles = StyleSheet.create({
     fontWeight: '700'
   },
   mobileSplitInput: {
-    width: 46,
+    width: 40,
     paddingHorizontal: 6,
-    paddingVertical: 7,
-    fontSize: 13
+    paddingVertical: 5,
+    fontSize: 12,
+    minHeight: 30
   },
   mobilePayBar: {
     flexDirection: 'row',
@@ -581,9 +583,9 @@ export const styles = StyleSheet.create({
   mobileOrderPrimaryButton: {
     backgroundColor: colors.buttonPrimary,
     borderRadius: 7,
-    paddingHorizontal: 7,
-    paddingVertical: 6,
-    minHeight: 36,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -592,21 +594,26 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 7,
-    paddingHorizontal: 7,
-    paddingVertical: 6,
-    minHeight: 36,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center'
   },
+  mobileCheckoutActionButton: {
+    flexGrow: 1,
+    flexBasis: '22%',
+    minWidth: 58
+  },
   mobileOrderButtonText: {
     color: colors.buttonSecondaryText,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     textAlign: 'center'
   },
   mobileOrderPrimaryButtonText: {
     color: colors.buttonPrimaryText,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     textAlign: 'center'
   },
@@ -628,6 +635,147 @@ export const styles = StyleSheet.create({
     width: '92%',
     maxHeight: '84%',
     padding: 12
+  },
+  mobileCustomerTicketPanel: {
+    width: '92%',
+    maxHeight: '84%',
+    padding: 10,
+    backgroundColor: '#F3F4F6'
+  },
+  mobileCustomerTicketHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    marginBottom: 8
+  },
+  mobileCustomerTicketPaper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 12
+  },
+  mobileCustomerTicketTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    marginBottom: 6
+  },
+  mobileCustomerTicketBusinessName: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'center',
+    textTransform: 'uppercase'
+  },
+  mobileCustomerTicketTradeName: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 3
+  },
+  mobileCustomerTicketSmall: {
+    color: colors.text,
+    fontSize: 10,
+    lineHeight: 14
+  },
+  mobileCustomerTicketDivider: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderStyle: 'dashed',
+    marginVertical: 8
+  },
+  mobileCustomerTicketMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  mobileCustomerTicketList: {
+    maxHeight: 420
+  },
+  mobileCustomerTicketTableHeader: {
+    flexDirection: 'row',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.text,
+    paddingBottom: 4,
+    marginBottom: 2
+  },
+  mobileCustomerTicketQtyHeader: {
+    width: 24,
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase'
+  },
+  mobileCustomerTicketNameHeader: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase'
+  },
+  mobileCustomerTicketMoneyHeader: {
+    width: 58,
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'right',
+    textTransform: 'uppercase'
+  },
+  mobileCustomerTicketRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingVertical: 4
+  },
+  mobileCustomerTicketQty: {
+    width: 24,
+    color: colors.text,
+    fontSize: 11,
+    textAlign: 'left'
+  },
+  mobileCustomerTicketItemName: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  mobileCustomerTicketAmount: {
+    width: 58,
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'right'
+  },
+  mobileCustomerTicketSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 2
+  },
+  mobileCustomerTicketTotal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingTop: 6,
+    marginTop: 4
+  },
+  mobileCustomerTicketTotalAmount: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800'
+  },
+  mobileCustomerTicketFooter: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 10
   },
   mobileAaList: {
     maxHeight: 360

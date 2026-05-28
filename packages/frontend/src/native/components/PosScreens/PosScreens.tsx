@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { styles } from '../../app/App.styles';
+import { getSimplifiedInvoiceConfig } from '../../helpers/kitchenTicketPrinter';
 import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
 import { OrderSection } from '../OrderZone/OrderSection';
@@ -176,6 +177,32 @@ function getConfirmedItems(tableOrders: Order[]): ConfirmedItemRow[] {
   );
 }
 
+function getCombinedConfirmedLines(confirmedItems: ConfirmedItemRow[]): Array<{ key: string; name: string; qty: number; unitPriceCents: number; totalPriceCents: number }> {
+  const lineByKey = new Map<string, { key: string; name: string; qty: number; unitPriceCents: number; totalPriceCents: number }>();
+
+  for (const confirmedItem of confirmedItems) {
+    const unitPriceCents = confirmedItem.item.unitPriceCents ?? 0;
+    const key = `${confirmedItem.item.name.trim().toLowerCase()}|${unitPriceCents}`;
+    const existing = lineByKey.get(key);
+    const totalPriceCents = unitPriceCents * confirmedItem.item.qty;
+
+    if (existing) {
+      existing.qty += confirmedItem.item.qty;
+      existing.totalPriceCents += totalPriceCents;
+    } else {
+      lineByKey.set(key, {
+        key,
+        name: confirmedItem.item.name,
+        qty: confirmedItem.item.qty,
+        unitPriceCents,
+        totalPriceCents,
+      });
+    }
+  }
+
+  return Array.from(lineByKey.values());
+}
+
 function MobilePreorderItem({
   item,
   orderProps,
@@ -304,8 +331,16 @@ function MobileConfirmedItem({
 function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderSectionProps'] }): React.JSX.Element {
   const [aaQtyByKey, setAaQtyByKey] = useState<Record<string, number>>({});
   const [isAaModalVisible, setIsAaModalVisible] = useState(false);
+  const [isCustomerTicketVisible, setIsCustomerTicketVisible] = useState(false);
   const [splitPeopleText, setSplitPeopleText] = useState('2');
   const confirmedItems = getConfirmedItems(orderProps.tableOrders);
+  const customerTicketLines = getCombinedConfirmedLines(confirmedItems);
+  const invoiceConfig = getSimplifiedInvoiceConfig();
+  const ticketTotalCents = customerTicketLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
+  const vatRate = invoiceConfig.vatRatePercent / 100;
+  const taxableBaseCents = Math.round(ticketTotalCents / (1 + vatRate));
+  const vatCents = ticketTotalCents - taxableBaseCents;
+  const customerTicketIssuedAt = new Date();
   const hasPreorder = orderProps.preorderItems.length > 0;
   const hasConfirmed = confirmedItems.length > 0;
   const selectedAaItemCount = Object.values(aaQtyByKey).reduce((sum, qty) => sum + qty, 0);
@@ -491,62 +526,137 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
       <View style={styles.mobileCheckoutPanel}>
         <View style={styles.mobileCheckoutTotalField}>
-          <Text style={styles.mobileCheckoutTotalLabel}>Total de productos</Text>
+          <Text style={styles.mobileCheckoutTotalLabel}>Total</Text>
           <Text style={styles.mobileOrderTotal}>{orderProps.formatPrice(orderProps.currentTableTotal)}</Text>
         </View>
         <View style={styles.mobileTicketActionsRow}>
           <TouchableOpacity
-            style={[styles.mobileOrderPrimaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderPrimaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={() => orderProps.onPrintTicket()}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.mobileOrderPrimaryButtonText}>Imprimir ticket</Text>
+            <Text style={styles.mobileOrderPrimaryButtonText}>Imprimir</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
+            onPress={() => setIsCustomerTicketVisible(true)}
+            disabled={!hasConfirmed}
+          >
+            <Text style={styles.mobileOrderButtonText}>Ver ticket</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={() => setIsAaModalVisible(true)}
             disabled={!hasConfirmed}
           >
             <Text style={styles.mobileOrderButtonText}>AA</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.mobileOrderSecondaryButton, styles.flex1]} onPress={orderProps.onOpenCashDrawer}>
-            <Text style={styles.mobileOrderButtonText}>Abrir caja</Text>
+          <TouchableOpacity style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton]} onPress={orderProps.onOpenCashDrawer}>
+            <Text style={styles.mobileOrderButtonText}>Caja</Text>
           </TouchableOpacity>
-        </View>
-        <View style={styles.mobilePayBar}>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={() => orderProps.onPayTicket('cash')}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.mobileOrderButtonText}>Pagar efectivo</Text>
+            <Text style={styles.mobileOrderButtonText}>Efectivo</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={() => orderProps.onPayTicket('card')}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.mobileOrderButtonText}>Pagar tarjeta</Text>
+            <Text style={styles.mobileOrderButtonText}>Tarjeta</Text>
           </TouchableOpacity>
-        </View>
-        <View style={styles.mobileSplitRow}>
-          <Text style={styles.mobileSplitLabel}>Comensales</Text>
           <TextInput
-            style={[styles.smallNumberInput, styles.mobileSplitInput]}
+            style={[styles.smallNumberInput, styles.mobileSplitInput, !hasConfirmed && styles.mobileDisabledButton]}
             keyboardType="number-pad"
             value={splitPeopleText}
             onChangeText={setSplitPeopleText}
             placeholder="2"
+            editable={hasConfirmed}
           />
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
             onPress={handlePrintDividedTicket}
             disabled={!hasConfirmed}
           >
-            <Text style={styles.mobileOrderButtonText}>Imprimir dividido</Text>
+            <Text style={styles.mobileOrderButtonText}>Dividir</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal
+        visible={isCustomerTicketVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCustomerTicketVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, styles.mobileCustomerTicketPanel]}>
+            <View style={styles.mobileCustomerTicketHeader}>
+              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => setIsCustomerTicketVisible(false)}>
+                <Text style={styles.mobileOrderButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.mobileCustomerTicketList}>
+              <View style={styles.mobileCustomerTicketPaper}>
+                <Text style={styles.mobileCustomerTicketBusinessName}>{invoiceConfig.businessName}</Text>
+                <Text style={styles.mobileCustomerTicketTradeName}>{invoiceConfig.tradeName}</Text>
+                <Text style={styles.mobileCustomerTicketSmall}>{`NIF ${invoiceConfig.nif}`}</Text>
+                <Text style={styles.mobileCustomerTicketSmall}>{invoiceConfig.address}</Text>
+                <Text style={styles.mobileCustomerTicketSmall}>{invoiceConfig.city}</Text>
+                <Text style={styles.mobileCustomerTicketSmall}>{`Tel. ${invoiceConfig.phone}`}</Text>
+                <View style={styles.mobileCustomerTicketDivider} />
+                <Text style={styles.mobileCustomerTicketTitle}>Factura simplificada</Text>
+                <View style={styles.mobileCustomerTicketMeta}>
+                  <Text style={styles.mobileCustomerTicketSmall}>{`Mesa ${tableZoneLabel(orderProps.selectedTable.zone)}-${orderProps.selectedTable.number}`}</Text>
+                  <Text style={styles.mobileCustomerTicketSmall}>
+                    {customerTicketIssuedAt.toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+                <View style={styles.mobileCustomerTicketDivider} />
+                <View style={styles.mobileCustomerTicketTableHeader}>
+                  <Text style={styles.mobileCustomerTicketQtyHeader}>Ud</Text>
+                  <Text style={styles.mobileCustomerTicketNameHeader}>Producto</Text>
+                  <Text style={styles.mobileCustomerTicketMoneyHeader}>P.Unit</Text>
+                  <Text style={styles.mobileCustomerTicketMoneyHeader}>Total</Text>
+                </View>
+                {customerTicketLines.map((item) => (
+                  <View key={`customer-ticket-${item.key}`} style={styles.mobileCustomerTicketRow}>
+                    <Text style={styles.mobileCustomerTicketQty}>{String(item.qty)}</Text>
+                    <Text style={styles.mobileCustomerTicketItemName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.unitPriceCents)}</Text>
+                    <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.totalPriceCents)}</Text>
+                  </View>
+                ))}
+                {customerTicketLines.length === 0 ? <Text style={styles.emptyText}>No hay productos enviados a cocina.</Text> : null}
+                <View style={styles.mobileCustomerTicketDivider} />
+                <View style={styles.mobileCustomerTicketSummaryRow}>
+                  <Text style={styles.mobileCustomerTicketSmall}>{`Base imponible IVA ${invoiceConfig.vatRatePercent.toFixed(0)}%`}</Text>
+                  <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(taxableBaseCents)}</Text>
+                </View>
+                <View style={styles.mobileCustomerTicketSummaryRow}>
+                  <Text style={styles.mobileCustomerTicketSmall}>{`IVA ${invoiceConfig.vatRatePercent.toFixed(0)}%`}</Text>
+                  <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(vatCents)}</Text>
+                </View>
+                <View style={styles.mobileCustomerTicketTotal}>
+                  <Text style={styles.mobileCheckoutTotalLabel}>Total IVA incluido</Text>
+                  <Text style={styles.mobileCustomerTicketTotalAmount}>{orderProps.formatPrice(ticketTotalCents)}</Text>
+                </View>
+                <Text style={styles.mobileCustomerTicketFooter}>IVA incluido. Vista previa para cliente.</Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isAaModalVisible}
@@ -660,7 +770,6 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
 
   function handleSelectTable(table: TableId): void {
     props.onSelectTable(table);
-    goToView('menu');
   }
 
   function handleAddMenuItem(menuId: number): void {
