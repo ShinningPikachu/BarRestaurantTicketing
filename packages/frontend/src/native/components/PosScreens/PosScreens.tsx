@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { styles } from '../../app/App.styles';
+import { getItemDisplayName } from '../../helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from '../../helpers/kitchenTicketPrinter';
 import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
@@ -177,8 +178,8 @@ function getConfirmedItems(tableOrders: Order[]): ConfirmedItemRow[] {
   );
 }
 
-function getCombinedConfirmedLines(confirmedItems: ConfirmedItemRow[]): Array<{ key: string; name: string; qty: number; unitPriceCents: number; totalPriceCents: number }> {
-  const lineByKey = new Map<string, { key: string; name: string; qty: number; unitPriceCents: number; totalPriceCents: number }>();
+function getCombinedConfirmedLines(confirmedItems: ConfirmedItemRow[]): Array<{ key: string; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }> {
+  const lineByKey = new Map<string, { key: string; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }>();
 
   for (const confirmedItem of confirmedItems) {
     const unitPriceCents = confirmedItem.item.unitPriceCents ?? 0;
@@ -193,6 +194,8 @@ function getCombinedConfirmedLines(confirmedItems: ConfirmedItemRow[]): Array<{ 
       lineByKey.set(key, {
         key,
         name: confirmedItem.item.name,
+        primaryName: confirmedItem.item.primaryName,
+        secondaryName: confirmedItem.item.secondaryName,
         qty: confirmedItem.item.qty,
         unitPriceCents,
         totalPriceCents,
@@ -210,15 +213,18 @@ function MobilePreorderItem({
   item: PreOrderItem;
   orderProps: PosScreenProps['orderSectionProps'];
 }): React.JSX.Element {
-  const title = item.menuItemId
-    ? orderProps.getMenuTitleById(orderProps.menuByCategory, item.menuItemId)
-    : item.name;
+  const title = getItemDisplayName({
+    name: item.menuItemId ? orderProps.getMenuTitleById(orderProps.menuByCategory, item.menuItemId) : item.name,
+    primaryName: item.primaryName,
+    secondaryName: item.secondaryName,
+  });
 
   return (
     <View style={[styles.mobileOrderItem, styles.mobileEditableOrderItem]}>
       <View style={styles.mobilePreorderMainRow}>
         <View style={styles.flex1}>
-          <Text style={styles.mobileOrderItemName} numberOfLines={2}>{title}</Text>
+          <Text style={styles.mobileOrderItemName} numberOfLines={1}>{title.primary}</Text>
+          {title.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={2}>{title.secondary}</Text> : null}
           <Text style={styles.mobileOrderItemPrice}>{orderProps.formatPrice(item.unitPriceCents * item.qty)}</Text>
         </View>
         <View style={styles.qtyGroup}>
@@ -271,14 +277,19 @@ function MobileCartaPreorderSidebar({ orderProps }: { orderProps: PosScreenProps
       <ScrollView style={styles.mobileCartaSidebarList} showsVerticalScrollIndicator={false}>
         {hasItems ? (
           orderProps.preorderItems.map((item) => {
-            const title = item.menuItemId
-              ? orderProps.getMenuTitleById(orderProps.menuByCategory, item.menuItemId)
-              : item.name;
+            const title = getItemDisplayName({
+              name: item.menuItemId ? orderProps.getMenuTitleById(orderProps.menuByCategory, item.menuItemId) : item.name,
+              primaryName: item.primaryName,
+              secondaryName: item.secondaryName,
+            });
 
             return (
               <View key={item.id} style={styles.mobileCartaSidebarItem}>
                 <Text style={styles.mobileCartaSidebarQty}>{`x${item.qty}`}</Text>
-                <Text style={styles.mobileCartaSidebarName} numberOfLines={2}>{title}</Text>
+                <View style={styles.flex1}>
+                  <Text style={styles.mobileCartaSidebarName} numberOfLines={1}>{title.primary}</Text>
+                  {title.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={1}>{title.secondary}</Text> : null}
+                </View>
               </View>
             );
           })
@@ -309,10 +320,12 @@ function MobileConfirmedItem({
   orderId: string;
   orderProps: PosScreenProps['orderSectionProps'];
 }): React.JSX.Element {
+  const displayName = getItemDisplayName(item);
   return (
     <View style={styles.mobileOrderItem}>
       <View style={styles.flex1}>
-        <Text style={styles.mobileOrderItemName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.mobileOrderItemName} numberOfLines={1}>{displayName.primary}</Text>
+        {displayName.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={2}>{displayName.secondary}</Text> : null}
         <Text style={styles.mobileOrderItemPrice}>
           {orderProps.formatPrice((item.unitPriceCents ?? 0) * item.qty)}
         </Text>
@@ -629,14 +642,20 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                   <Text style={styles.mobileCustomerTicketMoneyHeader}>P.Unit</Text>
                   <Text style={styles.mobileCustomerTicketMoneyHeader}>Total</Text>
                 </View>
-                {customerTicketLines.map((item) => (
-                  <View key={`customer-ticket-${item.key}`} style={styles.mobileCustomerTicketRow}>
-                    <Text style={styles.mobileCustomerTicketQty}>{String(item.qty)}</Text>
-                    <Text style={styles.mobileCustomerTicketItemName} numberOfLines={2}>{item.name}</Text>
-                    <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.unitPriceCents)}</Text>
-                    <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.totalPriceCents)}</Text>
-                  </View>
-                ))}
+                {customerTicketLines.map((item) => {
+                  const displayName = getItemDisplayName(item);
+                  return (
+                    <View key={`customer-ticket-${item.key}`} style={styles.mobileCustomerTicketRow}>
+                      <Text style={styles.mobileCustomerTicketQty}>{String(item.qty)}</Text>
+                      <View style={styles.mobileCustomerTicketNameCell}>
+                        <Text style={styles.mobileCustomerTicketItemName} numberOfLines={1}>{displayName.primary}</Text>
+                        {displayName.secondary ? <Text style={styles.mobileCustomerTicketSmall} numberOfLines={2}>{displayName.secondary}</Text> : null}
+                      </View>
+                      <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.unitPriceCents)}</Text>
+                      <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.totalPriceCents)}</Text>
+                    </View>
+                  );
+                })}
                 {customerTicketLines.length === 0 ? <Text style={styles.emptyText}>No hay productos enviados a cocina.</Text> : null}
                 <View style={styles.mobileCustomerTicketDivider} />
                 <View style={styles.mobileCustomerTicketSummaryRow}>
@@ -677,10 +696,13 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             </View>
 
             <ScrollView style={styles.mobileAaList}>
-              {confirmedItems.map((confirmedItem) => (
+              {confirmedItems.map((confirmedItem) => {
+                const displayName = getItemDisplayName(confirmedItem.item);
+                return (
                 <View key={`mobile-aa-${confirmedItem.key}`} style={styles.mobileAaSelectionRow}>
                   <View style={styles.flex1}>
-                    <Text style={styles.mobileOrderItemName} numberOfLines={2}>{confirmedItem.item.name}</Text>
+                    <Text style={styles.mobileOrderItemName} numberOfLines={1}>{displayName.primary}</Text>
+                    {displayName.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={2}>{displayName.secondary}</Text> : null}
                     <Text style={styles.mobileOrderItemPrice}>
                       {`${orderProps.formatPrice(confirmedItem.item.unitPriceCents ?? 0)} · disponible x${confirmedItem.item.qty}`}
                     </Text>
@@ -702,7 +724,8 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                     </TouchableOpacity>
                   </View>
                 </View>
-              ))}
+                );
+              })}
               {confirmedItems.length === 0 ? <Text style={styles.emptyText}>No hay pedidos confirmados.</Text> : null}
             </ScrollView>
 

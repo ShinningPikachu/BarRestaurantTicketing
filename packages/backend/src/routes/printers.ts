@@ -9,6 +9,8 @@ const router = Router();
 
 const ticketLineSchema = z.object({
   name: z.string().trim().min(1),
+  primaryName: z.string().trim().optional().nullable(),
+  secondaryName: z.string().trim().optional().nullable(),
   qty: z.number().int().positive(),
   unitPriceCents: z.number().int().min(0),
   totalPriceCents: z.number().int().min(0),

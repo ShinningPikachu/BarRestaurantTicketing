@@ -740,10 +740,12 @@ export const styles = StyleSheet.create({
     textAlign: 'left'
   },
   mobileCustomerTicketItemName: {
-    flex: 1,
     color: colors.text,
     fontSize: 11,
     fontWeight: '600'
+  },
+  mobileCustomerTicketNameCell: {
+    flex: 1
   },
   mobileCustomerTicketAmount: {
     width: 58,

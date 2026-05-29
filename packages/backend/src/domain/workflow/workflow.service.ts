@@ -146,7 +146,9 @@ export class WorkflowService {
       const existing = draftSession.items.find((item) =>
         item.menuItemId === menu.id &&
         item.unitPriceCents === menu.priceCents &&
-        item.name === menu.name
+        item.name === menu.name &&
+        item.primaryName === menu.primaryName &&
+        item.secondaryName === menu.secondaryName
       );
 
       if (existing) {
@@ -158,6 +160,8 @@ export class WorkflowService {
         await workflowRepository.createPreOrderItem(draftSession.id, {
           menuItemId: menu.id,
           name: menu.name,
+          primaryName: menu.primaryName,
+          secondaryName: menu.secondaryName,
           qty: 1,
           unitPriceCents: menu.priceCents
         }, tx);
@@ -246,6 +250,8 @@ export class WorkflowService {
       const normalizedItems = items.map((item) => ({
         menuItemId: item.menuItemId,
         name: item.name,
+        primaryName: item.primaryName,
+        secondaryName: item.secondaryName,
         qty: item.qty,
         unitPriceCents: item.unitPriceCents
       }));
@@ -275,7 +281,9 @@ export class WorkflowService {
       const existing = draftSession.items.find((item) =>
         item.menuItemId === orderItem.menuItemId &&
         item.unitPriceCents === orderItem.unitPriceCents &&
-        item.name === orderItem.name
+        item.name === orderItem.name &&
+        item.primaryName === orderItem.primaryName &&
+        item.secondaryName === orderItem.secondaryName
       );
 
       if (existing) {
@@ -287,6 +295,8 @@ export class WorkflowService {
         await workflowRepository.createPreOrderItem(draftSession.id, {
           menuItemId: orderItem.menuItemId ?? null,
           name: orderItem.name,
+          primaryName: orderItem.primaryName,
+          secondaryName: orderItem.secondaryName,
           qty: orderItem.qty,
           unitPriceCents: orderItem.unitPriceCents
         }, tx);
@@ -344,6 +354,8 @@ export class WorkflowService {
           orderItemId: item.id,
           menuItemId: item.menuItemId,
           name: item.name,
+          primaryName: item.primaryName,
+          secondaryName: item.secondaryName,
           qty: item.qty,
           unitPriceCents: item.unitPriceCents,
           totalPriceCents: item.totalPriceCents,
@@ -428,6 +440,8 @@ export class WorkflowService {
           orderItemId: orderItem.id,
           menuItemId: orderItem.menuItemId,
           name: orderItem.name,
+          primaryName: orderItem.primaryName,
+          secondaryName: orderItem.secondaryName,
           qty: selected.qty,
           unitPriceCents: orderItem.unitPriceCents,
           totalPriceCents: selected.qty * orderItem.unitPriceCents,

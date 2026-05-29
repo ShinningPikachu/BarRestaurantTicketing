@@ -10,6 +10,8 @@ const router = Router();
 
 const menuItemBodySchema = z.object({
   name: z.string().trim().min(1),
+  primaryName: z.string().trim().optional().nullable(),
+  secondaryName: z.string().trim().optional().nullable(),
   priceCents: z.number().int().min(0),
   costCents: z.number().int().min(0).optional().nullable(),
   category: z.string().trim().min(1),
@@ -62,6 +64,8 @@ function parseMenuImportCsv(csv: string) {
 
     return {
       name,
+      primaryName: record.primaryName?.trim() || null,
+      secondaryName: record.secondaryName?.trim() || null,
       category,
       priceCents,
       costCents,

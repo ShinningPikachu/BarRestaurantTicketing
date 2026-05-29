@@ -22,6 +22,7 @@ import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCat
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
+import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
 import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
 import { MobileMainScreen } from './src/native/app/MobileMainScreen';
@@ -162,13 +163,19 @@ function escapeHtml(value: string): string {
 }
 
 function buildPaidTicketHtml(ticket: PaidTicket): string {
-  const rows = ticket.items.map((item) => `
-    <tr>
-      <td>${item.qty}</td>
-      <td>${escapeHtml(item.name)}</td>
-      <td>${centsToCurrency(item.unitPriceCents)}</td>
-      <td>${centsToCurrency(item.totalPriceCents)}</td>
-    </tr>`).join('');
+  const rows = ticket.items.map((item) => {
+    const displayName = getItemDisplayName(item);
+    return `
+      <tr>
+        <td>${item.qty}</td>
+        <td>
+          <div class="item-primary">${escapeHtml(displayName.primary)}</div>
+          ${displayName.secondary ? `<div class="item-secondary">${escapeHtml(displayName.secondary)}</div>` : ''}
+        </td>
+        <td>${centsToCurrency(item.unitPriceCents)}</td>
+        <td>${centsToCurrency(item.totalPriceCents)}</td>
+      </tr>`;
+  }).join('');
 
   return `<!doctype html>
 <html lang="es">
@@ -183,6 +190,8 @@ function buildPaidTicketHtml(ticket: PaidTicket): string {
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { border-bottom: 1px solid #E2E8F0; padding: 6px 4px; text-align: left; }
     td:last-child, th:last-child { text-align: right; }
+    .item-primary { font-weight: 700; }
+    .item-secondary { color: #475569; font-size: 11px; margin-top: 2px; }
     .totals { margin-top: 12px; font-size: 13px; }
     .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
     .total { font-weight: 700; font-size: 15px; border-top: 1px solid #111827; padding-top: 8px; }
@@ -765,6 +774,8 @@ export default function App(): React.JSX.Element {
     const config = getSimplifiedInvoiceConfig();
     const lines = ticket.items.map((item) => ({
       name: item.name,
+      primaryName: item.primaryName,
+      secondaryName: item.secondaryName,
       qty: item.qty,
       unitPriceCents: item.unitPriceCents,
       totalPriceCents: item.totalPriceCents,

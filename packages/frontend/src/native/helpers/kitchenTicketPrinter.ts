@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { Order, tableZoneLabel } from '../types';
 import { SelectedTable } from '../app/app.types';
 import { apiService } from '../services/api';
+import { getItemDisplayName } from './itemDisplayName';
 
 const SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY = 'bar-ticketing-simplified-invoice-sequence';
 
@@ -130,8 +131,8 @@ export function getOptionalXprinterTarget(): {
   };
 }
 
-function getCombinedOrderLines(orders: Order[]): Array<{ name: string; qty: number; unitPriceCents: number; totalPriceCents: number }> {
-  const lineByKey = new Map<string, { name: string; qty: number; unitPriceCents: number; totalPriceCents: number }>();
+function getCombinedOrderLines(orders: Order[]): Array<{ name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }> {
+  const lineByKey = new Map<string, { name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }>();
 
   for (const item of orders.flatMap((order) => order.items)) {
     const unitPriceCents = item.unitPriceCents ?? 0;
@@ -144,6 +145,8 @@ function getCombinedOrderLines(orders: Order[]): Array<{ name: string; qty: numb
     } else {
       lineByKey.set(key, {
         name: item.name,
+        primaryName: item.primaryName,
+        secondaryName: item.secondaryName,
         qty: item.qty,
         unitPriceCents,
         totalPriceCents: getOrderLineTotalCents(item),
@@ -157,10 +160,14 @@ function getCombinedOrderLines(orders: Order[]): Array<{ name: string; qty: numb
 function buildLineRows(orders: Order[]): string {
   return getCombinedOrderLines(orders)
     .map((item) => {
+      const displayName = getItemDisplayName(item);
       return `
         <tr>
           <td class="qty">${item.qty}</td>
-          <td class="name">${escapeHtml(item.name)}</td>
+          <td class="name">
+            <div class="item-primary">${escapeHtml(displayName.primary)}</div>
+            ${displayName.secondary ? `<div class="item-secondary">${escapeHtml(displayName.secondary)}</div>` : ''}
+          </td>
           <td class="money">${formatEuroFromCents(item.unitPriceCents)}</td>
           <td class="money">${formatEuroFromCents(item.totalPriceCents)}</td>
         </tr>`;
@@ -273,6 +280,15 @@ function buildSimplifiedInvoiceHtml(params: {
       width: auto;
       padding-right: 8px;
       overflow-wrap: anywhere;
+    }
+    .item-primary {
+      font-weight: 700;
+    }
+    .item-secondary {
+      color: #444;
+      font-size: 10px;
+      line-height: 1.25;
+      margin-top: 1px;
     }
     .money {
       width: 66px;

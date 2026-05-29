@@ -6,6 +6,8 @@ export interface PaidTicketLine {
   orderItemId: number;
   menuItemId?: number | null;
   name: string;
+  primaryName?: string | null;
+  secondaryName?: string | null;
   qty: number;
   unitPriceCents: number;
   totalPriceCents: number;
@@ -157,7 +159,7 @@ export class WorkflowRepository {
 
   async createPreOrderItem(
     sessionId: string,
-    payload: { menuItemId?: number | null; name: string; qty: number; unitPriceCents: number },
+    payload: { menuItemId?: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number },
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
@@ -165,6 +167,8 @@ export class WorkflowRepository {
     const data: Prisma.PreOrderItemUncheckedCreateInput = {
       sessionId,
       name: payload.name,
+      primaryName: payload.primaryName ?? null,
+      secondaryName: payload.secondaryName ?? null,
       qty: payload.qty,
       unitPriceCents: payload.unitPriceCents,
       totalPriceCents: payload.unitPriceCents * payload.qty
@@ -264,6 +268,8 @@ export class WorkflowRepository {
             orderItemId: item.orderItemId,
             menuItemId: item.menuItemId ?? null,
             name: item.name,
+            primaryName: item.primaryName ?? null,
+            secondaryName: item.secondaryName ?? null,
             qty: item.qty,
             unitPriceCents: item.unitPriceCents,
             totalPriceCents: item.totalPriceCents,
@@ -300,7 +306,7 @@ export class WorkflowRepository {
   async createOrderFromPreOrder(
     tableId: number,
     sessionId: string,
-    items: Array<{ menuItemId: number | null; name: string; qty: number; unitPriceCents: number }>,
+    items: Array<{ menuItemId: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number }>,
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
@@ -315,6 +321,8 @@ export class WorkflowRepository {
           create: items.map((item) => ({
             menuItemId: item.menuItemId,
             name: item.name,
+            primaryName: item.primaryName ?? null,
+            secondaryName: item.secondaryName ?? null,
             qty: item.qty,
             unitPriceCents: item.unitPriceCents,
             totalPriceCents: item.qty * item.unitPriceCents
@@ -328,7 +336,7 @@ export class WorkflowRepository {
   async createKitchenTicket(
     orderId: string,
     tableId: number,
-    items: Array<{ menuItemId: number | null; name: string; qty: number; unitPriceCents: number }>,
+    items: Array<{ menuItemId: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number }>,
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
@@ -342,6 +350,8 @@ export class WorkflowRepository {
           create: items.map((item) => ({
             menuItemId: item.menuItemId,
             name: item.name,
+            primaryName: item.primaryName ?? null,
+            secondaryName: item.secondaryName ?? null,
             qty: item.qty,
             unitPriceCents: item.unitPriceCents,
             totalPriceCents: item.qty * item.unitPriceCents

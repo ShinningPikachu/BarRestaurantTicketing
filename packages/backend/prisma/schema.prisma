@@ -40,6 +40,8 @@ model OrderItem {
   menuItemId      Int?
   menuItem        MenuItem? @relation(fields: [menuItemId], references: [id])
   name            String
+  primaryName     String?
+  secondaryName   String?
   qty             Int
   unitPriceCents  Int       @default(0)
   totalPriceCents Int       @default(0)
@@ -48,6 +50,8 @@ model OrderItem {
 model MenuItem {
   id                 Int                 @id @default(autoincrement())
   name               String
+  primaryName        String?
+  secondaryName      String?
   priceCents         Int
   costCents          Int?
   sku                String?
@@ -102,6 +106,8 @@ model PaidTicketItem {
   orderItemId     Int?
   menuItemId      Int?
   name            String
+  primaryName     String?
+  secondaryName   String?
   qty             Int
   unitPriceCents  Int
   totalPriceCents Int
@@ -126,6 +132,8 @@ model PreOrderItem {
   menuItemId      Int?
   menuItem        MenuItem?       @relation(fields: [menuItemId], references: [id])
   name            String
+  primaryName     String?
+  secondaryName   String?
   qty             Int
   unitPriceCents  Int             @default(0)
   totalPriceCents Int             @default(0)
@@ -151,6 +159,8 @@ model KitchenTicketItem {
   menuItemId      Int?
   menuItem        MenuItem?     @relation(fields: [menuItemId], references: [id])
   name            String
+  primaryName     String?
+  secondaryName   String?
   qty             Int
   unitPriceCents  Int           @default(0)
   totalPriceCents Int           @default(0)

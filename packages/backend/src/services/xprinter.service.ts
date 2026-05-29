@@ -5,12 +5,37 @@ import { config } from '../config/index.js';
 
 interface TicketLine {
   name: string;
+  primaryName?: string | null;
+  secondaryName?: string | null;
   qty: number;
   unitPriceCents: number;
   totalPriceCents: number;
 }
 
 const RECEIPT_WIDTH = 48;
+
+function getLineDisplayName(item: Pick<TicketLine, 'name' | 'primaryName' | 'secondaryName'>): { primary: string; secondary: string | null } {
+  const primaryName = item.primaryName?.trim();
+  const secondaryName = item.secondaryName?.trim();
+
+  if (primaryName) {
+    return { primary: primaryName, secondary: secondaryName || null };
+  }
+
+  const name = item.name.trim();
+  for (const pattern of [/\s+con\s+/i, /,\s*/]) {
+    const match = pattern.exec(name);
+    if (match && match.index > 0) {
+      const primary = name.slice(0, match.index).trim();
+      const secondary = name.slice(match.index + match[0].length).trim();
+      if (primary && secondary) {
+        return { primary, secondary };
+      }
+    }
+  }
+
+  return { primary: name, secondary: null };
+}
 
 export interface XprinterTicketPayload {
   businessName: string;
@@ -133,12 +158,18 @@ function buildEscPosTicket(payload: XprinterTicketPayload): Buffer {
 
   for (const item of payload.lines) {
     const prefix = `${item.qty}x `;
-    const nameRows = wrap(item.name, 32);
+    const displayName = getLineDisplayName(item);
+    const nameRows = wrap(displayName.primary, 32);
     push([0x1b, 0x45, 0x01]);
     push(line(`${prefix}${nameRows[0]}`, money(item.totalPriceCents)));
     push([0x1b, 0x45, 0x00]);
     for (const extraRow of nameRows.slice(1)) {
       push(`   ${extraRow}`);
+    }
+    if (displayName.secondary) {
+      for (const secondaryRow of wrap(displayName.secondary, 34)) {
+        push(`   ${secondaryRow}`);
+      }
     }
     push(line('   Precio ud.', money(item.unitPriceCents)));
   }

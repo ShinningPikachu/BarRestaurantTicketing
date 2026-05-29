@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, FlatList, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SelectedTable } from '../../app/app.types';
 import { styles } from '../../app/App.styles';
+import { getItemDisplayName } from '../../helpers/itemDisplayName';
 import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, tableZoneLabel } from '../../types';
 
 interface OrderSectionProps {
@@ -218,14 +219,17 @@ export function OrderSection({
         keyExtractor={(item) => String(item.id)}
         ListEmptyComponent={<Text style={styles.emptyText}>No hay artículos en el prepedido.</Text>}
         renderItem={({ item }) => {
-          const title = item.menuItemId
-            ? getMenuTitleById(menuByCategory, item.menuItemId)
-            : item.name;
+          const title = getItemDisplayName({
+            name: item.menuItemId ? getMenuTitleById(menuByCategory, item.menuItemId) : item.name,
+            primaryName: item.primaryName,
+            secondaryName: item.secondaryName,
+          });
           return (
             <View style={[styles.preorderRow, styles.preorderEditableRow]}>
               <View style={styles.preorderMainRow}>
                 <View style={styles.flex1}>
-                  <Text style={styles.itemName}>{title}</Text>
+                  <Text style={styles.itemName}>{title.primary}</Text>
+                  {title.secondary ? <Text style={styles.itemPrice}>{title.secondary}</Text> : null}
                   <Text style={styles.itemPrice}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
                 </View>
 
@@ -289,10 +293,13 @@ export function OrderSection({
         contentContainerStyle={styles.confirmedListContent}
         keyExtractor={(item) => item.key}
         ListEmptyComponent={<Text style={styles.emptyText}>No hay pedidos confirmados.</Text>}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const displayName = getItemDisplayName(item.item);
+          return (
           <View style={[styles.preorderRow, styles.confirmedPreorderRow]}>
             <View style={styles.flex1}>
-              <Text style={styles.itemName}>{item.item.name}</Text>
+              <Text style={styles.itemName}>{displayName.primary}</Text>
+              {displayName.secondary ? <Text style={styles.itemPrice}>{displayName.secondary}</Text> : null}
               <Text style={styles.itemPrice}>{formatPrice((item.item.unitPriceCents ?? 0) * item.item.qty)}</Text>
             </View>
 
@@ -307,7 +314,8 @@ export function OrderSection({
               </TouchableOpacity>
             </View>
           </View>
-        )}
+          );
+        }}
       />
 
       <View style={styles.checkoutPanel}>
@@ -369,10 +377,13 @@ export function OrderSection({
               data={confirmedItems}
               keyExtractor={(item) => `aa-${item.key}`}
               ListEmptyComponent={<Text style={styles.emptyText}>No hay pedidos confirmados.</Text>}
-              renderItem={({ item }) => (
+              renderItem={({ item }) => {
+                const displayName = getItemDisplayName(item.item);
+                return (
                 <View style={styles.aaSelectionRow}>
                   <View style={styles.flex1}>
-                    <Text style={styles.itemName}>{item.item.name}</Text>
+                    <Text style={styles.itemName}>{displayName.primary}</Text>
+                    {displayName.secondary ? <Text style={styles.itemPrice}>{displayName.secondary}</Text> : null}
                     <Text style={styles.itemPrice}>
                       {`${formatPrice(item.item.unitPriceCents ?? 0)} · disponible x${item.item.qty}`}
                     </Text>
@@ -394,7 +405,8 @@ export function OrderSection({
                     </TouchableOpacity>
                   </View>
                 </View>
-              )}
+                );
+              }}
             />
 
             <View style={styles.modalFooter}>

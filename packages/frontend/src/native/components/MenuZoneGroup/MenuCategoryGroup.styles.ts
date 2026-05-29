@@ -31,10 +31,9 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   menuItemChip: {
-    minWidth: 150,
-    width: 174,
+    minWidth: 0,
     maxWidth: '100%',
-    flexShrink: 1,
+    flexShrink: 0,
     flexDirection: 'column',
     alignItems: 'flex-start',
     paddingHorizontal: 14,
@@ -68,11 +67,24 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 19,
     fontWeight: '700',
-    marginBottom: 4
+    marginBottom: 2
   },
   mobileItemName: {
-    minHeight: 34,
     fontSize: 14
+  },
+  itemSecondaryName: {
+    maxWidth: '100%',
+    minHeight: 34,
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 17,
+    marginBottom: 5
+  },
+  mobileItemSecondaryName: {
+    minHeight: 30,
+    fontSize: 12,
+    lineHeight: 15,
+    marginBottom: 4
   },
   itemPrice: {
     fontSize: 17,

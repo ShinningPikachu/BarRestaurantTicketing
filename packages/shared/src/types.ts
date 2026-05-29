@@ -56,6 +56,8 @@ export function tableKey(table: TableId): string {
 export interface MenuItem {
   id: number;
   name: string;
+  primaryName?: string | null;
+  secondaryName?: string | null;
   priceCents: number;
   costCents?: number | null;
   sku?: string;
@@ -68,6 +70,8 @@ export interface OrderItem {
   id?: number;
   menuItemId?: number | null;
   name: string;
+  primaryName?: string | null;
+  secondaryName?: string | null;
   qty: number;
   unitPriceCents?: number;
   totalPriceCents?: number;
@@ -88,6 +92,8 @@ export interface PreOrderItem {
   id: number;
   menuItemId?: number | null;
   name: string;
+  primaryName?: string | null;
+  secondaryName?: string | null;
   qty: number;
   unitPriceCents: number;
   totalPriceCents: number;

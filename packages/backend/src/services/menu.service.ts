@@ -2,6 +2,8 @@ import prisma from '../db';
 
 interface MenuImportItem {
   name: string;
+  primaryName?: string | null;
+  secondaryName?: string | null;
   priceCents: number;
   costCents?: number | null;
   category: string;
@@ -31,6 +33,8 @@ export class MenuService {
 
   async createMenuItem(payload: {
     name: string;
+    primaryName?: string | null;
+    secondaryName?: string | null;
     priceCents: number;
     costCents?: number | null;
     category: string;
@@ -42,6 +46,8 @@ export class MenuService {
     return prisma.menuItem.create({
       data: {
         name: payload.name,
+        primaryName: payload.primaryName || null,
+        secondaryName: payload.secondaryName || null,
         priceCents: payload.priceCents,
         costCents: payload.costCents ?? null,
         category: payload.category,
@@ -55,6 +61,8 @@ export class MenuService {
 
   async updateMenuItem(id: number, payload: {
     name?: string;
+    primaryName?: string | null;
+    secondaryName?: string | null;
     priceCents?: number;
     costCents?: number | null;
     category?: string;
@@ -89,6 +97,8 @@ export class MenuService {
     for (const item of items) {
       const data = {
         name: item.name,
+        primaryName: item.primaryName || null,
+        secondaryName: item.secondaryName || null,
         priceCents: item.priceCents,
         costCents: item.costCents ?? null,
         category: item.category,

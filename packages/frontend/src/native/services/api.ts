@@ -269,6 +269,8 @@ export class ApiService {
 
   async createMenuItem(payload: {
     name: string;
+    primaryName?: string | null;
+    secondaryName?: string | null;
     priceCents: number;
     costCents?: number | null;
     category: string;
@@ -289,6 +291,8 @@ export class ApiService {
     id: number,
     payload: {
       name?: string;
+      primaryName?: string | null;
+      secondaryName?: string | null;
       priceCents?: number;
       costCents?: number | null;
       category?: string;
@@ -342,7 +346,7 @@ export class ApiService {
     invoiceNumber: string;
     issuedAt: string;
     tableLabel: string;
-    lines: Array<{ name: string; qty: number; unitPriceCents: number; totalPriceCents: number }>;
+    lines: Array<{ name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }>;
     taxableBaseCents: number;
     vatCents: number;
     vatRatePercent: number;
