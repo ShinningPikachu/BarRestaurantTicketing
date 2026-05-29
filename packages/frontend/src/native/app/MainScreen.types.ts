@@ -26,6 +26,10 @@ export interface MainScreenProps {
   managedMenuItems: MenuItem[];
   productName: string;
   setProductName: (value: string) => void;
+  productPrimaryName: string;
+  setProductPrimaryName: (value: string) => void;
+  productSecondaryName: string;
+  setProductSecondaryName: (value: string) => void;
   productCategory: string;
   setProductCategory: (value: string) => void;
   productPrice: string;
@@ -41,6 +45,8 @@ export interface MainScreenProps {
   importProductsCsv: () => void;
   chooseProductImage: (onSelected: (imageDataUrl: string) => void) => Promise<void>;
   saveNewProduct: () => Promise<void>;
+  updateProductName: (item: MenuItem, value: string) => Promise<void>;
+  updateProductDisplayNames: (item: MenuItem, primaryName: string, secondaryName: string) => Promise<void>;
   updateProductCategory: (item: MenuItem, value: string) => Promise<void>;
   updateProductPrice: (item: MenuItem, value: string) => Promise<void>;
   updateProductCost: (item: MenuItem, value: string) => Promise<void>;

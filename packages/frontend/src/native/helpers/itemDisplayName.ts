@@ -9,14 +9,14 @@ export interface NamedLine {
   secondaryName?: string | null;
 }
 
-const splitPatterns = [
-  /\s+con\s+/i,
-  /,\s*/,
-];
+function cleanDisplayName(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  return /^\.+$/.test(trimmed) ? '' : trimmed;
+}
 
 export function getItemDisplayName(item: NamedLine): ItemDisplayName {
-  const primaryName = item.primaryName?.trim();
-  const secondaryName = item.secondaryName?.trim();
+  const primaryName = cleanDisplayName(item.primaryName);
+  const secondaryName = cleanDisplayName(item.secondaryName);
 
   if (primaryName) {
     return {
@@ -26,17 +26,6 @@ export function getItemDisplayName(item: NamedLine): ItemDisplayName {
   }
 
   const name = item.name.trim();
-  for (const pattern of splitPatterns) {
-    const match = pattern.exec(name);
-    if (match && match.index > 0) {
-      const primary = name.slice(0, match.index).trim();
-      const secondary = name.slice(match.index + match[0].length).trim();
-      if (primary && secondary) {
-        return { primary, secondary };
-      }
-    }
-  }
-
   return { primary: name, secondary: null };
 }
 

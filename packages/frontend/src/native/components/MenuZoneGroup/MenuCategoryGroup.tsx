@@ -81,7 +81,7 @@ return (
                   resizeMode="contain"
                 />
               ) : null}
-              <Text style={[styles.itemName, isMobile && styles.mobileItemName]} numberOfLines={1}>
+              <Text style={[styles.itemName, isMobile && styles.mobileItemName]} numberOfLines={2}>
                 {displayName.primary}
               </Text>
               {displayName.secondary ? (

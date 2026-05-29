@@ -223,7 +223,7 @@ function MobilePreorderItem({
     <View style={[styles.mobileOrderItem, styles.mobileEditableOrderItem]}>
       <View style={styles.mobilePreorderMainRow}>
         <View style={styles.flex1}>
-          <Text style={styles.mobileOrderItemName} numberOfLines={1}>{title.primary}</Text>
+          <Text style={styles.mobileOrderItemName} numberOfLines={2}>{title.primary}</Text>
           {title.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={2}>{title.secondary}</Text> : null}
           <Text style={styles.mobileOrderItemPrice}>{orderProps.formatPrice(item.unitPriceCents * item.qty)}</Text>
         </View>
@@ -287,7 +287,7 @@ function MobileCartaPreorderSidebar({ orderProps }: { orderProps: PosScreenProps
               <View key={item.id} style={styles.mobileCartaSidebarItem}>
                 <Text style={styles.mobileCartaSidebarQty}>{`x${item.qty}`}</Text>
                 <View style={styles.flex1}>
-                  <Text style={styles.mobileCartaSidebarName} numberOfLines={1}>{title.primary}</Text>
+                  <Text style={styles.mobileCartaSidebarName} numberOfLines={2}>{title.primary}</Text>
                   {title.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={1}>{title.secondary}</Text> : null}
                 </View>
               </View>
@@ -324,7 +324,7 @@ function MobileConfirmedItem({
   return (
     <View style={styles.mobileOrderItem}>
       <View style={styles.flex1}>
-        <Text style={styles.mobileOrderItemName} numberOfLines={1}>{displayName.primary}</Text>
+        <Text style={styles.mobileOrderItemName} numberOfLines={2}>{displayName.primary}</Text>
         {displayName.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={2}>{displayName.secondary}</Text> : null}
         <Text style={styles.mobileOrderItemPrice}>
           {orderProps.formatPrice((item.unitPriceCents ?? 0) * item.qty)}
@@ -648,7 +648,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                     <View key={`customer-ticket-${item.key}`} style={styles.mobileCustomerTicketRow}>
                       <Text style={styles.mobileCustomerTicketQty}>{String(item.qty)}</Text>
                       <View style={styles.mobileCustomerTicketNameCell}>
-                        <Text style={styles.mobileCustomerTicketItemName} numberOfLines={1}>{displayName.primary}</Text>
+                        <Text style={styles.mobileCustomerTicketItemName} numberOfLines={2}>{displayName.primary}</Text>
                         {displayName.secondary ? <Text style={styles.mobileCustomerTicketSmall} numberOfLines={2}>{displayName.secondary}</Text> : null}
                       </View>
                       <Text style={styles.mobileCustomerTicketAmount}>{orderProps.formatPrice(item.unitPriceCents)}</Text>
@@ -701,7 +701,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                 return (
                 <View key={`mobile-aa-${confirmedItem.key}`} style={styles.mobileAaSelectionRow}>
                   <View style={styles.flex1}>
-                    <Text style={styles.mobileOrderItemName} numberOfLines={1}>{displayName.primary}</Text>
+                    <Text style={styles.mobileOrderItemName} numberOfLines={2}>{displayName.primary}</Text>
                     {displayName.secondary ? <Text style={styles.mobileOrderItemPrice} numberOfLines={2}>{displayName.secondary}</Text> : null}
                     <Text style={styles.mobileOrderItemPrice}>
                       {`${orderProps.formatPrice(confirmedItem.item.unitPriceCents ?? 0)} · disponible x${confirmedItem.item.qty}`}

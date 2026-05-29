@@ -15,26 +15,18 @@ interface TicketLine {
 const RECEIPT_WIDTH = 48;
 
 function getLineDisplayName(item: Pick<TicketLine, 'name' | 'primaryName' | 'secondaryName'>): { primary: string; secondary: string | null } {
-  const primaryName = item.primaryName?.trim();
-  const secondaryName = item.secondaryName?.trim();
+  const cleanDisplayName = (value: string | null | undefined) => {
+    const trimmed = value?.trim() ?? '';
+    return /^\.+$/.test(trimmed) ? '' : trimmed;
+  };
+  const primaryName = cleanDisplayName(item.primaryName);
+  const secondaryName = cleanDisplayName(item.secondaryName);
 
   if (primaryName) {
     return { primary: primaryName, secondary: secondaryName || null };
   }
 
-  const name = item.name.trim();
-  for (const pattern of [/\s+con\s+/i, /,\s*/]) {
-    const match = pattern.exec(name);
-    if (match && match.index > 0) {
-      const primary = name.slice(0, match.index).trim();
-      const secondary = name.slice(match.index + match[0].length).trim();
-      if (primary && secondary) {
-        return { primary, secondary };
-      }
-    }
-  }
-
-  return { primary: name, secondary: null };
+  return { primary: item.name.trim(), secondary: null };
 }
 
 export interface XprinterTicketPayload {

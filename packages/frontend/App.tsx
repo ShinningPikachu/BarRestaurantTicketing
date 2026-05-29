@@ -238,6 +238,8 @@ export default function App(): React.JSX.Element {
   const [ticketSearchText, setTicketSearchText] = useState('');
   const [managedMenuItems, setManagedMenuItems] = useState<MenuItem[]>([]);
   const [productName, setProductName] = useState('');
+  const [productPrimaryName, setProductPrimaryName] = useState('');
+  const [productSecondaryName, setProductSecondaryName] = useState('');
   const [productCategory, setProductCategory] = useState('');
   const [productPrice, setProductPrice] = useState('');
   const [productCost, setProductCost] = useState('');
@@ -537,6 +539,8 @@ export default function App(): React.JSX.Element {
     try {
       await apiService.createMenuItem({
         name,
+        primaryName: productPrimaryName.trim() || null,
+        secondaryName: productSecondaryName.trim() || null,
         category,
         priceCents,
         costCents,
@@ -546,6 +550,8 @@ export default function App(): React.JSX.Element {
         available: true,
       });
       setProductName('');
+      setProductPrimaryName('');
+      setProductSecondaryName('');
       setProductCategory('');
       setProductPrice('');
       setProductCost('');
@@ -700,6 +706,35 @@ export default function App(): React.JSX.Element {
       await actions.reloadMenu();
     } catch {
       Alert.alert('Error', 'No se pudo actualizar el tipo.');
+    }
+  }
+
+  async function updateProductDisplayNames(item: MenuItem, primaryName: string, secondaryName: string): Promise<void> {
+    try {
+      await apiService.updateMenuItem(item.id, {
+        primaryName: primaryName.trim() || null,
+        secondaryName: secondaryName.trim() || null,
+      });
+      await loadManagedProducts();
+      await actions.reloadMenu();
+    } catch {
+      Alert.alert('Error', 'No se pudieron actualizar los nombres del producto.');
+    }
+  }
+
+  async function updateProductName(item: MenuItem, name: string): Promise<void> {
+    const nextName = name.trim();
+    if (!nextName) {
+      Alert.alert('Nombre no válido', 'Introduce un nombre de producto.');
+      return;
+    }
+
+    try {
+      await apiService.updateMenuItem(item.id, { name: nextName });
+      await loadManagedProducts();
+      await actions.reloadMenu();
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar el nombre del producto.');
     }
   }
 
@@ -1045,6 +1080,10 @@ export default function App(): React.JSX.Element {
     managedMenuItems,
     productName,
     setProductName,
+    productPrimaryName,
+    setProductPrimaryName,
+    productSecondaryName,
+    setProductSecondaryName,
     productCategory,
     setProductCategory,
     productPrice,
@@ -1060,6 +1099,8 @@ export default function App(): React.JSX.Element {
     importProductsCsv,
     chooseProductImage,
     saveNewProduct,
+    updateProductName,
+    updateProductDisplayNames,
     updateProductCategory,
     updateProductPrice,
     updateProductCost,

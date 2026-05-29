@@ -221,6 +221,16 @@ export const desktopStyles = StyleSheet.create({
     gap: 8,
     marginBottom: 10
   },
+  productNameCreateRow: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  productNameCreateInput: {
+    flex: 1,
+    minWidth: 180
+  },
   formInput: {
     minWidth: 150,
     borderColor: colors.inputBorder,
@@ -252,6 +262,20 @@ export const desktopStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap'
+  },
+  productNameEditRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 6
+  },
+  productNameInput: {
+    flex: 1,
+    minWidth: 140
+  },
+  productFullNameInput: {
+    width: '100%'
   },
   productImagePreview: {
     width: 64,
