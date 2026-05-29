@@ -1020,6 +1020,7 @@ export default function App(): React.JSX.Element {
     goHome,
     onConfigureConnection: openConnectionSetup,
     onLogout: () => void handleLogout(),
+    computerPairingUrl: getApiBaseUrl(),
     posScreenProps,
     sessionSummary,
     filteredPaidTickets,

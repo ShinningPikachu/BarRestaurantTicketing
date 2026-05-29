@@ -2,7 +2,7 @@ import { ComponentProps } from 'react';
 import { DesktopPosScreen, MobilePosScreen } from '../components';
 import { MenuItem, PaidTicket, SessionSummary } from '../types';
 
-export type AppSection = 'home' | 'pos' | 'history' | 'products';
+export type AppSection = 'home' | 'pos' | 'history' | 'products' | 'mobile-connect';
 export type PosScreenProps = ComponentProps<typeof DesktopPosScreen> & ComponentProps<typeof MobilePosScreen>;
 
 export interface MainScreenProps {
@@ -12,6 +12,7 @@ export interface MainScreenProps {
   goHome: () => void;
   onConfigureConnection: () => void;
   onLogout: () => void;
+  computerPairingUrl: string;
   posScreenProps: PosScreenProps;
   sessionSummary: SessionSummary | null;
   filteredPaidTickets: PaidTicket[];

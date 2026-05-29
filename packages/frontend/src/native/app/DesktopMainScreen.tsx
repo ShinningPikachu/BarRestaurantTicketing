@@ -1,8 +1,42 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, Platform, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { toQR } from 'toqr';
 import { DesktopPosScreen } from '../components';
 import { MainScreenProps } from './MainScreen.types';
 import { desktopStyles as styles } from './DesktopMain.styles';
+
+function PairingQrCode({ value }: { value: string }): React.JSX.Element {
+  const qr = useMemo(() => {
+    const modules = toQR(value);
+    const size = Math.sqrt(modules.length);
+    const rows: number[][] = [];
+
+    for (let row = 0; row < size; row += 1) {
+      const cells: number[] = [];
+      for (let column = 0; column < size; column += 1) {
+        cells.push(modules[row * size + column]);
+      }
+      rows.push(cells);
+    }
+
+    return rows;
+  }, [value]);
+
+  return (
+    <View style={styles.pairingQr} accessibilityLabel={`QR de conexion ${value}`}>
+      {qr.map((row, rowIndex) => (
+        <View key={`row-${rowIndex}`} style={styles.pairingQrRow}>
+          {row.map((cell, columnIndex) => (
+            <View
+              key={`${rowIndex}-${columnIndex}`}
+              style={[styles.pairingQrCell, cell ? styles.pairingQrCellDark : styles.pairingQrCellLight]}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
   return (
@@ -43,6 +77,24 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
             <Text style={styles.homeButtonTitle}>Productos</Text>
             <Text style={styles.homeButtonText}>Añadir productos, tipos y cambiar precios.</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.homeButton} onPress={() => props.setActiveSection('mobile-connect')}>
+            <Text style={styles.homeButtonTitle}>Conectar movil</Text>
+            <Text style={styles.homeButtonText}>Mostrar el QR para emparejar la app instalada del telefono.</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {props.activeSection === 'mobile-connect' ? (
+        <View style={styles.pairingPanel}>
+          <View style={styles.pairingContent}>
+            <View style={styles.pairingTextBlock}>
+              <Text style={styles.sectionTitle}>Conectar movil</Text>
+              <Text style={styles.helperText}>En el telefono, abre la app instalada, toca Conectar y escanea este codigo.</Text>
+              <Text style={styles.pairingAddress}>{props.computerPairingUrl}</Text>
+              <Text style={styles.helperText}>Telefono y ordenador deben estar en la misma red Wi-Fi. Si no escanea, escribe esta direccion manualmente en el telefono.</Text>
+            </View>
+            <PairingQrCode value={props.computerPairingUrl} />
+          </View>
         </View>
       ) : null}
 

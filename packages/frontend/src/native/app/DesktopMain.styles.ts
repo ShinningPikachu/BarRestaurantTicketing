@@ -324,5 +324,60 @@ export const desktopStyles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 8,
     fontSize: 16
+  },
+  pairingPanel: {
+    flex: 1,
+    minHeight: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    padding: 16,
+    justifyContent: 'center'
+  },
+  pairingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 32,
+    flexWrap: 'wrap'
+  },
+  pairingTextBlock: {
+    maxWidth: 460,
+    minWidth: 280,
+    flexShrink: 1
+  },
+  pairingAddress: {
+    color: colors.text,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 18,
+    fontWeight: '700',
+    marginVertical: 12
+  },
+  pairingQr: {
+    width: 340,
+    height: 340,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  pairingQrRow: {
+    flex: 1,
+    flexDirection: 'row'
+  },
+  pairingQrCell: {
+    flex: 1
+  },
+  pairingQrCellDark: {
+    backgroundColor: '#000000'
+  },
+  pairingQrCellLight: {
+    backgroundColor: '#FFFFFF'
   }
 });

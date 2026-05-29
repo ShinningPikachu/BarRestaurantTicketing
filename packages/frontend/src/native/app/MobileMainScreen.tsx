@@ -9,6 +9,7 @@ const screenTitles: Record<AppSection, string> = {
   pos: 'Venta',
   history: 'Tickets',
   products: 'Productos',
+  'mobile-connect': 'Conectar movil',
 };
 
 const screenSubtitles: Record<AppSection, string> = {
@@ -16,6 +17,7 @@ const screenSubtitles: Record<AppSection, string> = {
   pos: 'Mesas, pedidos y cobro',
   history: 'Copias, PDF y resumen de caja',
   products: 'Menu, precios e imagenes',
+  'mobile-connect': 'Emparejar telefono',
 };
 
 function MobileHeader(props: MainScreenProps): React.JSX.Element {
