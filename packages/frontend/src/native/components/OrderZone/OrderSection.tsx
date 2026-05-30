@@ -40,10 +40,8 @@ interface ConfirmedItemRow {
 const PRICE_ADJUSTMENTS = [
   { label: '+0.10', deltaCents: 10 },
   { label: '+0.50', deltaCents: 50 },
-  { label: '+1.00', deltaCents: 100 },
   { label: '-0.10', deltaCents: -10 },
-  { label: '-0.50', deltaCents: -50 },
-  { label: '-1.00', deltaCents: -100 }
+  { label: '-0.50', deltaCents: -50 }
 ];
 
 export function OrderSection({
@@ -210,111 +208,123 @@ export function OrderSection({
     <View style={styles.orderSection}>
       <Text style={styles.sectionTitle}>{`Cuenta mesa ${tableZoneLabel(selectedTable.zone)}-${selectedTable.number}`}</Text>
 
-      <Text style={styles.subTitle}>Prepedido</Text>
-      <FlatList
-        data={preorderItems}
-        style={styles.preorderList}
-        keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={<Text style={styles.emptyText}>No hay artículos en el prepedido.</Text>}
-        renderItem={({ item }) => {
-          const title = getItemDisplayName({
-            name: item.menuItemId ? getMenuTitleById(menuByCategory, item.menuItemId) : item.name,
-            primaryName: item.primaryName,
-            secondaryName: item.secondaryName,
-          });
-          return (
-            <View style={[styles.preorderRow, styles.preorderEditableRow]}>
-              <View style={styles.preorderMainRow}>
-                <View style={styles.flex1}>
-                  <Text style={styles.itemName}>{title.primary}</Text>
-                  {title.secondary ? <Text style={styles.itemPrice}>{title.secondary}</Text> : null}
-                  <Text style={styles.itemPrice}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
+      <View style={styles.orderProductsColumns}>
+        <View style={styles.orderProductsColumn}>
+          <View style={styles.orderColumnHeader}>
+            <Text style={styles.subTitle}>Prepedido</Text>
+            <Text style={styles.orderColumnCount}>{String(preorderItems.length)}</Text>
+          </View>
+
+          <FlatList
+            data={preorderItems}
+            style={styles.orderColumnList}
+            contentContainerStyle={styles.orderColumnListContent}
+            keyExtractor={(item) => String(item.id)}
+            ListEmptyComponent={<Text style={styles.emptyText}>No hay artículos en el prepedido.</Text>}
+            renderItem={({ item }) => {
+              const title = getItemDisplayName({
+                name: item.menuItemId ? getMenuTitleById(menuByCategory, item.menuItemId) : item.name,
+                primaryName: item.primaryName,
+                secondaryName: item.secondaryName,
+              });
+              return (
+                <View style={[styles.preorderRow, styles.preorderEditableRow]}>
+                  <View style={styles.preorderMainRow}>
+                    <View style={styles.flex1}>
+                      <Text style={styles.itemName}>{title.primary}</Text>
+                      {title.secondary ? <Text style={styles.itemPrice}>{title.secondary}</Text> : null}
+                      <Text style={styles.itemPrice}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
+                    </View>
+
+                    <View style={styles.qtyGroup}>
+                      <TouchableOpacity style={styles.qtyButton} onPress={() => onRemovePendingItem(item.id)}>
+                        <Text style={styles.qtyButtonText}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{item.qty}</Text>
+                      <TouchableOpacity style={styles.qtyButton} onPress={() => onAddPendingItem(item.id)}>
+                        <Text style={styles.qtyButtonText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <TextInput
+                      style={styles.priceInput}
+                      keyboardType="decimal-pad"
+                      value={priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
+                      selectTextOnFocus
+                      placeholder="0.00"
+                      onChangeText={(value) => onUpdatePriceDraft(item.id, value)}
+                      onBlur={() => onCommitPriceDraft(item.id)}
+                      onSubmitEditing={() => onCommitPriceDraft(item.id)}
+                    />
+                  </View>
+
+                  <View style={styles.priceQuickActions}>
+                    {PRICE_ADJUSTMENTS.map((adjustment) => (
+                      <TouchableOpacity
+                        key={adjustment.label}
+                        style={styles.priceQuickButton}
+                        onPress={() => onAdjustItemPrice(item.id, adjustment.deltaCents)}
+                      >
+                        <Text style={styles.priceQuickButtonText}>{adjustment.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
+              );
+            }}
+          />
 
-                <View style={styles.qtyGroup}>
-                  <TouchableOpacity style={styles.qtyButton} onPress={() => onRemovePendingItem(item.id)}>
-                    <Text style={styles.qtyButtonText}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.qtyText}>{item.qty}</Text>
-                  <TouchableOpacity style={styles.qtyButton} onPress={() => onAddPendingItem(item.id)}>
-                    <Text style={styles.qtyButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TextInput
-                  style={styles.priceInput}
-                  keyboardType="decimal-pad"
-                  value={priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
-                  selectTextOnFocus
-                  placeholder="0.00"
-                  onChangeText={(value) => onUpdatePriceDraft(item.id, value)}
-                  onBlur={() => onCommitPriceDraft(item.id)}
-                  onSubmitEditing={() => onCommitPriceDraft(item.id)}
-                />
-              </View>
-
-              <View style={styles.priceQuickActions}>
-                {PRICE_ADJUSTMENTS.map((adjustment) => (
-                  <TouchableOpacity
-                    key={adjustment.label}
-                    style={styles.priceQuickButton}
-                    onPress={() => onAdjustItemPrice(item.id, adjustment.deltaCents)}
-                  >
-                    <Text style={styles.priceQuickButtonText}>{adjustment.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          );
-        }}
-      />
-
-      <View style={styles.footerRow}>
-        <Text style={styles.totalText}>{`Por enviar: ${formatPrice(preorderTotal)}`}</Text>
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.primaryButton} onPress={onConfirmOrder}>
-            <Text style={styles.primaryButtonText}>Enviar a cocina</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={onClearPreOrder}>
-            <Text style={styles.secondaryButtonText}>Limpiar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.footerRow}>
-        <Text style={styles.subTitle}>Pedidos confirmados</Text>
-      </View>
-
-      <FlatList
-        data={confirmedItems}
-        style={styles.confirmedList}
-        contentContainerStyle={styles.confirmedListContent}
-        keyExtractor={(item) => item.key}
-        ListEmptyComponent={<Text style={styles.emptyText}>No hay pedidos confirmados.</Text>}
-        renderItem={({ item }) => {
-          const displayName = getItemDisplayName(item.item);
-          return (
-          <View style={[styles.preorderRow, styles.confirmedPreorderRow]}>
-            <View style={styles.flex1}>
-              <Text style={styles.itemName}>{displayName.primary}</Text>
-              {displayName.secondary ? <Text style={styles.itemPrice}>{displayName.secondary}</Text> : null}
-              <Text style={styles.itemPrice}>{formatPrice((item.item.unitPriceCents ?? 0) * item.item.qty)}</Text>
-            </View>
-
-            <Text style={styles.confirmedQtyText}>{`x${item.item.qty}`}</Text>
-
+          <View style={styles.orderColumnFooter}>
+            <Text style={styles.totalText}>{`Por enviar: ${formatPrice(preorderTotal)}`}</Text>
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.primaryButton} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)}>
-                <Text style={styles.primaryButtonText}>Editar</Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={onConfirmOrder}>
+                <Text style={styles.primaryButtonText}>Enviar a cocina</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => onRemoveOrder(item.orderId)}>
-                <Text style={styles.secondaryButtonText}>Eliminar</Text>
+              <TouchableOpacity style={styles.secondaryButton} onPress={onClearPreOrder}>
+                <Text style={styles.secondaryButtonText}>Limpiar</Text>
               </TouchableOpacity>
             </View>
           </View>
-          );
-        }}
-      />
+        </View>
+
+        <View style={[styles.orderProductsColumn, styles.confirmedOrderProductsColumn]}>
+          <View style={styles.orderColumnHeader}>
+            <Text style={styles.subTitle}>Pedidos confirmados</Text>
+            <Text style={styles.orderColumnCount}>{String(confirmedItems.length)}</Text>
+          </View>
+
+          <FlatList
+            data={confirmedItems}
+            style={styles.orderColumnList}
+            contentContainerStyle={styles.orderColumnListContent}
+            keyExtractor={(item) => item.key}
+            ListEmptyComponent={<Text style={styles.emptyText}>No hay pedidos confirmados.</Text>}
+            renderItem={({ item }) => {
+              const displayName = getItemDisplayName(item.item);
+              return (
+                <View style={[styles.preorderRow, styles.confirmedPreorderRow]}>
+                  <View style={styles.flex1}>
+                    <Text style={styles.itemName}>{displayName.primary}</Text>
+                    {displayName.secondary ? <Text style={styles.itemPrice}>{displayName.secondary}</Text> : null}
+                    <Text style={styles.itemPrice}>{formatPrice((item.item.unitPriceCents ?? 0) * item.item.qty)}</Text>
+                  </View>
+
+                  <Text style={styles.confirmedQtyText}>{`x${item.item.qty}`}</Text>
+
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)}>
+                      <Text style={styles.primaryButtonText}>Editar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={() => onRemoveOrder(item.orderId)}>
+                      <Text style={styles.secondaryButtonText}>Eliminar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        </View>
+      </View>
 
       <View style={styles.checkoutPanel}>
         <View style={styles.checkoutTotalField}>

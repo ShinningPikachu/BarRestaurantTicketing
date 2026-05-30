@@ -126,14 +126,14 @@ export const styles = StyleSheet.create({
   ticketColumn: {
     flex: 1.28,
     flexBasis: 0,
-    minWidth: 410
+    minWidth: 560
   },
   columns: {
     flex: 1,
     flexDirection: 'row',
     gap: 10,
     width: '100%',
-    minWidth: 1040
+    minWidth: 1190
   },
   column: {
     flex: 1,
@@ -1121,6 +1121,55 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 4,
     marginBottom: 4
+  },
+  orderProductsColumns: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+    gap: 10
+  },
+  orderProductsColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0
+  },
+  confirmedOrderProductsColumn: {
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    paddingLeft: 10
+  },
+  orderColumnHeader: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  orderColumnCount: {
+    minWidth: 30,
+    textAlign: 'center',
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '700',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.zoneMenu,
+    paddingHorizontal: 7,
+    paddingVertical: 3
+  },
+  orderColumnList: {
+    flex: 1,
+    minHeight: 0
+  },
+  orderColumnListContent: {
+    paddingBottom: 8
+  },
+  orderColumnFooter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+    marginTop: 6
   },
   preorderRow: {
     flexDirection: 'row',
