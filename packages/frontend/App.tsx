@@ -40,8 +40,8 @@ const PRODUCT_IMAGE_MAX_SIZE = 512;
 const PRODUCT_IMAGE_QUALITY = 0.82;
 const AUTH_TOKEN_STORAGE_KEY = 'bar-ticketing-auth-token';
 const API_BASE_URL_STORAGE_KEY = 'bar-ticketing-api-base-url';
-const DATA_SYNC_SIGNAL_INTERVAL_MS = 1200;
-const DATA_REFRESH_INTERVAL_MS = 8000;
+const DATA_SYNC_SIGNAL_INTERVAL_MS = 5000;
+const DATA_SYNC_MIN_REFRESH_INTERVAL_MS = 5000;
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
 
 interface ExpoLikeGlobal {
@@ -234,6 +234,9 @@ export default function App(): React.JSX.Element {
   const isRefreshingDataRef = useRef(false);
   const isCheckingSyncRevisionRef = useRef(false);
   const lastSyncRevisionRef = useRef<number | null>(null);
+  const lastOperationalSyncAtRef = useRef(0);
+  const pendingSyncRevisionRef = useRef<number | null>(null);
+  const syncRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { state, actions } = useTicketingController(authStatus === 'signedIn');
   const { width } = useWindowDimensions();
   const [activeSection, setActiveSection] = useState<AppSection>('home');
@@ -534,9 +537,9 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  async function refreshOperationalData(options: { showFeedback?: boolean; showError?: boolean } = {}): Promise<void> {
+  async function refreshOperationalData(options: { showFeedback?: boolean; showError?: boolean } = {}): Promise<boolean> {
     if (authStatus !== 'signedIn' || isRefreshingDataRef.current) {
-      return;
+      return false;
     }
 
     isRefreshingDataRef.current = true;
@@ -556,13 +559,17 @@ export default function App(): React.JSX.Element {
         await loadManagedProducts({ showError: options.showError });
       }
 
+      lastOperationalSyncAtRef.current = Date.now();
+
       if (options.showFeedback) {
         Alert.alert('Datos actualizados', 'Ordenador y móvil están sincronizados con el servidor.');
       }
+      return true;
     } catch {
       if (options.showError !== false) {
         Alert.alert('Error', 'No se pudieron actualizar los datos.');
       }
+      return false;
     } finally {
       isRefreshingDataRef.current = false;
       setIsRefreshingData(false);
@@ -1000,45 +1007,69 @@ export default function App(): React.JSX.Element {
 
   useEffect(() => {
     if (authStatus !== 'signedIn' || loading) {
-      return;
-    }
-
-    const refreshSilently = () => {
-      void refreshOperationalData({ showError: false });
-    };
-    const interval = setInterval(refreshSilently, DATA_REFRESH_INTERVAL_MS);
-    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
-        refreshSilently();
-      }
-    });
-
-    let visibilityHandler: (() => void) | null = null;
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      visibilityHandler = () => {
-        if (!document.hidden) {
-          refreshSilently();
-        }
-      };
-      document.addEventListener('visibilitychange', visibilityHandler);
-    }
-
-    return () => {
-      clearInterval(interval);
-      appStateSubscription.remove();
-      if (visibilityHandler) {
-        document.removeEventListener('visibilitychange', visibilityHandler);
-      }
-    };
-  }, [activeSection, authStatus, loading, selectedTable.number, selectedTable.zone]);
-
-  useEffect(() => {
-    if (authStatus !== 'signedIn' || loading) {
       lastSyncRevisionRef.current = null;
+      pendingSyncRevisionRef.current = null;
+      if (syncRefreshTimeoutRef.current) {
+        clearTimeout(syncRefreshTimeoutRef.current);
+        syncRefreshTimeoutRef.current = null;
+      }
       return;
     }
 
     let active = true;
+
+    const clearScheduledSyncRefresh = () => {
+      if (syncRefreshTimeoutRef.current) {
+        clearTimeout(syncRefreshTimeoutRef.current);
+        syncRefreshTimeoutRef.current = null;
+      }
+    };
+
+    const scheduleSyncRefresh = (revision: number, delayOverride?: number) => {
+      pendingSyncRevisionRef.current = revision;
+      if (syncRefreshTimeoutRef.current) {
+        return;
+      }
+
+      const elapsedSinceLastSync = Date.now() - lastOperationalSyncAtRef.current;
+      const delay = delayOverride ?? Math.max(0, DATA_SYNC_MIN_REFRESH_INTERVAL_MS - elapsedSinceLastSync);
+      syncRefreshTimeoutRef.current = setTimeout(() => {
+        syncRefreshTimeoutRef.current = null;
+        const pendingRevision = pendingSyncRevisionRef.current;
+        if (pendingRevision !== null) {
+          void synchronizeChangedRevision(pendingRevision);
+        }
+      }, delay);
+    };
+
+    async function synchronizeChangedRevision(revision: number): Promise<void> {
+      if (!active) {
+        return;
+      }
+
+      if (isRefreshingDataRef.current) {
+        scheduleSyncRefresh(revision, 250);
+        return;
+      }
+
+      const elapsedSinceLastSync = Date.now() - lastOperationalSyncAtRef.current;
+      if (elapsedSinceLastSync < DATA_SYNC_MIN_REFRESH_INTERVAL_MS) {
+        scheduleSyncRefresh(revision);
+        return;
+      }
+
+      pendingSyncRevisionRef.current = null;
+      const refreshed = await refreshOperationalData({ showError: false });
+      if (!active) {
+        return;
+      }
+
+      if (refreshed) {
+        lastSyncRevisionRef.current = revision;
+      } else {
+        scheduleSyncRefresh(revision, DATA_SYNC_SIGNAL_INTERVAL_MS);
+      }
+    }
 
     const checkSyncRevision = async () => {
       if (!active || isCheckingSyncRevisionRef.current || isRefreshingDataRef.current) {
@@ -1052,12 +1083,12 @@ export default function App(): React.JSX.Element {
 
         if (previousRevision === null) {
           lastSyncRevisionRef.current = syncRevision.revision;
+          lastOperationalSyncAtRef.current = Date.now();
           return;
         }
 
         if (syncRevision.revision !== previousRevision) {
-          await refreshOperationalData({ showError: false });
-          lastSyncRevisionRef.current = syncRevision.revision;
+          await synchronizeChangedRevision(syncRevision.revision);
         }
       } catch {
         // The regular refresh path handles visible connection errors.
@@ -1068,10 +1099,30 @@ export default function App(): React.JSX.Element {
 
     void checkSyncRevision();
     const interval = setInterval(checkSyncRevision, DATA_SYNC_SIGNAL_INTERVAL_MS);
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void checkSyncRevision();
+      }
+    });
+
+    let visibilityHandler: (() => void) | null = null;
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      visibilityHandler = () => {
+        if (!document.hidden) {
+          void checkSyncRevision();
+        }
+      };
+      document.addEventListener('visibilitychange', visibilityHandler);
+    }
 
     return () => {
       active = false;
+      clearScheduledSyncRefresh();
       clearInterval(interval);
+      appStateSubscription.remove();
+      if (visibilityHandler) {
+        document.removeEventListener('visibilitychange', visibilityHandler);
+      }
     };
   }, [activeSection, authStatus, loading, selectedTable.number, selectedTable.zone]);
 

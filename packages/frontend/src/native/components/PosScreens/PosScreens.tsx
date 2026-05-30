@@ -432,8 +432,6 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
       confirmedOrders: buildAaOrders(),
       ticketNote: 'AA - consumo individual',
     });
-    setIsAaModalVisible(false);
-    setAaQtyByKey({});
   }
 
   function buildAaPaymentItems(): Array<{ orderId: string; itemId: number; qty: number }> | null {

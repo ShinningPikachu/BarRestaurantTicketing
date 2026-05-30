@@ -143,8 +143,6 @@ export function OrderSection({
       confirmedOrders: buildAaOrders(),
       ticketNote: 'AA - consumo individual',
     });
-    setIsAaModalVisible(false);
-    setAaQtyByKey({});
   }
 
   function handlePrintDividedTicket(): void {
