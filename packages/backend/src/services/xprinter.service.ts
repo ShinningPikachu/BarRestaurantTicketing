@@ -13,6 +13,10 @@ interface TicketLine {
 }
 
 const RECEIPT_WIDTH = 48;
+const ITEM_QTY_WIDTH = 4;
+const ITEM_UNIT_PRICE_WIDTH = 10;
+const ITEM_TOTAL_WIDTH = 12;
+const ITEM_NAME_WIDTH = RECEIPT_WIDTH - ITEM_QTY_WIDTH - ITEM_UNIT_PRICE_WIDTH - ITEM_TOTAL_WIDTH;
 
 function getLineDisplayName(item: Pick<TicketLine, 'name' | 'primaryName' | 'secondaryName'>): { primary: string; secondary: string | null } {
   const cleanDisplayName = (value: string | null | undefined) => {
@@ -80,6 +84,20 @@ function line(left: string, right = '', width = RECEIPT_WIDTH): string {
   return `${cleanLeft.slice(0, width - cleanRight.length - 1)}${' '.repeat(space)}${cleanRight}`;
 }
 
+function receiptColumn(value: string, width: number, align: 'left' | 'right' = 'left'): string {
+  const clean = normalizeReceiptText(value).slice(0, width);
+  return align === 'right' ? clean.padStart(width, ' ') : clean.padEnd(width, ' ');
+}
+
+function itemLine(qty: string, name: string, unitPrice: string, totalPrice: string): string {
+  return [
+    receiptColumn(qty, ITEM_QTY_WIDTH),
+    receiptColumn(name, ITEM_NAME_WIDTH),
+    receiptColumn(unitPrice, ITEM_UNIT_PRICE_WIDTH, 'right'),
+    receiptColumn(totalPrice, ITEM_TOTAL_WIDTH, 'right'),
+  ].join('');
+}
+
 function wrap(value: string, width = RECEIPT_WIDTH): string[] {
   const words = normalizeReceiptText(value).split(/\s+/).filter(Boolean);
   const rows: string[] = [];
@@ -145,25 +163,23 @@ function buildEscPosTicket(payload: XprinterTicketPayload): Buffer {
   push(line('MESA', payload.tableLabel));
   if (payload.ticketNote) push(line('Modalidad', payload.ticketNote));
   push('-'.repeat(RECEIPT_WIDTH));
-  push(line('UD  PRODUCTO', 'TOTAL'));
+  push(itemLine('UD', 'PRODUCTO', 'PRECIO', 'TOTAL'));
   push('-'.repeat(RECEIPT_WIDTH));
 
   for (const item of payload.lines) {
-    const prefix = `${item.qty}x `;
     const displayName = getLineDisplayName(item);
-    const nameRows = wrap(displayName.primary, 32);
+    const nameRows = wrap(displayName.primary, ITEM_NAME_WIDTH);
     push([0x1b, 0x45, 0x01]);
-    push(line(`${prefix}${nameRows[0]}`, money(item.totalPriceCents)));
+    push(itemLine(`${item.qty}x`, nameRows[0], money(item.unitPriceCents), money(item.totalPriceCents)));
     push([0x1b, 0x45, 0x00]);
     for (const extraRow of nameRows.slice(1)) {
-      push(`   ${extraRow}`);
+      push(itemLine('', extraRow, '', ''));
     }
     if (displayName.secondary) {
-      for (const secondaryRow of wrap(displayName.secondary, 34)) {
-        push(`   ${secondaryRow}`);
+      for (const secondaryRow of wrap(displayName.secondary, ITEM_NAME_WIDTH)) {
+        push(itemLine('', secondaryRow, '', ''));
       }
     }
-    push(line('   Precio ud.', money(item.unitPriceCents)));
   }
 
   push('='.repeat(RECEIPT_WIDTH));

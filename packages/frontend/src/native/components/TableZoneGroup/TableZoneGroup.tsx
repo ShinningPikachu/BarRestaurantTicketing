@@ -24,11 +24,11 @@ interface DraggableTableProps {
   formatPrice: (cents: number) => string;
 }
 
-const DESKTOP_TABLE_WIDTH = 86;
-const DESKTOP_TABLE_HEIGHT = 64;
+const DESKTOP_TABLE_WIDTH = 90;
+const DESKTOP_TABLE_HEIGHT = 68;
 const DESKTOP_BOARD_VISIBLE_HEIGHT = 176;
-const MOBILE_TABLE_WIDTH = 78;
-const MOBILE_TABLE_HEIGHT = 58;
+const MOBILE_TABLE_WIDTH = 82;
+const MOBILE_TABLE_HEIGHT = 62;
 const MOBILE_BOARD_VISIBLE_HEIGHT = 190;
 const BOARD_PADDING = 12;
 const DESKTOP_TABLE_GAP = 7;
