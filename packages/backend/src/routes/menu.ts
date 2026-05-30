@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { menuService } from '../services/menu.service';
+import { signalDataChange } from '../services/sync.service.js';
 import { errorResponse, successResponse } from '../types/api';
 import { validateBody, validateParams } from '../middleware/validation';
 import { logger } from '../utils/logger.js';
@@ -107,6 +108,7 @@ router.post(
     try {
       const items = parseMenuImportCsv(req.body.csv);
       const result = await menuService.importMenuItems(items);
+      signalDataChange('menu');
       res.json(successResponse(result));
     } catch (error) {
       logger.error({ error }, 'Failed to import menu CSV');
@@ -121,6 +123,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const item = await menuService.createMenuItem(req.body);
+      signalDataChange('menu');
       res.status(201).json(successResponse(item));
     } catch (error) {
       logger.error({ error }, 'Failed to create menu item');
@@ -136,6 +139,7 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const item = await menuService.updateMenuItem(Number(req.params.id), req.body);
+      signalDataChange('menu');
       res.json(successResponse(item));
     } catch (error) {
       logger.error({ error }, 'Failed to update menu item');
@@ -150,6 +154,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await menuService.deleteMenuItem(Number(req.params.id));
+      signalDataChange('menu');
       res.json(successResponse({ ok: true }));
     } catch (error) {
       logger.error({ error }, 'Failed to delete menu item');

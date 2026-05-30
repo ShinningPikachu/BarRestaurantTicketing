@@ -2,6 +2,12 @@ import { Platform } from 'react-native';
 import type { BackendTable, MenuItem, Order, PaidTicket, PaymentMethod, PaymentResult, SessionSummary, TableWorkflow } from '../types';
 import { logger } from '../utils/logger';
 
+export interface SyncRevision {
+  revision: number;
+  changedAt: string;
+  scope: 'menu' | 'orders' | 'tables' | null;
+}
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -334,6 +340,11 @@ export class ApiService {
   async fetchSessionSummary(): Promise<SessionSummary> {
     const response = await this.request('/tickets/summary/session');
     return parseOrThrow<SessionSummary>(response, 'Failed to fetch session summary');
+  }
+
+  async fetchSyncRevision(): Promise<SyncRevision> {
+    const response = await this.request('/sync/revision');
+    return parseOrThrow<SyncRevision>(response, 'Failed to fetch sync revision');
   }
 
   async printXprinterTicket(payload: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -7,6 +7,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import {
   Alert,
+  AppState,
   BackHandler,
   Modal,
   Platform,
@@ -39,6 +40,8 @@ const PRODUCT_IMAGE_MAX_SIZE = 512;
 const PRODUCT_IMAGE_QUALITY = 0.82;
 const AUTH_TOKEN_STORAGE_KEY = 'bar-ticketing-auth-token';
 const API_BASE_URL_STORAGE_KEY = 'bar-ticketing-api-base-url';
+const DATA_SYNC_SIGNAL_INTERVAL_MS = 1200;
+const DATA_REFRESH_INTERVAL_MS = 8000;
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
 
 interface ExpoLikeGlobal {
@@ -227,6 +230,10 @@ export default function App(): React.JSX.Element {
   const [isPairingScannerVisible, setIsPairingScannerVisible] = useState(false);
   const [isSavingConnection, setIsSavingConnection] = useState(false);
   const [isHandlingPairScan, setIsHandlingPairScan] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const isRefreshingDataRef = useRef(false);
+  const isCheckingSyncRevisionRef = useRef(false);
+  const lastSyncRevisionRef = useRef<number | null>(null);
   const { state, actions } = useTicketingController(authStatus === 'signedIn');
   const { width } = useWindowDimensions();
   const [activeSection, setActiveSection] = useState<AppSection>('home');
@@ -453,15 +460,17 @@ export default function App(): React.JSX.Element {
     return () => subscription.remove();
   }, [activeSection, authStatus, sectionHistory]);
 
-  async function loadTicketHistory(): Promise<void> {
+  async function loadTicketHistory(options: { showError?: boolean } = {}): Promise<void> {
     try {
       setPaidTickets(await apiService.fetchPaidTickets());
     } catch {
-      Alert.alert('Error', 'No se pudo cargar el historial de tickets.');
+      if (options.showError !== false) {
+        Alert.alert('Error', 'No se pudo cargar el historial de tickets.');
+      }
     }
   }
 
-  async function refreshSessionSummary(showFeedback = false): Promise<void> {
+  async function refreshSessionSummary(showFeedback = false, options: { showError?: boolean } = {}): Promise<void> {
     try {
       const summary = await apiService.fetchSessionSummary();
       setSessionSummary(summary);
@@ -474,7 +483,9 @@ export default function App(): React.JSX.Element {
         );
       }
     } catch {
-      Alert.alert('Error', 'No se pudo cargar el resumen de sesión.');
+      if (options.showError !== false) {
+        Alert.alert('Error', 'No se pudo cargar el resumen de sesión.');
+      }
     }
   }
 
@@ -513,11 +524,48 @@ export default function App(): React.JSX.Element {
     setAuthStatus('signedOut');
   }
 
-  async function loadManagedProducts(): Promise<void> {
+  async function loadManagedProducts(options: { showError?: boolean } = {}): Promise<void> {
     try {
       setManagedMenuItems(await apiService.fetchManageMenu());
     } catch {
-      Alert.alert('Error', 'No se pudo cargar la gestión de productos.');
+      if (options.showError !== false) {
+        Alert.alert('Error', 'No se pudo cargar la gestión de productos.');
+      }
+    }
+  }
+
+  async function refreshOperationalData(options: { showFeedback?: boolean; showError?: boolean } = {}): Promise<void> {
+    if (authStatus !== 'signedIn' || isRefreshingDataRef.current) {
+      return;
+    }
+
+    isRefreshingDataRef.current = true;
+    setIsRefreshingData(true);
+
+    try {
+      await actions.refreshData();
+
+      if (activeSection === 'history') {
+        await Promise.all([
+          loadTicketHistory({ showError: options.showError }),
+          refreshSessionSummary(false, { showError: options.showError }),
+        ]);
+      }
+
+      if (activeSection === 'products') {
+        await loadManagedProducts({ showError: options.showError });
+      }
+
+      if (options.showFeedback) {
+        Alert.alert('Datos actualizados', 'Ordenador y móvil están sincronizados con el servidor.');
+      }
+    } catch {
+      if (options.showError !== false) {
+        Alert.alert('Error', 'No se pudieron actualizar los datos.');
+      }
+    } finally {
+      isRefreshingDataRef.current = false;
+      setIsRefreshingData(false);
     }
   }
 
@@ -934,6 +982,8 @@ export default function App(): React.JSX.Element {
     onAddMenuItem: (menuId: number) => {
       void actions.addMenuItem(menuId);
     },
+    onRefreshData: () => void refreshOperationalData({ showFeedback: true }),
+    isRefreshingData,
     onExit: goBack,
     formatPrice: centsToCurrency,
   };
@@ -947,6 +997,83 @@ export default function App(): React.JSX.Element {
       void loadManagedProducts();
     }
   }, [activeSection]);
+
+  useEffect(() => {
+    if (authStatus !== 'signedIn' || loading) {
+      return;
+    }
+
+    const refreshSilently = () => {
+      void refreshOperationalData({ showError: false });
+    };
+    const interval = setInterval(refreshSilently, DATA_REFRESH_INTERVAL_MS);
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        refreshSilently();
+      }
+    });
+
+    let visibilityHandler: (() => void) | null = null;
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      visibilityHandler = () => {
+        if (!document.hidden) {
+          refreshSilently();
+        }
+      };
+      document.addEventListener('visibilitychange', visibilityHandler);
+    }
+
+    return () => {
+      clearInterval(interval);
+      appStateSubscription.remove();
+      if (visibilityHandler) {
+        document.removeEventListener('visibilitychange', visibilityHandler);
+      }
+    };
+  }, [activeSection, authStatus, loading, selectedTable.number, selectedTable.zone]);
+
+  useEffect(() => {
+    if (authStatus !== 'signedIn' || loading) {
+      lastSyncRevisionRef.current = null;
+      return;
+    }
+
+    let active = true;
+
+    const checkSyncRevision = async () => {
+      if (!active || isCheckingSyncRevisionRef.current || isRefreshingDataRef.current) {
+        return;
+      }
+
+      isCheckingSyncRevisionRef.current = true;
+      try {
+        const syncRevision = await apiService.fetchSyncRevision();
+        const previousRevision = lastSyncRevisionRef.current;
+
+        if (previousRevision === null) {
+          lastSyncRevisionRef.current = syncRevision.revision;
+          return;
+        }
+
+        if (syncRevision.revision !== previousRevision) {
+          await refreshOperationalData({ showError: false });
+          lastSyncRevisionRef.current = syncRevision.revision;
+        }
+      } catch {
+        // The regular refresh path handles visible connection errors.
+      } finally {
+        isCheckingSyncRevisionRef.current = false;
+      }
+    };
+
+    void checkSyncRevision();
+    const interval = setInterval(checkSyncRevision, DATA_SYNC_SIGNAL_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeSection, authStatus, loading, selectedTable.number, selectedTable.zone]);
 
   const connectionModal = (
     <Modal
@@ -1066,6 +1193,8 @@ export default function App(): React.JSX.Element {
     goHome,
     onConfigureConnection: openConnectionSetup,
     onLogout: () => void handleLogout(),
+    onRefreshData: () => void refreshOperationalData({ showFeedback: true }),
+    isRefreshingData,
     computerPairingUrl: getApiBaseUrl(),
     posScreenProps,
     sessionSummary,

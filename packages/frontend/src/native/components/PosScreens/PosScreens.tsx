@@ -7,6 +7,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -57,6 +58,8 @@ export interface PosScreenProps {
   onAddTable: (zone: TableZone) => void;
   onRemoveTable: (table: TableId) => void;
   onAddMenuItem: (menuId: number) => void;
+  onRefreshData?: () => void;
+  isRefreshingData?: boolean;
   onExit?: () => void;
   formatPrice: (cents: number) => string;
 }
@@ -755,6 +758,9 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
   const [pageWidth, setPageWidth] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
   const currentTableTotal = props.orderSectionProps.currentTableTotal;
+  const refreshControl = props.onRefreshData ? (
+    <RefreshControl refreshing={props.isRefreshingData ?? false} onRefresh={props.onRefreshData} />
+  ) : undefined;
 
   function goToView(view: MobileTpvView, animated = true): void {
     setActiveView(view);
@@ -856,7 +862,7 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
         >
           <View style={[styles.mobilePagerPage, pageWidth > 0 ? { width: pageWidth } : null]}>
             <View style={styles.mobileSinglePanel}>
-              <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
                 <TableSelector
                   layout="mobile"
                   tables={props.tables}
@@ -877,7 +883,7 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
                 <MobileCartaPreorderSidebar orderProps={props.orderSectionProps} />
                 <View style={styles.mobileCartaMenuPane}>
                   <Text style={styles.mobileGuidanceText}>Toca varios productos y abre la cuenta cuando hayas terminado.</Text>
-                  <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false}>
+                  <ScrollView style={styles.mobilePanelScroll} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
                     <MenuSelector
                       layout="mobile"
                       menuCategories={props.menuCategories}

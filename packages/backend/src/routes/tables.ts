@@ -2,6 +2,7 @@ import { Request, Response, Router, NextFunction } from 'express';
 import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service';
 import { validateParams, validateBody } from '../middleware/validation';
+import { signalDataChange } from '../services/sync.service.js';
 import { successResponse } from '../types/api';
 import { logger } from '../utils/logger.js';
 
@@ -52,6 +53,7 @@ router.post(
       logger.info({ zone }, 'Creating new table in zone');
 
       const table = await workflowService.addTable(zone);
+      signalDataChange('tables');
       res.status(201).json(successResponse(table));
     } catch (error) {
       logger.error({ error }, 'Failed to create table');
@@ -71,6 +73,7 @@ router.delete(
       logger.info({ zone, number }, 'Deleting table');
 
       await workflowService.deleteTable(number, zone);
+      signalDataChange('tables');
       res.json(successResponse({ ok: true }));
     } catch (error) {
       logger.error({ error }, 'Failed to delete table');
@@ -111,6 +114,7 @@ router.post(
 
       await workflowService.addPreOrderMenuItem(number, zone, menuItemId);
       const workflow = await workflowService.getTableWorkflow(number, zone);
+      signalDataChange('orders');
       res.json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to add pre-order item');
@@ -134,6 +138,7 @@ router.patch(
 
       await workflowService.updatePreOrderItem(number, zone, itemId, { qty, unitPriceCents });
       const workflow = await workflowService.getTableWorkflow(number, zone);
+      signalDataChange('orders');
       res.json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to update pre-order item');
@@ -154,6 +159,7 @@ router.post(
 
       await workflowService.clearPreOrder(number, zone);
       const workflow = await workflowService.getTableWorkflow(number, zone);
+      signalDataChange('orders');
       res.json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to clear pre-order');
@@ -174,6 +180,7 @@ router.post(
 
       await workflowService.sendToKitchen(number, zone);
       const workflow = await workflowService.getTableWorkflow(number, zone);
+      signalDataChange('orders');
       res.json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to send to kitchen');

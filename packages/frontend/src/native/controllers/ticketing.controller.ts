@@ -222,6 +222,14 @@ export function useTicketingController(enabled = true) {
     }
   }
 
+  async function refreshData(): Promise<void> {
+    const refreshedTable = await tableController.actions.refreshTables();
+    await Promise.all([
+      menuController.actions.loadMenu({ showError: false }),
+      workflowController.actions.refreshWorkflow(refreshedTable),
+    ]);
+  }
+
   return {
     controllers: {
       menu: menuController,
@@ -256,6 +264,7 @@ export function useTicketingController(enabled = true) {
       printTicket,
       payTable,
       paySelectedItems,
+      refreshData,
       reloadMenu: menuController.actions.loadMenu,
       removeOrder,
       moveConfirmedItemToPreOrder: workflowController.actions.moveConfirmedItemToPreOrder,

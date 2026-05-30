@@ -12,6 +12,8 @@ export interface MainScreenProps {
   goHome: () => void;
   onConfigureConnection: () => void;
   onLogout: () => void;
+  onRefreshData: () => void;
+  isRefreshingData: boolean;
   computerPairingUrl: string;
   posScreenProps: PosScreenProps;
   sessionSummary: SessionSummary | null;

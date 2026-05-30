@@ -57,6 +57,9 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
               <Text style={styles.secondaryButtonText}>Inicio</Text>
             </TouchableOpacity>
           ) : null}
+          <TouchableOpacity style={styles.headerButton} onPress={props.onRefreshData} disabled={props.isRefreshingData}>
+            <Text style={styles.secondaryButtonText}>{props.isRefreshingData ? 'Actualizando...' : 'Actualizar'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={props.onLogout}>
             <Text style={styles.secondaryButtonText}>Salir</Text>
           </TouchableOpacity>

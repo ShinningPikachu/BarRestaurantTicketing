@@ -131,6 +131,19 @@ export function useTableController() {
     return initialTable;
   }
 
+  async function refreshTables(): Promise<SelectedTable> {
+    const loadedTablesRaw = await apiService.fetchTables();
+    const loadedTables = mapTablesByZone(loadedTablesRaw);
+    const selectedStillExists = loadedTables.get(selectedTable.zone)?.includes(selectedTable.number) ?? false;
+    const nextSelectedTable = selectedStillExists ? selectedTable : getInitialTable(loadedTables);
+
+    setTables(loadedTables);
+    setTableTotals(mapTableTotals(loadedTablesRaw));
+    setSelectedTable(nextSelectedTable);
+
+    return nextSelectedTable;
+  }
+
   async function selectTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
     try {
       await onSelected(table);
@@ -227,6 +240,7 @@ export function useTableController() {
     },
     actions: {
       loadTables,
+      refreshTables,
       selectTable,
       addTable,
       removeTable,

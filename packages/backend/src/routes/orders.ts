@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service';
 import { validateBody, validateParams } from '../middleware/validation';
+import { signalDataChange } from '../services/sync.service.js';
 import { successResponse } from '../types/api';
 import { logger } from '../utils/logger.js';
 
@@ -64,6 +65,7 @@ router.post(
 
       await workflowService.sendToKitchen(tableNumber, tableZone);
       const workflow = await workflowService.getTableWorkflow(tableNumber, tableZone);
+      signalDataChange('orders');
       res.status(201).json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to send order to kitchen');
@@ -82,6 +84,7 @@ router.post(
 
       const result = await workflowService.payTable(tableNumber, tableZone, method, splitPeople);
       const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
+      signalDataChange('orders');
       res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
     } catch (error) {
       logger.error({ error }, 'Failed to pay table ticket');
@@ -100,6 +103,7 @@ router.post(
 
       const result = await workflowService.paySelectedItems(tableNumber, tableZone, method, items);
       const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
+      signalDataChange('orders');
       res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
     } catch (error) {
       logger.error({ error }, 'Failed to pay selected ticket items');
@@ -113,6 +117,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { id } = req.params;
     logger.info({ orderId: id }, 'Deleting order');
     await workflowService.deleteOrder(id);
+    signalDataChange('orders');
     res.json(successResponse({ ok: true }));
   } catch (error) {
     logger.error({ error }, 'Failed to delete order');
@@ -132,6 +137,7 @@ router.post(
 
       const targetTable = await workflowService.moveConfirmedOrderItemToPreOrder(id, parsedItemId);
       const workflow = await workflowService.getTableWorkflow(targetTable.tableNumber, targetTable.tableZone);
+      signalDataChange('orders');
       res.json(successResponse(workflow));
     } catch (error) {
       logger.error({ error }, 'Failed to move item to pre-order');

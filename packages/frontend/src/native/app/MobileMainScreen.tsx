@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Platform, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MobilePosScreen } from '../components';
 import { AppSection, MainScreenProps } from './MainScreen.types';
 import { mobileStyles as styles } from './MobileMain.styles';
@@ -33,6 +33,9 @@ function MobileHeader(props: MainScreenProps): React.JSX.Element {
             <Text style={styles.secondaryButtonText}>Conectar</Text>
           </TouchableOpacity>
         ) : null}
+        <TouchableOpacity style={styles.headerButton} onPress={props.onRefreshData} disabled={props.isRefreshingData}>
+          <Text style={styles.secondaryButtonText}>{props.isRefreshingData ? '...' : 'Actualizar'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.headerButton} onPress={props.onLogout}>
           <Text style={styles.secondaryButtonText}>Salir</Text>
         </TouchableOpacity>
@@ -96,6 +99,8 @@ function MobileHomeScreen(props: MainScreenProps): React.JSX.Element {
 }
 
 function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
+  const refreshControl = <RefreshControl refreshing={props.isRefreshingData} onRefresh={props.onRefreshData} />;
+
   return (
     <View style={styles.fullPanel}>
       {props.sessionSummary ? (
@@ -159,7 +164,7 @@ function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.columnScroll} contentContainerStyle={styles.listContent}>
+      <ScrollView style={styles.columnScroll} contentContainerStyle={styles.listContent} refreshControl={refreshControl}>
         {props.filteredPaidTickets.map((ticket) => (
           <View key={ticket.id} style={styles.historyRow}>
             <View style={styles.historyCardHeader}>
@@ -190,9 +195,11 @@ function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
 }
 
 function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
+  const refreshControl = <RefreshControl refreshing={props.isRefreshingData} onRefresh={props.onRefreshData} />;
+
   return (
     <View style={styles.fullPanel}>
-      <ScrollView style={styles.columnScroll} contentContainerStyle={styles.productsContent} showsVerticalScrollIndicator>
+      <ScrollView style={styles.columnScroll} contentContainerStyle={styles.productsContent} showsVerticalScrollIndicator refreshControl={refreshControl}>
         <View style={styles.productForm}>
           <View style={styles.productFormHeader}>
             <Text style={styles.subTitle}>Nuevo producto</Text>
