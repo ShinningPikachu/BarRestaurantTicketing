@@ -69,21 +69,21 @@ export const styles = StyleSheet.create({
   tableNodeText: {
     color: colors.text,
     fontWeight: '700',
-    fontSize: 18,
+    fontSize: 16,
     userSelect: 'none'
   },
   mobileTableNodeText: {
-    fontSize: 17
+    fontSize: 15
   },
   tableAmountText: {
     color: colors.textTertiary,
     fontWeight: '700',
-    fontSize: 12,
-    marginTop: 3,
+    fontSize: 11,
+    marginTop: 2,
     userSelect: 'none'
   },
   mobileTableAmountText: {
-    fontSize: 11
+    fontSize: 10
   },
   tableNodeTextSelected: {
     color: colors.textLight
@@ -102,6 +102,22 @@ export const styles = StyleSheet.create({
     color: colors.buttonSecondaryText,
     fontWeight: '700',
     fontSize: 14
+  },
+  resetPositionsButton: {
+    width: '100%',
+    paddingVertical: 8,
+    minHeight: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    marginTop: 7
+  },
+  resetPositionsButtonText: {
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 13
   },
   removeSelectedButton: {
     width: '100%',

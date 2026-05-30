@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Animated, PanResponder, PanResponderGestureState, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { TableId, TableZone, tableKey, tableZoneLabel } from '../../types';
 import { styles } from './TableZoneGroup.styles';
@@ -23,18 +24,73 @@ interface DraggableTableProps {
   formatPrice: (cents: number) => string;
 }
 
-const DESKTOP_TABLE_WIDTH = 94;
-const DESKTOP_TABLE_HEIGHT = 72;
+const DESKTOP_TABLE_WIDTH = 86;
+const DESKTOP_TABLE_HEIGHT = 64;
 const DESKTOP_BOARD_VISIBLE_HEIGHT = 176;
-const MOBILE_TABLE_WIDTH = 86;
-const MOBILE_TABLE_HEIGHT = 66;
+const MOBILE_TABLE_WIDTH = 78;
+const MOBILE_TABLE_HEIGHT = 58;
 const MOBILE_BOARD_VISIBLE_HEIGHT = 190;
 const BOARD_PADDING = 12;
-const DESKTOP_TABLE_GAP = 8;
-const MOBILE_TABLE_GAP = 8;
+const DESKTOP_TABLE_GAP = 7;
+const MOBILE_TABLE_GAP = 7;
+const TABLE_POSITIONS_STORAGE_KEY_PREFIX = 'bar-ticketing-table-positions-v1';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function getStorageKey(layout: 'desktop' | 'mobile', zone: TableZone): string {
+  return `${TABLE_POSITIONS_STORAGE_KEY_PREFIX}:${layout}:${zone}`;
+}
+
+function isTablePosition(value: unknown): value is TablePosition {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const position = value as Partial<TablePosition>;
+  return typeof position.x === 'number'
+    && Number.isFinite(position.x)
+    && typeof position.y === 'number'
+    && Number.isFinite(position.y);
+}
+
+function parseStoredPositions(value: string | null): Record<string, TablePosition> {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.entries(parsed).reduce<Record<string, TablePosition>>((positions, [key, position]) => {
+      if (isTablePosition(position)) {
+        positions[key] = position;
+      }
+      return positions;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
+function areTablePositionsEqual(left: Record<string, TablePosition>, right: Record<string, TablePosition>): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => {
+    const leftPosition = left[key];
+    const rightPosition = right[key];
+    return rightPosition !== undefined
+      && leftPosition.x === rightPosition.x
+      && leftPosition.y === rightPosition.y;
+  });
 }
 
 function DraggableTable({
@@ -152,61 +208,113 @@ interface TableZoneGroupProps {
 }
 
 export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableZoneGroupProps): React.JSX.Element {
-  const [boardWidth, setBoardWidth] = useState(300);
+  const [boardWidth, setBoardWidth] = useState(0);
   const [tablePositions, setTablePositions] = useState<Record<string, TablePosition>>({});
+  const [hasLoadedPositions, setHasLoadedPositions] = useState(false);
   const isMobile = layout === 'mobile';
   const tableWidth = isMobile ? MOBILE_TABLE_WIDTH : DESKTOP_TABLE_WIDTH;
   const tableHeight = isMobile ? MOBILE_TABLE_HEIGHT : DESKTOP_TABLE_HEIGHT;
   const boardVisibleHeight = isMobile ? MOBILE_BOARD_VISIBLE_HEIGHT : DESKTOP_BOARD_VISIBLE_HEIGHT;
   const tableGap = isMobile ? MOBILE_TABLE_GAP : DESKTOP_TABLE_GAP;
+  const measuredBoardWidth = boardWidth > 0 ? boardWidth : 300;
 
   const tablesPerRow = Math.max(
     1,
-    Math.floor((boardWidth - BOARD_PADDING * 2 + tableGap) / (tableWidth + tableGap))
+    Math.floor((measuredBoardWidth - BOARD_PADDING * 2 + tableGap) / (tableWidth + tableGap))
   );
   const rowCount = Math.max(1, Math.ceil(numbers.length / tablesPerRow));
   const boardContentHeight = Math.max(
     boardVisibleHeight,
     BOARD_PADDING * 2 + rowCount * tableHeight + Math.max(0, rowCount - 1) * tableGap
   );
-  const maxX = Math.max(0, boardWidth - tableWidth - BOARD_PADDING);
+  const maxX = Math.max(0, measuredBoardWidth - tableWidth - BOARD_PADDING);
   const maxY = Math.max(0, boardContentHeight - tableHeight - BOARD_PADDING);
   const isSelectedInZone = selectedTable.zone === zone;
   const canRemoveSelected = isSelectedInZone && numbers.length > 1;
+  const storageKey = useMemo(() => getStorageKey(layout, zone), [layout, zone]);
+  const generatedTablePositions = useMemo(() => {
+    const next: Record<string, TablePosition> = {};
+
+    numbers.forEach((number, index) => {
+      const column = index % tablesPerRow;
+      const row = Math.floor(index / tablesPerRow);
+      next[tableKey({ zone, number })] = {
+        x: clamp(BOARD_PADDING + column * (tableWidth + tableGap), 0, maxX),
+        y: clamp(BOARD_PADDING + row * (tableHeight + tableGap), 0, maxY),
+      };
+    });
+
+    return next;
+  }, [maxX, maxY, numbers, tableGap, tableHeight, tableWidth, tablesPerRow, zone]);
 
   useEffect(() => {
+    let isMounted = true;
+    setHasLoadedPositions(false);
+
+    async function loadPositions(): Promise<void> {
+      let storedPositions: Record<string, TablePosition> = {};
+      try {
+        storedPositions = parseStoredPositions(await AsyncStorage.getItem(storageKey));
+      } catch {
+        storedPositions = {};
+      }
+
+      if (!isMounted) {
+        return;
+      }
+
+      setTablePositions(storedPositions);
+      setHasLoadedPositions(true);
+    }
+
+    void loadPositions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!hasLoadedPositions || boardWidth <= 0) {
+      return;
+    }
+
     setTablePositions((previous) => {
       const next: Record<string, TablePosition> = {};
 
-      numbers.forEach((number, index) => {
+      numbers.forEach((number) => {
         const key = tableKey({ zone, number });
         const existing = previous[key];
 
         if (existing) {
-          next[key] = {
-            x: clamp(existing.x, 0, maxX),
-            y: clamp(existing.y, 0, maxY),
-          };
+          next[key] = existing;
           return;
         }
 
-        const column = index % tablesPerRow;
-        const row = Math.floor(index / tablesPerRow);
-        next[key] = {
-          x: clamp(BOARD_PADDING + column * (tableWidth + tableGap), 0, maxX),
-          y: clamp(BOARD_PADDING + row * (tableHeight + tableGap), 0, maxY),
-        };
+        next[key] = generatedTablePositions[key] ?? { x: BOARD_PADDING, y: BOARD_PADDING };
       });
 
-      return next;
+      return areTablePositionsEqual(previous, next) ? previous : next;
     });
-  }, [maxX, maxY, numbers, tableGap, tableHeight, tableWidth, tablesPerRow, zone]);
+  }, [boardWidth, generatedTablePositions, hasLoadedPositions, numbers, zone]);
+
+  useEffect(() => {
+    if (!hasLoadedPositions) {
+      return;
+    }
+
+    void AsyncStorage.setItem(storageKey, JSON.stringify(tablePositions));
+  }, [hasLoadedPositions, storageKey, tablePositions]);
 
   function handleDragMove(table: TableId, nextPosition: TablePosition): void {
     setTablePositions((previous) => ({
       ...previous,
       [tableKey(table)]: nextPosition,
     }));
+  }
+
+  function handleResetPositions(): void {
+    setTablePositions(generatedTablePositions);
   }
 
   return (
@@ -249,6 +357,9 @@ export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals,
       </ScrollView>
       <TouchableOpacity key={`add-${zone}`} style={styles.addTableButton} onPress={() => onAddTable(zone)}>
         <Text style={styles.addTableButtonText}>{`+ Añadir mesa`}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity key={`reset-${zone}`} style={styles.resetPositionsButton} onPress={handleResetPositions}>
+        <Text style={styles.resetPositionsButtonText}>Restablecer posiciones</Text>
       </TouchableOpacity>
       {isSelectedInZone ? (
         <TouchableOpacity
