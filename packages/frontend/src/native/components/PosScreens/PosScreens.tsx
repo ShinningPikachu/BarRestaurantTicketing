@@ -142,11 +142,21 @@ function MenuSelector({
           return (
             <TouchableOpacity
               key={category}
-              style={[styles.menuTypeButton, isSelected && styles.menuTypeButtonSelected]}
+              style={[
+                styles.menuTypeButton,
+                layout === 'desktop' && styles.desktopMenuTypeButton,
+                isSelected && styles.menuTypeButtonSelected
+              ]}
               onPress={() => onSelectMenuCategory(category)}
               activeOpacity={0.75}
             >
-              <Text style={[styles.menuTypeButtonText, isSelected && styles.menuTypeButtonTextSelected]}>
+              <Text
+                style={[
+                  styles.menuTypeButtonText,
+                  layout === 'desktop' && styles.desktopMenuTypeButtonText,
+                  isSelected && styles.menuTypeButtonTextSelected
+                ]}
+              >
                 {translateCategory(category)}
               </Text>
             </TouchableOpacity>
