@@ -47,6 +47,7 @@ export interface MainScreenProps {
   importProductsCsv: () => void;
   chooseProductImage: (onSelected: (imageDataUrl: string) => void) => Promise<void>;
   saveNewProduct: () => Promise<void>;
+  updateProductDetails: (item: MenuItem, values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string }) => Promise<boolean>;
   updateProductName: (item: MenuItem, value: string) => Promise<void>;
   updateProductDisplayNames: (item: MenuItem, primaryName: string, secondaryName: string) => Promise<void>;
   updateProductCategory: (item: MenuItem, value: string) => Promise<void>;

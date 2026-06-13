@@ -334,7 +334,7 @@ export default function App(): React.JSX.Element {
       setIsHandlingPairScan(false);
       Alert.alert(
         'No se encuentra el ordenador',
-        'Comprueba que el TPV esté abierto en el ordenador y que teléfono y ordenador estén en la misma red Wi-Fi.'
+        'Comprueba que el TPV esté abierto en el ordenador y que el teléfono esté en la misma red Wi-Fi o conectado al hotspot del ordenador.'
       );
     } finally {
       setIsSavingConnection(false);
@@ -512,7 +512,7 @@ export default function App(): React.JSX.Element {
       } else {
         Alert.alert(
           'No se pudo conectar',
-          `El teléfono no puede conectar con el servidor.\n\nServidor configurado:\n${getApiBaseUrl()}\n\nComprueba que la aplicación esté abierta en el ordenador y que el teléfono esté en la misma red Wi-Fi.`
+          `El teléfono no puede conectar con el servidor.\n\nServidor configurado:\n${getApiBaseUrl()}\n\nComprueba que la aplicación esté abierta en el ordenador y que el teléfono esté en la misma red Wi-Fi o conectado al hotspot del ordenador.`
         );
       }
     } finally {
@@ -745,6 +745,51 @@ export default function App(): React.JSX.Element {
       await loadManagedProducts();
     } catch {
       Alert.alert('Error', 'No se pudo actualizar el coste interno.');
+    }
+  }
+
+  async function updateProductDetails(
+    item: MenuItem,
+    values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string }
+  ): Promise<boolean> {
+    const nextName = values.name.trim();
+    const nextCategory = values.category.trim();
+    const priceCents = parsePriceToCents(values.price);
+    const trimmedCost = values.cost.trim();
+    const costCents = trimmedCost ? parsePriceToCents(trimmedCost) : null;
+
+    if (!nextName) {
+      Alert.alert('Nombre no válido', 'Introduce un nombre de producto.');
+      return false;
+    }
+    if (!nextCategory) {
+      Alert.alert('Tipo no válido', 'Introduce un tipo de producto.');
+      return false;
+    }
+    if (priceCents === null) {
+      Alert.alert('Precio no válido', 'Introduce un precio válido.');
+      return false;
+    }
+    if (costCents === null && trimmedCost) {
+      Alert.alert('Coste no válido', 'Introduce un coste válido o deja el campo vacío.');
+      return false;
+    }
+
+    try {
+      await apiService.updateMenuItem(item.id, {
+        name: nextName,
+        primaryName: values.primaryName.trim() || null,
+        secondaryName: values.secondaryName.trim() || null,
+        category: nextCategory,
+        priceCents,
+        costCents,
+      });
+      await loadManagedProducts();
+      await actions.reloadMenu();
+      return true;
+    } catch {
+      Alert.alert('Error', 'No se pudieron guardar los cambios del producto.');
+      return false;
     }
   }
 
@@ -1279,6 +1324,7 @@ export default function App(): React.JSX.Element {
     importProductsCsv,
     chooseProductImage,
     saveNewProduct,
+    updateProductDetails,
     updateProductName,
     updateProductDisplayNames,
     updateProductCategory,

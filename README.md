@@ -257,6 +257,12 @@ The build script uses your computer LAN IP as the first connection address:
 http://YOUR_COMPUTER_LAN_IP:3000/api
 ```
 
+If the phone will connect through a computer-created hotspot, build with the hotspot IP instead:
+
+```bash
+BAR_TICKETING_HOST_IP=10.42.0.1 npm run android:apk
+```
+
 The installed Android app can later be paired with a different computer address without rebuilding it. After installing an APK that includes this pairing feature once, start the computer TPV normally, tap `Conectar` in the Android app, and scan the pairing QR shown in the computer startup terminal. Pairing stores only the local server address; the POS login code is still required.
 
 If you want to force the initial backend URL, set it before building:
@@ -277,7 +283,7 @@ Install it on a connected Android phone with USB debugging enabled:
 adb install -r packages/frontend/android/app/build/outputs/apk/release/app-release.apk
 ```
 
-The phone and computer must stay on the same network, and the computer firewall must allow the backend port, usually `3000`.
+The phone and computer must stay on the same network, and the computer firewall must allow the backend port, usually `3000`. A computer-created hotspot counts as the same network when the phone is connected to that hotspot.
 
 ## Environment
 
@@ -483,6 +489,32 @@ npm run prisma:studio
 
 ## Troubleshooting
 
+### Use Without A Wi-Fi Router
+
+The computer cannot make the phone use `localhost`: on the phone, `localhost` always means the phone itself. For no-router service, create a Wi-Fi hotspot on the computer, connect the phone to that hotspot, and pair with the computer hotspot IP.
+
+Typical setup:
+
+1. Start the computer hotspot from the operating system network settings.
+2. Connect the phone to that hotspot.
+3. Start BarRestaurantTicketing on the computer.
+4. In the phone app, tap `Conectar`.
+5. Scan the pairing QR shown by the computer, or type the pairing address manually.
+
+On many Linux systems the hotspot address is `10.42.0.1`; on Windows Internet Connection Sharing it is often `192.168.137.1`. If the QR shows a different network address than the hotspot, start the app with an explicit hotspot address:
+
+```bash
+BAR_TICKETING_HOST_IP=10.42.0.1 npm run dev
+```
+
+Use the same override when building an APK whose first address should point at the hotspot:
+
+```bash
+BAR_TICKETING_HOST_IP=10.42.0.1 npm run android:apk
+```
+
+The backend already listens on all network interfaces, so the hotspot path does not need a separate server mode. The computer firewall still needs to allow port `3000`.
+
 ### Phone Cannot Connect To Backend
 
 The Android phone connects to the computer through its local network IP address. That address can change when you move to a different Wi-Fi network, restart a router, use a hotspot, or receive a new DHCP lease. An APK built with an old address cannot reach the computer until it is paired again.
@@ -490,7 +522,7 @@ The Android phone connects to the computer through its local network IP address.
 For the installed Android app:
 
 1. Start BarRestaurantTicketing on the computer.
-2. Keep phone and computer on the same Wi-Fi network.
+2. Keep phone and computer on the same Wi-Fi network, or connect the phone to the computer hotspot.
 3. In the phone app, tap `Conectar`.
 4. Scan the `Installed Android app` QR code printed in the computer startup terminal.
 5. Log in with the POS access code.
@@ -509,7 +541,7 @@ Example:
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run -w frontend dev:phone
 ```
 
-Make sure the phone and computer are on the same Wi-Fi and the backend is running.
+Make sure the phone and computer are on the same Wi-Fi or hotspot network and the backend is running.
 
 ### Printer Does Not Print
 

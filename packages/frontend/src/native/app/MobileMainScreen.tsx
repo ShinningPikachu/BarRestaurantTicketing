@@ -1,8 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Platform, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MobilePosScreen } from '../components';
 import { AppSection, MainScreenProps } from './MainScreen.types';
 import { mobileStyles as styles } from './MobileMain.styles';
+import { MenuItem } from '../types';
+
+type ProductEditValues = {
+  name: string;
+  primaryName: string;
+  secondaryName: string;
+  category: string;
+  price: string;
+  cost: string;
+};
+
+function getProductEditValues(item: MenuItem): ProductEditValues {
+  return {
+    name: item.name,
+    primaryName: item.primaryName ?? '',
+    secondaryName: item.secondaryName ?? '',
+    category: item.category,
+    price: (item.priceCents / 100).toFixed(2),
+    cost: item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : '',
+  };
+}
+
+function valuesChanged(first: ProductEditValues, second: ProductEditValues): boolean {
+  return (
+    first.name !== second.name ||
+    first.primaryName !== second.primaryName ||
+    first.secondaryName !== second.secondaryName ||
+    first.category !== second.category ||
+    first.price !== second.price ||
+    first.cost !== second.cost
+  );
+}
 
 const screenTitles: Record<AppSection, string> = {
   home: 'TPV Restaurante',
@@ -194,6 +226,109 @@ function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
   );
 }
 
+function MobileProductEditRow({ item, props }: { item: MenuItem; props: MainScreenProps }): React.JSX.Element {
+  const [values, setValues] = useState<ProductEditValues>(() => getProductEditValues(item));
+  const [savedValues, setSavedValues] = useState<ProductEditValues>(() => getProductEditValues(item));
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  useEffect(() => {
+    const nextValues = getProductEditValues(item);
+    setValues(nextValues);
+    setSavedValues(nextValues);
+    setSaveState((current) => current === 'saving' || current === 'saved' ? 'saved' : 'idle');
+  }, [item.id, item.name, item.primaryName, item.secondaryName, item.category, item.priceCents, item.costCents]);
+
+  const hasChanges = valuesChanged(values, savedValues);
+  const saveDisabled = !hasChanges || saveState === 'saving';
+  const statusText = saveState === 'saving' ? 'Guardando...' : saveState === 'saved' ? 'Guardado' : hasChanges ? 'Cambios sin guardar' : 'Sin cambios';
+
+  const updateValue = (field: keyof ProductEditValues, value: string) => {
+    setValues((current) => ({ ...current, [field]: value }));
+    setSaveState('idle');
+  };
+
+  const saveChanges = async () => {
+    if (saveDisabled) {
+      return;
+    }
+
+    setSaveState('saving');
+    const didSave = await props.updateProductDetails(item, values);
+    if (didSave) {
+      setSavedValues(values);
+      setSaveState('saved');
+      return;
+    }
+    setSaveState('idle');
+  };
+
+  return (
+    <View style={styles.productRow}>
+      {item.imageDataUrl ? (
+        <Image source={{ uri: item.imageDataUrl }} style={styles.productRowImage} resizeMode="contain" />
+      ) : (
+        <View style={styles.productRowImagePlaceholder}>
+          <Text style={styles.itemPrice}>Sin imagen</Text>
+        </View>
+      )}
+      <View style={styles.productRowBody}>
+        <View style={styles.productRowTopLine}>
+          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          <TextInput
+            style={styles.productCategoryInput}
+            value={values.category}
+            onChangeText={(value) => updateValue('category', value)}
+            placeholder="Tipo"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+        <View style={styles.productEditRow}>
+          <TextInput
+            style={styles.formInput}
+            value={values.name}
+            onChangeText={(value) => updateValue('name', value)}
+            placeholder="Nombre"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={[styles.formInput, styles.formHalfInput]}
+            value={values.primaryName}
+            onChangeText={(value) => updateValue('primaryName', value)}
+            placeholder="Principal"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={[styles.formInput, styles.formHalfInput]}
+            value={values.secondaryName}
+            onChangeText={(value) => updateValue('secondaryName', value)}
+            placeholder="Secundario"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+        <View style={styles.productRowControls}>
+          <TextInput style={styles.priceInput} value={values.price} keyboardType="decimal-pad" onChangeText={(value) => updateValue('price', value)} placeholder="Precio" placeholderTextColor="#6B7280" />
+          <TextInput style={styles.priceInput} value={values.cost} keyboardType="decimal-pad" placeholder="Coste" placeholderTextColor="#6B7280" onChangeText={(value) => updateValue('cost', value)} />
+          <TouchableOpacity style={[styles.productRowActionButton, styles.productSaveChangesButton, saveDisabled ? styles.productSaveChangesButtonDisabled : null]} onPress={() => void saveChanges()} disabled={saveDisabled}>
+            <Text style={[styles.productSaveChangesText, saveDisabled ? styles.productSaveChangesTextDisabled : null]}>{saveState === 'saving' ? 'Guardando' : 'Guardar'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.productRowActionButton} onPress={() => void props.updateProductImage(item)}>
+            <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
+          </TouchableOpacity>
+          {item.imageDataUrl ? (
+            <TouchableOpacity style={styles.productRowActionButton} onPress={() => void props.removeProductImage(item)}>
+              <Text style={styles.secondaryButtonText}>Quitar</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.productRowActionButton} onPress={() => props.removeProduct(item)}>
+            <Text style={styles.secondaryButtonText}>Eliminar</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.productSaveStatus, saveState === 'saved' ? styles.productSaveStatusSuccess : null]}>{statusText}</Text>
+      </View>
+    </View>
+  );
+}
+
 function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
   const refreshControl = <RefreshControl refreshing={props.isRefreshingData} onRefresh={props.onRefreshData} />;
 
@@ -253,79 +388,9 @@ function MobileProductsScreen(props: MainScreenProps): React.JSX.Element {
         </View>
 
         <Text style={styles.compactSectionLabel}>Menu actual</Text>
-        {props.managedMenuItems.map((item) => {
-          let primaryDraft = item.primaryName ?? '';
-          let secondaryDraft = item.secondaryName ?? '';
-          const saveDisplayNames = () => void props.updateProductDisplayNames(item, primaryDraft, secondaryDraft);
-
-          return (
-            <View key={item.id} style={styles.productRow}>
-              {item.imageDataUrl ? (
-                <Image source={{ uri: item.imageDataUrl }} style={styles.productRowImage} resizeMode="contain" />
-              ) : (
-                <View style={styles.productRowImagePlaceholder}>
-                  <Text style={styles.itemPrice}>Sin imagen</Text>
-                </View>
-              )}
-              <View style={styles.productRowBody}>
-                <View style={styles.productRowTopLine}>
-                  <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                  <TextInput
-                    style={styles.productCategoryInput}
-                    defaultValue={item.category}
-                    onSubmitEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
-                    onEndEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
-                    placeholder="Tipo"
-                    placeholderTextColor="#6B7280"
-                  />
-                </View>
-                <View style={styles.productEditRow}>
-                  <TextInput
-                    style={styles.formInput}
-                    defaultValue={item.name}
-                    onSubmitEditing={(event) => void props.updateProductName(item, event.nativeEvent.text)}
-                    onEndEditing={(event) => void props.updateProductName(item, event.nativeEvent.text)}
-                    placeholder="Nombre"
-                    placeholderTextColor="#6B7280"
-                  />
-                  <TextInput
-                    style={[styles.formInput, styles.formHalfInput]}
-                    defaultValue={primaryDraft}
-                    onChangeText={(value) => { primaryDraft = value; }}
-                    onSubmitEditing={saveDisplayNames}
-                    onEndEditing={saveDisplayNames}
-                    placeholder="Principal"
-                    placeholderTextColor="#6B7280"
-                  />
-                  <TextInput
-                    style={[styles.formInput, styles.formHalfInput]}
-                    defaultValue={secondaryDraft}
-                    onChangeText={(value) => { secondaryDraft = value; }}
-                    onSubmitEditing={saveDisplayNames}
-                    onEndEditing={saveDisplayNames}
-                    placeholder="Secundario"
-                    placeholderTextColor="#6B7280"
-                  />
-                </View>
-                <View style={styles.productRowControls}>
-                  <TextInput style={styles.priceInput} defaultValue={(item.priceCents / 100).toFixed(2)} keyboardType="decimal-pad" onSubmitEditing={(event) => void props.updateProductPrice(item, event.nativeEvent.text)} onEndEditing={(event) => void props.updateProductPrice(item, event.nativeEvent.text)} />
-                  <TextInput style={styles.priceInput} defaultValue={item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : ''} keyboardType="decimal-pad" placeholder="Coste" placeholderTextColor="#6B7280" onSubmitEditing={(event) => void props.updateProductCost(item, event.nativeEvent.text)} onEndEditing={(event) => void props.updateProductCost(item, event.nativeEvent.text)} />
-                  <TouchableOpacity style={styles.productRowActionButton} onPress={() => void props.updateProductImage(item)}>
-                    <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
-                  </TouchableOpacity>
-                  {item.imageDataUrl ? (
-                    <TouchableOpacity style={styles.productRowActionButton} onPress={() => void props.removeProductImage(item)}>
-                      <Text style={styles.secondaryButtonText}>Quitar</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <TouchableOpacity style={styles.productRowActionButton} onPress={() => props.removeProduct(item)}>
-                    <Text style={styles.secondaryButtonText}>Eliminar</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          );
-        })}
+        {props.managedMenuItems.map((item) => (
+          <MobileProductEditRow key={item.id} item={item} props={props} />
+        ))}
       </ScrollView>
     </View>
   );
