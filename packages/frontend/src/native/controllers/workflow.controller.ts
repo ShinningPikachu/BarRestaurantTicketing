@@ -181,6 +181,19 @@ export function useWorkflowController() {
     }
   }
 
+  async function removeSelectedItems(
+    table: TableId,
+    items: Array<{ orderId: string; itemId: number; qty: number }>
+  ): Promise<void> {
+    try {
+      const workflow = await apiService.removeSelectedItems(table.number, table.zone, items);
+      applyWorkflow(workflow.preOrderItems, workflow.orders);
+      Alert.alert('Productos retirados', 'Se han eliminado los productos seleccionados.');
+    } catch {
+      Alert.alert('Error', 'No se pudieron eliminar los productos seleccionados.');
+    }
+  }
+
   return {
     state: {
       preorderItems,
@@ -205,6 +218,7 @@ export function useWorkflowController() {
       moveConfirmedItemToPreOrder,
       payTable,
       paySelectedItems,
+      removeSelectedItems,
     }
   };
 }

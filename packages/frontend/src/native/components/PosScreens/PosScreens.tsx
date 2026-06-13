@@ -7,6 +7,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text,
@@ -370,6 +371,10 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
   const hasPreorder = orderProps.preorderItems.length > 0;
   const hasConfirmed = confirmedItems.length > 0;
   const selectedAaItemCount = Object.values(aaQtyByKey).reduce((sum, qty) => sum + qty, 0);
+  const selectedAaTotalCents = confirmedItems.reduce((sum, confirmedItem) => {
+    const selectedQty = aaQtyByKey[confirmedItem.key] ?? 0;
+    return sum + selectedQty * (confirmedItem.item.unitPriceCents ?? 0);
+  }, 0);
 
   function setAaQty(key: string, nextQty: number, maxQty: number): void {
     setAaQtyByKey((current) => {
@@ -444,7 +449,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
     });
   }
 
-  function buildAaPaymentItems(): Array<{ orderId: string; itemId: number; qty: number }> | null {
+  function buildAaSelectedItems(actionLabel: string): Array<{ orderId: string; itemId: number; qty: number }> | null {
     const items: Array<{ orderId: string; itemId: number; qty: number }> = [];
 
     for (const confirmedItem of confirmedItems) {
@@ -453,7 +458,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
         continue;
       }
       if (confirmedItem.item.id === undefined) {
-        Alert.alert('No se puede pagar AA', 'Hay un artículo seleccionado sin identificador.');
+        Alert.alert(`No se puede ${actionLabel}`, 'Hay un artículo seleccionado sin identificador.');
         return null;
       }
 
@@ -465,7 +470,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
     }
 
     if (items.length === 0) {
-      Alert.alert('Sin selección AA', 'Selecciona al menos un artículo para registrar el pago AA.');
+      Alert.alert('Sin selección AA', `Selecciona al menos un artículo para ${actionLabel}.`);
       return null;
     }
 
@@ -473,13 +478,22 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
   }
 
   function handlePayAa(method: PaymentMethod): void {
-    const items = buildAaPaymentItems();
+    const items = buildAaSelectedItems('registrar el pago AA');
     if (!items) {
       return;
     }
 
     orderProps.onPaySelectedItems(method, items);
-    setIsAaModalVisible(false);
+    setAaQtyByKey({});
+  }
+
+  function handleRemoveSelectedAaItems(): void {
+    const items = buildAaSelectedItems('eliminar productos');
+    if (!items) {
+      return;
+    }
+
+    orderProps.onRemoveSelectedItems(items);
     setAaQtyByKey({});
   }
 
@@ -694,8 +708,8 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
         animationType="fade"
         onRequestClose={() => setIsAaModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalPanel, styles.mobileAaModalPanel]}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setIsAaModalVisible(false)}>
+          <Pressable style={[styles.modalPanel, styles.mobileAaModalPanel]} onPress={(event) => event.stopPropagation()}>
             <View style={styles.modalHeader}>
               <View style={styles.flex1}>
                 <Text style={styles.modalTitle}>Módulo AA</Text>
@@ -741,8 +755,19 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             </ScrollView>
 
             <View style={styles.mobileAaFooter}>
+              <View style={styles.aaSelectedSummary}>
+                <Text style={styles.aaSelectedSummaryLabel}>{`Seleccionado (${selectedAaItemCount})`}</Text>
+                <Text style={styles.aaSelectedSummaryAmount}>{orderProps.formatPrice(selectedAaTotalCents)}</Text>
+              </View>
               <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => setAaQtyByKey({})}>
-                <Text style={styles.mobileOrderButtonText}>Limpiar</Text>
+                <Text style={styles.mobileOrderButtonText}>Limpiar AA</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mobileOrderSecondaryButton, selectedAaItemCount === 0 ? styles.aaDisabledButton : null]}
+                onPress={handleRemoveSelectedAaItems}
+                disabled={selectedAaItemCount === 0}
+              >
+                <Text style={styles.mobileOrderButtonText}>Quitar seleccionados</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.mobileOrderPrimaryButton} onPress={handlePrintAaTicket}>
                 <Text style={styles.mobileOrderPrimaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
@@ -754,8 +779,8 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                 <Text style={styles.mobileOrderButtonText}>Pagar tarjeta</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

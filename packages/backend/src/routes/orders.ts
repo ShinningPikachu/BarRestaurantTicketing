@@ -38,6 +38,8 @@ const paySelectedItemsSchema = z.object({
   })).min(1),
 });
 
+const removeSelectedItemsSchema = paySelectedItemsSchema.omit({ method: true });
+
 export const moveToPreorderParamSchema = z.object({
   id: z.string().min(1, 'Order ID is required'),
   itemId: z.coerce.number().positive('Item ID must be positive'),
@@ -107,6 +109,25 @@ router.post(
       res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
     } catch (error) {
       logger.error({ error }, 'Failed to pay selected ticket items');
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/remove-items',
+  validateBody(removeSelectedItemsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tableNumber, tableZone, items } = req.body;
+      logger.info({ tableNumber, tableZone, itemCount: items.length }, 'Removing selected ticket items');
+
+      const result = await workflowService.removeSelectedItems(tableNumber, tableZone, items);
+      const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
+      signalDataChange('orders');
+      res.json(successResponse(workflow));
+    } catch (error) {
+      logger.error({ error }, 'Failed to remove selected ticket items');
       next(error);
     }
   }

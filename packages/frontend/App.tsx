@@ -994,6 +994,9 @@ export default function App(): React.JSX.Element {
     ) => {
       void actions.paySelectedItems(method, items);
     },
+    onRemoveSelectedItems: (items: Parameters<typeof actions.removeSelectedItems>[0]) => {
+      void actions.removeSelectedItems(items);
+    },
     onRemoveOrder: (orderId: string) => {
       void actions.removeOrder(orderId);
     },

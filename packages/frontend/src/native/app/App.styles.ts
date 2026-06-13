@@ -1649,6 +1649,33 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: colors.surfaceAlt
   },
+  aaSelectedSummary: {
+    flexBasis: '100%',
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.zoneMenu,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10
+  },
+  aaSelectedSummaryLabel: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  aaSelectedSummaryAmount: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '700'
+  },
+  aaDisabledButton: {
+    opacity: 0.45
+  },
   confirmedCard: {
     borderWidth: 1,
     borderColor: colors.border,

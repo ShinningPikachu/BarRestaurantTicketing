@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SelectedTable } from '../../app/app.types';
 import { styles } from '../../app/App.styles';
 import { getItemDisplayName } from '../../helpers/itemDisplayName';
@@ -25,6 +25,7 @@ interface OrderSectionProps {
   onPrintTicket: (options?: { confirmedOrders?: Order[]; splitPeople?: number; ticketNote?: string }) => void;
   onPayTicket: (method: PaymentMethod, splitPeople?: number) => void;
   onPaySelectedItems: (method: PaymentMethod, items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
+  onRemoveSelectedItems: (items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
   onRemoveOrder: (orderId: string) => void;
   onMoveConfirmedItemToPreOrder: (orderId: string, item: OrderItem) => void;
   onOpenCashDrawer: () => void;
@@ -64,6 +65,7 @@ export function OrderSection({
   onPrintTicket,
   onPayTicket,
   onPaySelectedItems,
+  onRemoveSelectedItems,
   onRemoveOrder,
   onMoveConfirmedItemToPreOrder,
   onOpenCashDrawer
@@ -72,18 +74,28 @@ export function OrderSection({
   const [isAaModalVisible, setIsAaModalVisible] = useState(false);
   const [splitPeopleText, setSplitPeopleText] = useState('2');
 
-  const confirmedItems: ConfirmedItemRow[] = tableOrders.flatMap((order) =>
-    order.items.map((item, index) => ({
-      key: `${order.id}-${item.id ?? index}-${item.name}-${item.unitPriceCents ?? 0}`,
-      orderId: order.id,
-      order,
-      item
-    }))
+  const confirmedItems: ConfirmedItemRow[] = useMemo(() =>
+    tableOrders.flatMap((order) =>
+      order.items.map((item, index) => ({
+        key: `${order.id}-${item.id ?? index}-${item.name}-${item.unitPriceCents ?? 0}`,
+        orderId: order.id,
+        order,
+        item
+      }))
+    ),
+    [tableOrders]
   );
 
   const selectedAaItemCount = useMemo(
     () => Object.values(aaQtyByKey).reduce((sum, qty) => sum + qty, 0),
     [aaQtyByKey]
+  );
+  const selectedAaTotalCents = useMemo(
+    () => confirmedItems.reduce((sum, confirmedItem) => {
+      const selectedQty = aaQtyByKey[confirmedItem.key] ?? 0;
+      return sum + selectedQty * (confirmedItem.item.unitPriceCents ?? 0);
+    }, 0),
+    [aaQtyByKey, confirmedItems]
   );
 
   function setAaQty(key: string, nextQty: number, maxQty: number): void {
@@ -165,7 +177,7 @@ export function OrderSection({
     return splitPeople;
   }
 
-  function buildAaPaymentItems(): Array<{ orderId: string; itemId: number; qty: number }> | null {
+  function buildAaSelectedItems(actionLabel: string): Array<{ orderId: string; itemId: number; qty: number }> | null {
     const items: Array<{ orderId: string; itemId: number; qty: number }> = [];
 
     for (const confirmedItem of confirmedItems) {
@@ -174,7 +186,7 @@ export function OrderSection({
         continue;
       }
       if (confirmedItem.item.id === undefined) {
-        Alert.alert('No se puede pagar AA', 'Hay un artículo seleccionado sin identificador.');
+        Alert.alert(`No se puede ${actionLabel}`, 'Hay un artículo seleccionado sin identificador.');
         return null;
       }
 
@@ -186,7 +198,7 @@ export function OrderSection({
     }
 
     if (items.length === 0) {
-      Alert.alert('Sin selección AA', 'Selecciona al menos un artículo para registrar el pago AA.');
+      Alert.alert('Sin selección AA', `Selecciona al menos un artículo para ${actionLabel}.`);
       return null;
     }
 
@@ -194,13 +206,22 @@ export function OrderSection({
   }
 
   function handlePayAa(method: PaymentMethod): void {
-    const items = buildAaPaymentItems();
+    const items = buildAaSelectedItems('registrar el pago AA');
     if (!items) {
       return;
     }
 
     onPaySelectedItems(method, items);
-    setIsAaModalVisible(false);
+    setAaQtyByKey({});
+  }
+
+  function handleRemoveSelectedAaItems(): void {
+    const items = buildAaSelectedItems('eliminar productos');
+    if (!items) {
+      return;
+    }
+
+    onRemoveSelectedItems(items);
     setAaQtyByKey({});
   }
 
@@ -369,8 +390,8 @@ export function OrderSection({
         animationType="fade"
         onRequestClose={() => setIsAaModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalPanel}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setIsAaModalVisible(false)}>
+          <Pressable style={styles.modalPanel} onPress={(event) => event.stopPropagation()}>
             <View style={styles.modalHeader}>
               <View style={styles.flex1}>
                 <Text style={styles.modalTitle}>Módulo AA</Text>
@@ -418,8 +439,19 @@ export function OrderSection({
             />
 
             <View style={styles.modalFooter}>
+              <View style={styles.aaSelectedSummary}>
+                <Text style={styles.aaSelectedSummaryLabel}>{`Seleccionado (${selectedAaItemCount})`}</Text>
+                <Text style={styles.aaSelectedSummaryAmount}>{formatPrice(selectedAaTotalCents)}</Text>
+              </View>
               <TouchableOpacity style={styles.secondaryButton} onPress={() => setAaQtyByKey({})}>
                 <Text style={styles.secondaryButtonText}>Limpiar AA</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, selectedAaItemCount === 0 ? styles.aaDisabledButton : null]}
+                onPress={handleRemoveSelectedAaItems}
+                disabled={selectedAaItemCount === 0}
+              >
+                <Text style={styles.secondaryButtonText}>Quitar seleccionados</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.primaryButton} onPress={handlePrintAaTicket}>
                 <Text style={styles.primaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
@@ -431,8 +463,8 @@ export function OrderSection({
                 <Text style={styles.secondaryButtonText}>Pagar tarjeta</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

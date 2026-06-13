@@ -222,6 +222,17 @@ export function useTicketingController(enabled = true) {
     }
   }
 
+  async function removeSelectedItems(
+    items: Array<{ orderId: string; itemId: number; qty: number }>
+  ): Promise<void> {
+    try {
+      await workflowController.actions.removeSelectedItems(selectedTable, items);
+    } catch (error) {
+      logger.error({ error }, 'Failed to remove selected items');
+      Alert.alert('Error', 'No se pudieron eliminar los productos seleccionados');
+    }
+  }
+
   async function refreshData(): Promise<void> {
     const refreshedTable = await tableController.actions.refreshTables();
     await Promise.all([
@@ -264,6 +275,7 @@ export function useTicketingController(enabled = true) {
       printTicket,
       payTable,
       paySelectedItems,
+      removeSelectedItems,
       refreshData,
       reloadMenu: menuController.actions.loadMenu,
       removeOrder,

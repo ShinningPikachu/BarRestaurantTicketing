@@ -494,6 +494,80 @@ export class WorkflowService {
       };
     });
   }
+
+  async removeSelectedItems(
+    tableNumber: number,
+    tableZone: string,
+    selectedItems: Array<{ orderId: string; itemId: number; qty: number }>
+  ) {
+    const normalizedNumber = normalizeNumber(tableNumber);
+    const normalizedZone = normalizeZone(tableZone);
+
+    if (selectedItems.length === 0) {
+      throw new ApiError(400, 'No selected items to remove', 'EMPTY_REMOVE_SELECTION');
+    }
+
+    const groupedSelectedItems = Array.from(selectedItems.reduce((grouped, item) => {
+      const key = `${item.orderId}:${item.itemId}`;
+      const current = grouped.get(key);
+      grouped.set(key, current ? { ...current, qty: current.qty + item.qty } : { ...item });
+      return grouped;
+    }, new Map<string, { orderId: string; itemId: number; qty: number }>()).values());
+
+    return workflowRepository.runInTransaction(async (tx) => {
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
+      if (!table) {
+        throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
+      }
+
+      const lines: Array<{ orderId: string; orderItemId: number; qty: number }> = [];
+      for (const selected of groupedSelectedItems) {
+        if (!Number.isInteger(selected.qty) || selected.qty <= 0) {
+          throw new ApiError(400, 'Invalid remove item quantity', 'INVALID_REMOVE_QTY');
+        }
+
+        const orderItem = await workflowRepository.getOrderItemWithOrder(selected.orderId, selected.itemId, tx);
+        if (!orderItem || orderItem.order.tableId !== table.id || orderItem.order.status !== 'confirmed') {
+          throw new ApiError(404, 'Order item not found for removal', 'REMOVE_ITEM_NOT_FOUND');
+        }
+        if (selected.qty > orderItem.qty) {
+          throw new ApiError(409, 'Remove item quantity exceeds remaining quantity', 'REMOVE_QTY_EXCEEDS_REMAINING');
+        }
+
+        lines.push({
+          orderId: orderItem.orderId,
+          orderItemId: orderItem.id,
+          qty: selected.qty,
+        });
+      }
+
+      for (const line of lines) {
+        const current = await workflowRepository.getOrderItemWithOrder(line.orderId, line.orderItemId, tx);
+        if (!current) {
+          continue;
+        }
+        const nextQty = current.qty - line.qty;
+        if (nextQty <= 0) {
+          await workflowRepository.deleteOrderItem(current.id, tx);
+        } else {
+          await workflowRepository.updateOrderItemQty(current.id, nextQty, tx);
+        }
+
+        const remainingItems = await workflowRepository.getOrderItems(line.orderId, tx);
+        if (remainingItems.length === 0) {
+          await workflowRepository.deleteOrder(line.orderId, tx);
+        } else {
+          const nextTotal = remainingItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+          await workflowRepository.updateOrderTotal(line.orderId, nextTotal, tx);
+        }
+      }
+
+      return {
+        tableNumber: table.number,
+        tableZone: table.zone ?? normalizedZone,
+      };
+    });
+  }
 }
 
 export const workflowService = new WorkflowService();

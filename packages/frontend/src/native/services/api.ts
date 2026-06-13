@@ -263,6 +263,19 @@ export class ApiService {
     return parseOrThrow<PaymentResult>(response, 'Failed to pay selected items');
   }
 
+  async removeSelectedItems(
+    tableNumber: number,
+    tableZone: string,
+    items: Array<{ orderId: string; itemId: number; qty: number }>
+  ): Promise<TableWorkflow> {
+    const response = await this.request('/orders/remove-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableNumber, tableZone, items })
+    });
+    return parseOrThrow<TableWorkflow>(response, 'Failed to remove selected items');
+  }
+
   async fetchMenu(): Promise<MenuItem[]> {
     const response = await this.request('/menu');
     return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu');
