@@ -1085,9 +1085,9 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface
   },
   desktopMenuTypeButton: {
-    minHeight: 60,
-    paddingHorizontal: 22,
-    paddingVertical: 17,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     justifyContent: 'center'
   },
   menuTypeButtonSelected: {
@@ -1100,7 +1100,7 @@ export const styles = StyleSheet.create({
     fontSize: 12
   },
   desktopMenuTypeButtonText: {
-    fontSize: 18
+    fontSize: 16
   },
   menuTypeButtonTextSelected: {
     color: colors.primaryDark
