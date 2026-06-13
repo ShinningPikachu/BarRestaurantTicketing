@@ -277,6 +277,36 @@ export const desktopStyles = StyleSheet.create({
   productFullNameInput: {
     width: '100%'
   },
+  productEditStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6
+  },
+  productSaveStatus: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  productSaveStatusSuccess: {
+    color: colors.success
+  },
+  productSaveChangesButton: {
+    minWidth: 142,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  productSaveChangesButtonDisabled: {
+    backgroundColor: colors.buttonSecondary,
+    borderColor: colors.border
+  },
+  productSaveChangesText: {
+    color: colors.textLight,
+    fontWeight: '700',
+    fontSize: 15
+  },
+  productSaveChangesTextDisabled: {
+    color: colors.textSecondary
+  },
   productImagePreview: {
     width: 64,
     height: 64,

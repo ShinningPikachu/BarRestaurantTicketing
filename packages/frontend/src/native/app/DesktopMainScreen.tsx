@@ -1,9 +1,141 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { toQR } from 'toqr';
 import { DesktopPosScreen } from '../components';
 import { MainScreenProps } from './MainScreen.types';
 import { desktopStyles as styles } from './DesktopMain.styles';
+import { MenuItem } from '../types';
+
+type ProductEditValues = {
+  name: string;
+  primaryName: string;
+  secondaryName: string;
+  category: string;
+  price: string;
+  cost: string;
+};
+
+function getProductEditValues(item: MenuItem): ProductEditValues {
+  return {
+    name: item.name,
+    primaryName: item.primaryName ?? '',
+    secondaryName: item.secondaryName ?? '',
+    category: item.category,
+    price: (item.priceCents / 100).toFixed(2),
+    cost: item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : '',
+  };
+}
+
+function valuesChanged(first: ProductEditValues, second: ProductEditValues): boolean {
+  return (
+    first.name !== second.name ||
+    first.primaryName !== second.primaryName ||
+    first.secondaryName !== second.secondaryName ||
+    first.category !== second.category ||
+    first.price !== second.price ||
+    first.cost !== second.cost
+  );
+}
+
+function DesktopProductEditRow({ item, props }: { item: MenuItem; props: MainScreenProps }): React.JSX.Element {
+  const [values, setValues] = useState<ProductEditValues>(() => getProductEditValues(item));
+  const [savedValues, setSavedValues] = useState<ProductEditValues>(() => getProductEditValues(item));
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  useEffect(() => {
+    const nextValues = getProductEditValues(item);
+    setValues(nextValues);
+    setSavedValues(nextValues);
+    setSaveState((current) => current === 'saving' || current === 'saved' ? 'saved' : 'idle');
+  }, [item.id, item.name, item.primaryName, item.secondaryName, item.category, item.priceCents, item.costCents]);
+
+  const hasChanges = valuesChanged(values, savedValues);
+  const saveDisabled = !hasChanges || saveState === 'saving';
+  const statusText = saveState === 'saving' ? 'Guardando...' : saveState === 'saved' ? 'Guardado' : hasChanges ? 'Cambios sin guardar' : 'Sin cambios';
+
+  const updateValue = (field: keyof ProductEditValues, value: string) => {
+    setValues((current) => ({ ...current, [field]: value }));
+    setSaveState('idle');
+  };
+
+  const saveChanges = async () => {
+    if (saveDisabled) {
+      return;
+    }
+
+    setSaveState('saving');
+    const didSave = await props.updateProductDetails(item, values);
+    if (didSave) {
+      setSavedValues(values);
+      setSaveState('saved');
+      return;
+    }
+    setSaveState('idle');
+  };
+
+  return (
+    <View key={item.id} style={styles.productRow}>
+      {item.imageDataUrl ? (
+        <Image source={{ uri: item.imageDataUrl }} style={styles.productRowImage} resizeMode="contain" />
+      ) : (
+        <View style={styles.productRowImagePlaceholder}>
+          <Text style={styles.itemPrice}>Sin imagen</Text>
+        </View>
+      )}
+      <View style={styles.flex1}>
+        <TextInput
+          style={[styles.formInput, styles.productFullNameInput]}
+          value={values.name}
+          onChangeText={(value) => updateValue('name', value)}
+          placeholder="Nombre"
+          placeholderTextColor="#6B7280"
+        />
+        <View style={styles.productNameEditRow}>
+          <TextInput
+            style={[styles.formInput, styles.productNameInput]}
+            value={values.primaryName}
+            onChangeText={(value) => updateValue('primaryName', value)}
+            placeholder="Principal"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={[styles.formInput, styles.productNameInput]}
+            value={values.secondaryName}
+            onChangeText={(value) => updateValue('secondaryName', value)}
+            placeholder="Secundario"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+        <TextInput
+          style={styles.formInput}
+          value={values.category}
+          onChangeText={(value) => updateValue('category', value)}
+          placeholder="Tipo"
+          placeholderTextColor="#6B7280"
+        />
+        <View style={styles.productEditStatusRow}>
+          <Text style={[styles.productSaveStatus, saveState === 'saved' ? styles.productSaveStatusSuccess : null]}>{statusText}</Text>
+        </View>
+      </View>
+      <TextInput style={styles.priceInput} value={values.price} keyboardType="decimal-pad" onChangeText={(value) => updateValue('price', value)} placeholder="Precio" placeholderTextColor="#6B7280" />
+      <TextInput style={styles.priceInput} value={values.cost} keyboardType="decimal-pad" placeholder="Coste" placeholderTextColor="#6B7280" onChangeText={(value) => updateValue('cost', value)} />
+      <TouchableOpacity style={[styles.secondaryButton, styles.productSaveChangesButton, saveDisabled ? styles.productSaveChangesButtonDisabled : null]} onPress={() => void saveChanges()} disabled={saveDisabled}>
+        <Text style={[styles.productSaveChangesText, saveDisabled ? styles.productSaveChangesTextDisabled : null]}>{saveState === 'saving' ? 'Guardando...' : 'Guardar cambios'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.updateProductImage(item)}>
+        <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
+      </TouchableOpacity>
+      {item.imageDataUrl ? (
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.removeProductImage(item)}>
+          <Text style={styles.secondaryButtonText}>Quitar</Text>
+        </TouchableOpacity>
+      ) : null}
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => props.removeProduct(item)}>
+        <Text style={styles.secondaryButtonText}>Eliminar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 function PairingQrCode({ value }: { value: string }): React.JSX.Element {
   const qr = useMemo(() => {
@@ -94,7 +226,9 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
               <Text style={styles.sectionTitle}>Conectar movil</Text>
               <Text style={styles.helperText}>En el telefono, abre la app instalada, toca Conectar y escanea este codigo.</Text>
               <Text style={styles.pairingAddress}>{props.computerPairingUrl}</Text>
-              <Text style={styles.helperText}>Telefono y ordenador deben estar en la misma red Wi-Fi. Si no escanea, escribe esta direccion manualmente en el telefono.</Text>
+              <Text style={styles.helperText}>Telefono y ordenador deben estar en la misma red Wi-Fi, o el telefono puede conectarse al punto Wi-Fi creado por este ordenador.</Text>
+              <Text style={styles.helperText}>Sin router: activa el hotspot del ordenador, conecta el telefono a esa red y vuelve a abrir esta pantalla para usar la direccion correcta.</Text>
+              <Text style={styles.helperText}>Si no escanea, escribe esta direccion manualmente en el telefono.</Text>
             </View>
             <PairingQrCode value={props.computerPairingUrl} />
           </View>
@@ -223,74 +357,9 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
             ))}
           </View>
           <ScrollView style={styles.columnScroll}>
-            {props.managedMenuItems.map((item) => {
-              let primaryDraft = item.primaryName ?? '';
-              let secondaryDraft = item.secondaryName ?? '';
-              const saveDisplayNames = () => void props.updateProductDisplayNames(item, primaryDraft, secondaryDraft);
-
-              return (
-                <View key={item.id} style={styles.productRow}>
-                  {item.imageDataUrl ? (
-                    <Image source={{ uri: item.imageDataUrl }} style={styles.productRowImage} resizeMode="contain" />
-                  ) : (
-                    <View style={styles.productRowImagePlaceholder}>
-                      <Text style={styles.itemPrice}>Sin imagen</Text>
-                    </View>
-                  )}
-                  <View style={styles.flex1}>
-                    <TextInput
-                      style={[styles.formInput, styles.productFullNameInput]}
-                      defaultValue={item.name}
-                      onSubmitEditing={(event) => void props.updateProductName(item, event.nativeEvent.text)}
-                      onEndEditing={(event) => void props.updateProductName(item, event.nativeEvent.text)}
-                      placeholder="Nombre"
-                      placeholderTextColor="#6B7280"
-                    />
-                    <View style={styles.productNameEditRow}>
-                      <TextInput
-                        style={[styles.formInput, styles.productNameInput]}
-                        defaultValue={primaryDraft}
-                        onChangeText={(value) => { primaryDraft = value; }}
-                        onSubmitEditing={saveDisplayNames}
-                        onEndEditing={saveDisplayNames}
-                        placeholder="Principal"
-                        placeholderTextColor="#6B7280"
-                      />
-                      <TextInput
-                        style={[styles.formInput, styles.productNameInput]}
-                        defaultValue={secondaryDraft}
-                        onChangeText={(value) => { secondaryDraft = value; }}
-                        onSubmitEditing={saveDisplayNames}
-                        onEndEditing={saveDisplayNames}
-                        placeholder="Secundario"
-                        placeholderTextColor="#6B7280"
-                      />
-                    </View>
-                    <TextInput
-                      style={styles.formInput}
-                      defaultValue={item.category}
-                      onSubmitEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
-                      onEndEditing={(event) => void props.updateProductCategory(item, event.nativeEvent.text)}
-                      placeholder="Tipo"
-                      placeholderTextColor="#6B7280"
-                    />
-                  </View>
-                  <TextInput style={styles.priceInput} defaultValue={(item.priceCents / 100).toFixed(2)} keyboardType="decimal-pad" onSubmitEditing={(event) => void props.updateProductPrice(item, event.nativeEvent.text)} onEndEditing={(event) => void props.updateProductPrice(item, event.nativeEvent.text)} />
-                  <TextInput style={styles.priceInput} defaultValue={item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : ''} keyboardType="decimal-pad" placeholder="Coste" placeholderTextColor="#6B7280" onSubmitEditing={(event) => void props.updateProductCost(item, event.nativeEvent.text)} onEndEditing={(event) => void props.updateProductCost(item, event.nativeEvent.text)} />
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.updateProductImage(item)}>
-                    <Text style={styles.secondaryButtonText}>{item.imageDataUrl ? 'Cambiar' : 'Imagen'}</Text>
-                  </TouchableOpacity>
-                  {item.imageDataUrl ? (
-                    <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.removeProductImage(item)}>
-                      <Text style={styles.secondaryButtonText}>Quitar</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => props.removeProduct(item)}>
-                    <Text style={styles.secondaryButtonText}>Eliminar</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+            {props.managedMenuItems.map((item) => (
+              <DesktopProductEditRow key={item.id} item={item} props={props} />
+            ))}
           </ScrollView>
         </View>
       ) : null}

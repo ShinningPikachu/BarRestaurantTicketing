@@ -1,9 +1,9 @@
-import os from 'node:os';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { printExpoGoLink, printInstalledAppPairingCode } from './expo-terminal.mjs';
+import { getHostIp } from './network-address.mjs';
 import { ensureRuntimeEnv } from './runtime-env.mjs';
 
 function loadEnvFile(filePath) {
@@ -41,40 +41,14 @@ function loadEnvFile(filePath) {
 const runtimeEnv = ensureRuntimeEnv(resolve(process.cwd(), '.env'));
 loadEnvFile(resolve(process.cwd(), '.env'));
 
-function getLanIp() {
-  let interfaces;
-  try {
-    interfaces = os.networkInterfaces();
-  } catch (error) {
-    console.warn(`Could not inspect network interfaces: ${error.message}`);
-    return 'localhost';
-  }
-
-  const candidates = [];
-
-  for (const [name, addresses] of Object.entries(interfaces)) {
-    for (const address of addresses ?? []) {
-      if (address.family !== 'IPv4' || address.internal) {
-        continue;
-      }
-
-      const score = /^(en|eth|wl|wlan|wifi)/i.test(name) ? 0 : 1;
-      candidates.push({ address: address.address, score });
-    }
-  }
-
-  candidates.sort((left, right) => left.score - right.score);
-  return candidates[0]?.address ?? 'localhost';
-}
-
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const backendPort = process.env.PORT || '3000';
-const lanIp = getLanIp();
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${lanIp}:${backendPort}/api`;
-const pairingApiBaseUrl = `http://${lanIp}:${backendPort}/api`;
+const hostIp = getHostIp({ fallback: 'localhost' });
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${hostIp}:${backendPort}/api`;
+const pairingApiBaseUrl = `http://${hostIp}:${backendPort}/api`;
 const desktopPort = process.env.DESKTOP_EXPO_PORT || '8081';
 const phonePort = process.env.PHONE_EXPO_PORT || '8082';
-const phoneExpoUrl = `exp://${lanIp}:${phonePort}`;
+const phoneExpoUrl = `exp://${hostIp}:${phonePort}`;
 const cacheRoot = resolve(process.cwd(), '.cache', 'expo');
 const pidFile = resolve(process.cwd(), '.cache', 'bar-restaurant-ticketing.pids');
 const desktopExpoHome = resolve(cacheRoot, 'desktop');
@@ -194,7 +168,9 @@ setTimeout(() => {
   }
 }, 1500);
 
-console.log(`\nBackend API shared by both screens: ${apiBaseUrl}`);
+console.log(`\nSelected computer address for phone pairing: ${hostIp}`);
+console.log('Tip: if you use the computer hotspot and the QR shows the wrong address, restart with BAR_TICKETING_HOST_IP set to the hotspot IP.');
+console.log(`Backend API shared by both screens: ${apiBaseUrl}`);
 console.log(`Computer web TPV: http://localhost:${desktopPort}`);
 console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
 printInstalledAppPairingCode(pairingApiBaseUrl);

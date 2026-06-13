@@ -462,7 +462,8 @@ export const mobileStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minWidth: 0
+    minWidth: 0,
+    flexWrap: 'wrap'
   },
   productEditRow: {
     flexDirection: 'row',
@@ -506,6 +507,31 @@ export const mobileStyles = StyleSheet.create({
     minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  productSaveChangesButton: {
+    minWidth: 76,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  productSaveChangesButtonDisabled: {
+    backgroundColor: colors.buttonSecondary,
+    borderColor: colors.border
+  },
+  productSaveChangesText: {
+    color: colors.textLight,
+    fontWeight: '700',
+    fontSize: 12
+  },
+  productSaveChangesTextDisabled: {
+    color: colors.textSecondary
+  },
+  productSaveStatus: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  productSaveStatusSuccess: {
+    color: colors.success
   },
   emptyText: {
     color: colors.textTertiary,

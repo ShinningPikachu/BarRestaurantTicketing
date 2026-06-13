@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getHostIp } from './network-address.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const frontendDir = resolve(repoRoot, 'packages/frontend');
@@ -66,32 +67,6 @@ function assertSupportedNodeVersion() {
   process.exit(1);
 }
 
-function getLanIp() {
-  let interfaces;
-  try {
-    interfaces = os.networkInterfaces();
-  } catch (error) {
-    console.warn(`Could not inspect network interfaces: ${error.message}`);
-    return undefined;
-  }
-
-  const candidates = [];
-
-  for (const [name, addresses] of Object.entries(interfaces)) {
-    for (const address of addresses ?? []) {
-      if (address.family !== 'IPv4' || address.internal) {
-        continue;
-      }
-
-      const score = /^(en|eth|wl|wlan|wifi)/i.test(name) ? 0 : 1;
-      candidates.push({ address: address.address, score });
-    }
-  }
-
-  candidates.sort((left, right) => left.score - right.score);
-  return candidates[0]?.address;
-}
-
 function run(command, args, options = {}) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, {
@@ -143,7 +118,7 @@ loadEnvFile(resolve(repoRoot, '.env'));
 loadEnvFile(resolve(frontendDir, '.env'));
 
 const backendPort = process.env.PORT || '3000';
-const detectedLanIp = getLanIp();
+const detectedLanIp = getHostIp();
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || (detectedLanIp ? `http://${detectedLanIp}:${backendPort}/api` : undefined);
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const gradleCommand = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
@@ -219,6 +194,9 @@ const buildEnv = {
 };
 
 console.log(`Building Android APK with API URL: ${apiBaseUrl}`);
+if (!process.env.EXPO_PUBLIC_API_BASE_URL && process.env.BAR_TICKETING_HOST_IP) {
+  console.log(`Using BAR_TICKETING_HOST_IP: ${process.env.BAR_TICKETING_HOST_IP}`);
+}
 if (javaHome) {
   console.log(`Using JAVA_HOME: ${javaHome}`);
 }
