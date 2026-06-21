@@ -105,6 +105,9 @@ export interface BackendTable {
   zone?: string | null;
   seats?: number | null;
   name?: string | null;
+  totalCents?: number;
+  pendingItemCount?: number;
+  confirmedItemCount?: number;
 }
 
 export interface TableWorkflow {

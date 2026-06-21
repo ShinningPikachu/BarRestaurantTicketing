@@ -67,12 +67,18 @@ export class WorkflowService {
     const tables = await workflowRepository.listTables();
     return tables
       .filter((table) => VALID_TABLE_ZONES.has((table.zone ?? '').trim().toLowerCase()))
-      .map(({ orders, preOrderSessions, ...table }) => ({
-        ...table,
-        totalCents: orders.reduce((sum, order) => sum + order.totalCents, 0)
-          + preOrderSessions.flatMap((session) => session.items)
-            .reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0),
-      }));
+      .map(({ orders, preOrderSessions, ...table }) => {
+        const pendingItems = preOrderSessions.flatMap((session) => session.items);
+        const confirmedItems = orders.flatMap((order) => order.items);
+
+        return {
+          ...table,
+          totalCents: orders.reduce((sum, order) => sum + order.totalCents, 0)
+            + pendingItems.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0),
+          pendingItemCount: pendingItems.reduce((sum, item) => sum + item.qty, 0),
+          confirmedItemCount: confirmedItems.reduce((sum, item) => sum + item.qty, 0),
+        };
+      });
   }
 
   async addTable(zone: string) {

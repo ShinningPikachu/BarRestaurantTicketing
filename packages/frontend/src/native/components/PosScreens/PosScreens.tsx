@@ -18,7 +18,7 @@ import {
 import { styles } from '../../app/App.styles';
 import { getItemDisplayName } from '../../helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from '../../helpers/kitchenTicketPrinter';
-import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
+import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TableKitchenStatus, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
 import { OrderSection } from '../OrderZone/OrderSection';
 import { TableZoneGroup } from '../TableZoneGroup/TableZoneGroup';
@@ -44,6 +44,7 @@ interface ConfirmedItemRow {
 export interface PosScreenProps {
   tables: Map<TableZone, number[]>;
   tableTotals: Map<string, number>;
+  tableKitchenStatuses: Map<string, TableKitchenStatus>;
   selectedTable: TableId;
   menuCategories: string[];
   visibleMenuCategory: string | null;
@@ -69,6 +70,7 @@ interface TableSelectorProps {
   layout?: MenuLayout;
   tables: Map<TableZone, number[]>;
   tableTotals: Map<string, number>;
+  tableKitchenStatuses: Map<string, TableKitchenStatus>;
   selectedTable: TableId;
   onSelectTable: (table: TableId) => void;
   onAddTable: (zone: TableZone) => void;
@@ -76,7 +78,7 @@ interface TableSelectorProps {
   formatPrice: (cents: number) => string;
 }
 
-function TableSelector({ layout = 'desktop', tables, tableTotals, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableSelectorProps): React.JSX.Element {
+function TableSelector({ layout = 'desktop', tables, tableTotals, tableKitchenStatuses, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableSelectorProps): React.JSX.Element {
   return (
     <>
       {TABLE_ZONES.map((zone: TableZone) => (
@@ -86,6 +88,7 @@ function TableSelector({ layout = 'desktop', tables, tableTotals, selectedTable,
           zone={zone}
           numbers={tables.get(zone) ?? []}
           tableTotals={tableTotals}
+          tableKitchenStatuses={tableKitchenStatuses}
           selectedTable={selectedTable}
           onSelectTable={onSelectTable}
           onAddTable={onAddTable}
@@ -900,6 +903,7 @@ export function MobilePosScreen(props: PosScreenProps): React.JSX.Element {
                   layout="mobile"
                   tables={props.tables}
                   tableTotals={props.tableTotals}
+                  tableKitchenStatuses={props.tableKitchenStatuses}
                   selectedTable={props.selectedTable}
                   onSelectTable={handleSelectTable}
                   onAddTable={props.onAddTable}
@@ -964,6 +968,7 @@ export function DesktopPosScreen(props: PosScreenProps): React.JSX.Element {
               <TableSelector
                 tables={props.tables}
                 tableTotals={props.tableTotals}
+                tableKitchenStatuses={props.tableKitchenStatuses}
                 selectedTable={props.selectedTable}
                 onSelectTable={props.onSelectTable}
                 onAddTable={props.onAddTable}

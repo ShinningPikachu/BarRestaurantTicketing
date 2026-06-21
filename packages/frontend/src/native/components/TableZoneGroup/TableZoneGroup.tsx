@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Animated, PanResponder, PanResponderGestureState, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { TableId, TableZone, tableKey, tableZoneLabel } from '../../types';
+import { TableId, TableKitchenStatus, TableZone, tableKey, tableZoneLabel } from '../../types';
 import { styles } from './TableZoneGroup.styles';
 
 interface TablePosition {
@@ -12,6 +12,7 @@ interface TablePosition {
 interface DraggableTableProps {
   table: TableId;
   totalCents: number;
+  kitchenStatus: TableKitchenStatus;
   position: TablePosition;
   isSelected: boolean;
   isMobile: boolean;
@@ -96,6 +97,7 @@ function areTablePositionsEqual(left: Record<string, TablePosition>, right: Reco
 function DraggableTable({
   table,
   totalCents,
+  kitchenStatus,
   position,
   isSelected,
   isMobile,
@@ -175,9 +177,12 @@ function DraggableTable({
       {...panResponder.panHandlers}
       style={[
         styles.tableNode,
+        kitchenStatus === 'pending' && styles.tableNodePending,
+        kitchenStatus === 'sent' && styles.tableNodeSent,
         isMobile && styles.mobileTableNode,
         isDragging && styles.tableNodeDragging,
         isSelected && styles.tableNodeSelected,
+        isSelected && kitchenStatus === 'empty' && styles.tableNodeSelectedEmpty,
         {
           width: tableWidth,
           height: tableHeight,
@@ -185,10 +190,27 @@ function DraggableTable({
         },
       ]}
     >
-      <Text selectable={false} style={[styles.tableNodeText, isMobile && styles.mobileTableNodeText, isSelected && styles.tableNodeTextSelected]}>
+      <Text
+        selectable={false}
+        style={[
+          styles.tableNodeText,
+          kitchenStatus === 'sent' && styles.tableNodeTextSent,
+          isMobile && styles.mobileTableNodeText,
+          isSelected && kitchenStatus === 'empty' && styles.tableNodeTextSelected
+        ]}
+      >
         {`M${table.number}`}
       </Text>
-      <Text selectable={false} style={[styles.tableAmountText, isMobile && styles.mobileTableAmountText, isSelected && styles.tableNodeTextSelected]}>
+      <Text
+        selectable={false}
+        style={[
+          styles.tableAmountText,
+          kitchenStatus === 'pending' && styles.tableAmountTextPending,
+          kitchenStatus === 'sent' && styles.tableAmountTextSent,
+          isMobile && styles.mobileTableAmountText,
+          isSelected && kitchenStatus === 'empty' && styles.tableNodeTextSelected
+        ]}
+      >
         {formatPrice(totalCents)}
       </Text>
     </Animated.View>
@@ -200,6 +222,7 @@ interface TableZoneGroupProps {
   zone: TableZone;
   numbers: number[];
   tableTotals: Map<string, number>;
+  tableKitchenStatuses: Map<string, TableKitchenStatus>;
   selectedTable: TableId;
   onSelectTable: (table: TableId) => void;
   onAddTable: (zone: TableZone) => void;
@@ -207,7 +230,7 @@ interface TableZoneGroupProps {
   formatPrice: (cents: number) => string;
 }
 
-export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableZoneGroupProps): React.JSX.Element {
+export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals, tableKitchenStatuses, selectedTable, onSelectTable, onAddTable, onRemoveTable, formatPrice }: TableZoneGroupProps): React.JSX.Element {
   const [boardWidth, setBoardWidth] = useState(0);
   const [tablePositions, setTablePositions] = useState<Record<string, TablePosition>>({});
   const [hasLoadedPositions, setHasLoadedPositions] = useState(false);
@@ -341,6 +364,7 @@ export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals,
               key={key}
               table={table}
               totalCents={tableTotals.get(key) ?? 0}
+              kitchenStatus={tableKitchenStatuses.get(key) ?? 'empty'}
               position={position}
               isSelected={isSelected}
               isMobile={isMobile}

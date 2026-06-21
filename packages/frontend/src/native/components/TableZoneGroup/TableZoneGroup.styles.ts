@@ -63,8 +63,19 @@ export const styles = StyleSheet.create({
     opacity: 0.82
   },
   tableNodeSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryDark
+    borderColor: colors.primaryDark,
+    borderWidth: 2
+  },
+  tableNodeSelectedEmpty: {
+    backgroundColor: colors.primary
+  },
+  tableNodePending: {
+    backgroundColor: '#FEF08A',
+    borderColor: '#D97706'
+  },
+  tableNodeSent: {
+    backgroundColor: colors.error,
+    borderColor: '#991B1B'
   },
   tableNodeText: {
     color: colors.text,
@@ -75,6 +86,9 @@ export const styles = StyleSheet.create({
   mobileTableNodeText: {
     fontSize: 16
   },
+  tableNodeTextSent: {
+    color: colors.textLight
+  },
   tableAmountText: {
     color: colors.textTertiary,
     fontWeight: '700',
@@ -84,6 +98,12 @@ export const styles = StyleSheet.create({
   },
   mobileTableAmountText: {
     fontSize: 11
+  },
+  tableAmountTextPending: {
+    color: colors.textBlack
+  },
+  tableAmountTextSent: {
+    color: colors.textLight
   },
   tableNodeTextSelected: {
     color: colors.textLight

@@ -105,7 +105,11 @@ export interface BackendTable {
   seats?: number | null;
   name?: string | null;
   totalCents?: number;
+  pendingItemCount?: number;
+  confirmedItemCount?: number;
 }
+
+export type TableKitchenStatus = 'empty' | 'pending' | 'sent';
 
 export interface TableWorkflow {
   table: BackendTable;

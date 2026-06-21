@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { getCurrentTableTotal } from '../app/app.helpers';
-import { Order, PaymentMethod, TableId, TableZone } from '../types';
+import { Order, PaymentMethod, TableId, TableKitchenStatus, TableZone } from '../types';
 import { useMenuController } from './menu.controller';
 import { useTableController } from './table.controller';
 import { useTicketController } from './ticket.controller';
@@ -27,10 +27,23 @@ export function useTicketingController(enabled = true) {
     () => getCurrentTableTotal(workflowController.state.preorderItems, tableConfirmedOrders),
     [workflowController.state.preorderItems, tableConfirmedOrders]
   );
+  const currentTableKitchenStatus = useMemo<TableKitchenStatus>(() => {
+    if (workflowController.state.preorderItems.some((item) => item.qty > 0)) {
+      return 'pending';
+    }
+    if (tableConfirmedOrders.some((order) => order.items.some((item) => item.qty > 0))) {
+      return 'sent';
+    }
+    return 'empty';
+  }, [workflowController.state.preorderItems, tableConfirmedOrders]);
 
   useEffect(() => {
     tableController.actions.updateTableTotal(selectedTable, currentTableTotal);
   }, [currentTableTotal, selectedTable.number, selectedTable.zone]);
+
+  useEffect(() => {
+    tableController.actions.updateTableKitchenStatus(selectedTable, currentTableKitchenStatus);
+  }, [currentTableKitchenStatus, selectedTable.number, selectedTable.zone]);
 
   // Initialization - separated for clarity
   useEffect(() => {
@@ -252,6 +265,7 @@ export function useTicketingController(enabled = true) {
       loading,
       tables: tableController.state.tables,
       tableTotals: tableController.state.tableTotals,
+      tableKitchenStatuses: tableController.state.tableKitchenStatuses,
       selectedTable,
       menuByCategory: menuController.state.menuByCategory,
       preorderItems: workflowController.state.preorderItems,

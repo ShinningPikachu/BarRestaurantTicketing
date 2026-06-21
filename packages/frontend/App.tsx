@@ -260,6 +260,7 @@ export default function App(): React.JSX.Element {
     loading,
     tables,
     tableTotals,
+    tableKitchenStatuses,
     selectedTable,
     menuByCategory,
     preorderItems,
@@ -1014,6 +1015,7 @@ export default function App(): React.JSX.Element {
   const posScreenProps = {
     tables,
     tableTotals,
+    tableKitchenStatuses,
     selectedTable,
     menuCategories,
     visibleMenuCategory,

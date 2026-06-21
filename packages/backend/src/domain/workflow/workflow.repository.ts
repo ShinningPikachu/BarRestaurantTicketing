@@ -26,7 +26,12 @@ export class WorkflowRepository {
       include: {
         orders: {
           where: { status: 'confirmed' },
-          select: { totalCents: true },
+          select: {
+            totalCents: true,
+            items: {
+              select: { qty: true },
+            },
+          },
         },
         preOrderSessions: {
           where: { status: 'draft' },

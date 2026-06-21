@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { SelectedTable } from '../app/app.types';
 import { ApiRequestError, apiService, logger } from '../services';
-import { BackendTable, TableId, TABLE_ZONES, TableZone, normalizeTableZone, tableKey, tableZoneLabel } from '../types';
+import { BackendTable, TableId, TableKitchenStatus, TABLE_ZONES, TableZone, normalizeTableZone, tableKey, tableZoneLabel } from '../types';
 
 function toKnownZone(zone: string | null | undefined): TableZone | null {
   const normalized = (zone ?? '').trim().toLowerCase();
@@ -74,6 +74,29 @@ function mapTableTotals(tables: BackendTable[]): Map<string, number> {
   return totals;
 }
 
+function getTableKitchenStatus(table: BackendTable): TableKitchenStatus {
+  if ((table.pendingItemCount ?? 0) > 0) {
+    return 'pending';
+  }
+  if ((table.confirmedItemCount ?? 0) > 0) {
+    return 'sent';
+  }
+  return 'empty';
+}
+
+function mapTableKitchenStatuses(tables: BackendTable[]): Map<string, TableKitchenStatus> {
+  const statuses = new Map<string, TableKitchenStatus>();
+
+  for (const table of tables) {
+    const zone = toKnownZone(table.zone);
+    if (zone) {
+      statuses.set(tableKey({ zone, number: table.number }), getTableKitchenStatus(table));
+    }
+  }
+
+  return statuses;
+}
+
 function confirmDeleteTable(table: TableId, onConfirm: () => void): void {
   const message = `Se eliminará la mesa M${table.number} en ${tableZoneLabel(table.zone)} y todos sus pedidos pendientes. Esta acción no se puede deshacer.`;
 
@@ -102,6 +125,7 @@ function confirmDeleteTable(table: TableId, onConfirm: () => void): void {
 export function useTableController() {
   const [tables, setTables] = useState<Map<TableZone, number[]>>(new Map());
   const [tableTotals, setTableTotals] = useState<Map<string, number>>(new Map());
+  const [tableKitchenStatuses, setTableKitchenStatuses] = useState<Map<string, TableKitchenStatus>>(new Map());
   const [selectedTable, setSelectedTable] = useState<SelectedTable>({ zone: TableZone.OUTSIDE, number: 1 });
 
   async function loadTables(): Promise<SelectedTable> {
@@ -126,6 +150,7 @@ export function useTableController() {
 
     setTables(loadedTables);
     setTableTotals(mapTableTotals(ensuredTablesRaw));
+    setTableKitchenStatuses(mapTableKitchenStatuses(ensuredTablesRaw));
     setSelectedTable(initialTable);
 
     return initialTable;
@@ -139,6 +164,7 @@ export function useTableController() {
 
     setTables(loadedTables);
     setTableTotals(mapTableTotals(loadedTablesRaw));
+    setTableKitchenStatuses(mapTableKitchenStatuses(loadedTablesRaw));
     setSelectedTable(nextSelectedTable);
 
     return nextSelectedTable;
@@ -159,6 +185,7 @@ export function useTableController() {
       const loadedTables = await apiService.fetchTables();
       setTables(mapTablesByZone(loadedTables));
       setTableTotals(mapTableTotals(loadedTables));
+      setTableKitchenStatuses(mapTableKitchenStatuses(loadedTables));
 
       const nextTable: TableId = {
         zone: normalizeTableZone(newTable.zone ?? zone),
@@ -185,6 +212,7 @@ export function useTableController() {
       const groupedTables = mapTablesByZone(loadedTables);
       setTables(groupedTables);
       setTableTotals(mapTableTotals(loadedTables));
+      setTableKitchenStatuses(mapTableKitchenStatuses(loadedTables));
 
       const nextTable = getFirstTableInZone(groupedTables, table.zone) ?? getInitialTable(groupedTables);
       setSelectedTable(nextTable);
@@ -201,6 +229,7 @@ export function useTableController() {
           const groupedTables = mapTablesByZone(loadedTables);
           setTables(groupedTables);
           setTableTotals(mapTableTotals(loadedTables));
+          setTableKitchenStatuses(mapTableKitchenStatuses(loadedTables));
 
           const zoneHasSelectedTable = groupedTables.get(selectedTable.zone)?.includes(selectedTable.number) ?? false;
           const nextTable = zoneHasSelectedTable
@@ -232,10 +261,24 @@ export function useTableController() {
     });
   }
 
+  function updateTableKitchenStatus(table: TableId, status: TableKitchenStatus): void {
+    setTableKitchenStatuses((current) => {
+      const key = tableKey(table);
+      if (current.get(key) === status) {
+        return current;
+      }
+
+      const next = new Map(current);
+      next.set(key, status);
+      return next;
+    });
+  }
+
   return {
     state: {
       tables,
       tableTotals,
+      tableKitchenStatuses,
       selectedTable,
     },
     actions: {
@@ -245,6 +288,7 @@ export function useTableController() {
       addTable,
       removeTable,
       updateTableTotal,
+      updateTableKitchenStatus,
     }
   };
 }
