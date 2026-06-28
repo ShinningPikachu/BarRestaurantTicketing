@@ -179,6 +179,7 @@ function DraggableTable({
         styles.tableNode,
         kitchenStatus === 'pending' && styles.tableNodePending,
         kitchenStatus === 'sent' && styles.tableNodeSent,
+        kitchenStatus === 'printed' && styles.tableNodePrinted,
         isMobile && styles.mobileTableNode,
         isDragging && styles.tableNodeDragging,
         isSelected && styles.tableNodeSelected,
@@ -194,7 +195,9 @@ function DraggableTable({
         selectable={false}
         style={[
           styles.tableNodeText,
+          kitchenStatus === 'pending' && styles.tableNodeTextPending,
           kitchenStatus === 'sent' && styles.tableNodeTextSent,
+          kitchenStatus === 'printed' && styles.tableNodeTextPrinted,
           isMobile && styles.mobileTableNodeText,
           isSelected && kitchenStatus === 'empty' && styles.tableNodeTextSelected
         ]}
@@ -207,6 +210,7 @@ function DraggableTable({
           styles.tableAmountText,
           kitchenStatus === 'pending' && styles.tableAmountTextPending,
           kitchenStatus === 'sent' && styles.tableAmountTextSent,
+          kitchenStatus === 'printed' && styles.tableAmountTextPrinted,
           isMobile && styles.mobileTableAmountText,
           isSelected && kitchenStatus === 'empty' && styles.tableNodeTextSelected
         ]}

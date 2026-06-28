@@ -13,6 +13,7 @@ model Table {
   zone             String?
   seats            Int?              @default(4)
   name             String?
+  ticketPrintedAt  DateTime?
   orders           Order[]
   preOrderSessions PreOrderSession[]
   kitchenTickets   KitchenTicket[]

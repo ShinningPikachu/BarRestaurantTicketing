@@ -75,10 +75,15 @@ function mapTableTotals(tables: BackendTable[]): Map<string, number> {
 }
 
 function getTableKitchenStatus(table: BackendTable): TableKitchenStatus {
-  if ((table.pendingItemCount ?? 0) > 0) {
+  const pendingItemCount = table.pendingItemCount ?? 0;
+  const confirmedItemCount = table.confirmedItemCount ?? 0;
+  if (table.hasPrintedTicket && pendingItemCount + confirmedItemCount > 0) {
+    return 'printed';
+  }
+  if (pendingItemCount > 0) {
     return 'pending';
   }
-  if ((table.confirmedItemCount ?? 0) > 0) {
+  if (confirmedItemCount > 0) {
     return 'sent';
   }
   return 'empty';
@@ -274,6 +279,11 @@ export function useTableController() {
     });
   }
 
+  async function markTableTicketPrinted(table: TableId): Promise<void> {
+    await apiService.markTableTicketPrinted(table.number, table.zone);
+    updateTableKitchenStatus(table, 'printed');
+  }
+
   return {
     state: {
       tables,
@@ -289,6 +299,7 @@ export function useTableController() {
       removeTable,
       updateTableTotal,
       updateTableKitchenStatus,
+      markTableTicketPrinted,
     }
   };
 }

@@ -202,6 +202,13 @@ export class ApiService {
     return parseOrThrow<TableWorkflow>(response, 'Failed to clear pre-order');
   }
 
+  async markTableTicketPrinted(tableNumber: number, tableZone: string): Promise<BackendTable> {
+    const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/ticket-printed`, {
+      method: 'POST'
+    });
+    return parseOrThrow<BackendTable>(response, 'Failed to mark table ticket as printed');
+  }
+
   async sendTablePreOrderToKitchen(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
     const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/send-to-kitchen`, {
       method: 'POST'

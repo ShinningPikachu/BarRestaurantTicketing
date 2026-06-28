@@ -27,6 +27,16 @@ export const colors = {
   zoneTable: '#FFF7ED',
   zoneMenu: '#F0FDFA',
 
+  tablePendingBackground: '#F59E0B',
+  tablePendingBorder: '#B45309',
+  tablePendingText: '#111827',
+  tableSentBackground: '#059669',
+  tableSentBorder: '#047857',
+  tableSentText: '#FFFFFF',
+  tablePrintedBackground: '#2563EB',
+  tablePrintedBorder: '#1D4ED8',
+  tablePrintedText: '#FFFFFF',
+
   success: '#059669',
   warning: '#D97706',
   error: '#DC2626',

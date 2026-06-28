@@ -26,7 +26,6 @@ interface OrderSectionProps {
   onPayTicket: (method: PaymentMethod, splitPeople?: number) => void;
   onPaySelectedItems: (method: PaymentMethod, items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
   onRemoveSelectedItems: (items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
-  onRemoveOrder: (orderId: string) => void;
   onMoveConfirmedItemToPreOrder: (orderId: string, item: OrderItem) => void;
   onOpenCashDrawer: () => void;
 }
@@ -66,7 +65,6 @@ export function OrderSection({
   onPayTicket,
   onPaySelectedItems,
   onRemoveSelectedItems,
-  onRemoveOrder,
   onMoveConfirmedItemToPreOrder,
   onOpenCashDrawer
 }: OrderSectionProps): React.JSX.Element {
@@ -225,6 +223,19 @@ export function OrderSection({
     setAaQtyByKey({});
   }
 
+  function handleRemoveConfirmedItem(item: ConfirmedItemRow): void {
+    if (item.item.id === undefined) {
+      Alert.alert('No se puede eliminar', 'Este producto de cocina no tiene identificador.');
+      return;
+    }
+
+    onRemoveSelectedItems([{
+      orderId: item.orderId,
+      itemId: item.item.id,
+      qty: item.item.qty,
+    }]);
+  }
+
   return (
     <View style={styles.orderSection}>
       <Text style={styles.sectionTitle}>{`Cuenta mesa ${tableZoneLabel(selectedTable.zone)}-${selectedTable.number}`}</Text>
@@ -336,7 +347,7 @@ export function OrderSection({
                     <TouchableOpacity style={styles.primaryButton} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)}>
                       <Text style={styles.primaryButtonText}>Editar</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={() => onRemoveOrder(item.orderId)}>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={() => handleRemoveConfirmedItem(item)}>
                       <Text style={styles.secondaryButtonText}>Eliminar</Text>
                     </TouchableOpacity>
                   </View>

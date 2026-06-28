@@ -70,12 +70,19 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary
   },
   tableNodePending: {
-    backgroundColor: '#FEF08A',
-    borderColor: '#D97706'
+    borderWidth: 2,
+    backgroundColor: colors.tablePendingBackground,
+    borderColor: colors.tablePendingBorder
   },
   tableNodeSent: {
-    backgroundColor: colors.error,
-    borderColor: '#991B1B'
+    borderWidth: 2,
+    backgroundColor: colors.tableSentBackground,
+    borderColor: colors.tableSentBorder
+  },
+  tableNodePrinted: {
+    borderWidth: 2,
+    backgroundColor: colors.tablePrintedBackground,
+    borderColor: colors.tablePrintedBorder
   },
   tableNodeText: {
     color: colors.text,
@@ -86,8 +93,14 @@ export const styles = StyleSheet.create({
   mobileTableNodeText: {
     fontSize: 16
   },
+  tableNodeTextPending: {
+    color: colors.tablePendingText
+  },
   tableNodeTextSent: {
-    color: colors.textLight
+    color: colors.tableSentText
+  },
+  tableNodeTextPrinted: {
+    color: colors.tablePrintedText
   },
   tableAmountText: {
     color: colors.textTertiary,
@@ -100,10 +113,13 @@ export const styles = StyleSheet.create({
     fontSize: 11
   },
   tableAmountTextPending: {
-    color: colors.textBlack
+    color: colors.tablePendingText
   },
   tableAmountTextSent: {
-    color: colors.textLight
+    color: colors.tableSentText
+  },
+  tableAmountTextPrinted: {
+    color: colors.tablePrintedText
   },
   tableNodeTextSelected: {
     color: colors.textLight

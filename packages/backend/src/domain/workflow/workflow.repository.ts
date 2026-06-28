@@ -57,6 +57,46 @@ export class WorkflowRepository {
     });
   }
 
+  async markTableTicketPrinted(tableId: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    await db.$executeRaw`UPDATE "Table" SET "ticketPrintedAt" = ${new Date()} WHERE "id" = ${tableId}`;
+    return db.table.findUniqueOrThrow({ where: { id: tableId } });
+  }
+
+  async clearTableTicketPrinted(tableId: number, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    await db.$executeRaw`UPDATE "Table" SET "ticketPrintedAt" = NULL WHERE "id" = ${tableId}`;
+    return db.table.findUniqueOrThrow({ where: { id: tableId } });
+  }
+
+  async getPrintedTicketTableIds(tableIds: number[], tx?: Prisma.TransactionClient): Promise<Set<number>> {
+    if (tableIds.length === 0) {
+      return new Set();
+    }
+
+    const db = tx ?? this.client;
+    const rows = await db.$queryRaw<Array<{ id: number }>>`
+      SELECT "id"
+      FROM "Table"
+      WHERE "ticketPrintedAt" IS NOT NULL
+        AND "id" IN (${Prisma.join(tableIds)})
+    `;
+
+    return new Set(rows.map((row) => row.id));
+  }
+
+  async hasTablePrintedTicket(tableId: number, tx?: Prisma.TransactionClient): Promise<boolean> {
+    const db = tx ?? this.client;
+    const rows = await db.$queryRaw<Array<{ ticketPrintedAt: Date | string | null }>>`
+      SELECT "ticketPrintedAt"
+      FROM "Table"
+      WHERE "id" = ${tableId}
+      LIMIT 1
+    `;
+
+    return Boolean(rows[0]?.ticketPrintedAt);
+  }
+
   async getTableNumbersInZone(zone: string, tx?: Prisma.TransactionClient): Promise<number[]> {
     const db = tx ?? this.client;
     const tables = await db.table.findMany({

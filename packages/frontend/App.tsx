@@ -998,9 +998,6 @@ export default function App(): React.JSX.Element {
     onRemoveSelectedItems: (items: Parameters<typeof actions.removeSelectedItems>[0]) => {
       void actions.removeSelectedItems(items);
     },
-    onRemoveOrder: (orderId: string) => {
-      void actions.removeOrder(orderId);
-    },
     onMoveConfirmedItemToPreOrder: (
       orderId: Parameters<typeof actions.moveConfirmedItemToPreOrder>[0],
       item: Parameters<typeof actions.moveConfirmedItemToPreOrder>[1]

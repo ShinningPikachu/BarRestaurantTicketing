@@ -62,21 +62,49 @@ function getSmallestAvailableTableNumber(existingNumbers: number[]): number {
   return candidate;
 }
 
+type WorkflowState = Awaited<ReturnType<typeof workflowRepository.getTableWorkflow>>;
+
+function workflowHasProducts(workflow: WorkflowState): boolean {
+  const hasPendingItems = workflow.preOrderSession?.items.some((item) => item.qty > 0) ?? false;
+  const hasConfirmedItems = workflow.orders.some((order) => order.items.some((item) => item.qty > 0));
+
+  return hasPendingItems || hasConfirmedItems;
+}
+
+function workflowHasConfirmedProducts(workflow: WorkflowState): boolean {
+  return workflow.orders.some((order) => order.items.some((item) => item.qty > 0));
+}
+
 export class WorkflowService {
+  private async clearPrintedTicketIfTableIsEmpty(
+    tableId: number,
+    tx?: Parameters<typeof workflowRepository.getTableWorkflow>[1]
+  ) {
+    const workflow = await workflowRepository.getTableWorkflow(tableId, tx);
+    if (!workflowHasProducts(workflow)) {
+      await workflowRepository.clearTableTicketPrinted(tableId, tx);
+    }
+  }
+
   async listTables() {
     const tables = await workflowRepository.listTables();
+    const printedTicketTableIds = await workflowRepository.getPrintedTicketTableIds(tables.map((table) => table.id));
+
     return tables
       .filter((table) => VALID_TABLE_ZONES.has((table.zone ?? '').trim().toLowerCase()))
       .map(({ orders, preOrderSessions, ...table }) => {
         const pendingItems = preOrderSessions.flatMap((session) => session.items);
         const confirmedItems = orders.flatMap((order) => order.items);
+        const pendingItemCount = pendingItems.reduce((sum, item) => sum + item.qty, 0);
+        const confirmedItemCount = confirmedItems.reduce((sum, item) => sum + item.qty, 0);
 
         return {
           ...table,
           totalCents: orders.reduce((sum, order) => sum + order.totalCents, 0)
             + pendingItems.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0),
-          pendingItemCount: pendingItems.reduce((sum, item) => sum + item.qty, 0),
-          confirmedItemCount: confirmedItems.reduce((sum, item) => sum + item.qty, 0),
+          pendingItemCount,
+          confirmedItemCount,
+          hasPrintedTicket: printedTicketTableIds.has(table.id) && pendingItemCount + confirmedItemCount > 0,
         };
       });
   }
@@ -123,12 +151,39 @@ export class WorkflowService {
     }
 
     const workflow = await workflowRepository.getTableWorkflow(table.id);
+    const hasPrintedTicket = await workflowRepository.hasTablePrintedTicket(table.id);
 
     return {
-      table,
+      table: {
+        ...table,
+        hasPrintedTicket: hasPrintedTicket && workflowHasProducts(workflow),
+      },
       preOrderItems: workflow.preOrderSession?.items ?? [],
       orders: workflow.orders
     };
+  }
+
+  async markTableTicketPrinted(tableNumber: number, tableZone: string) {
+    const normalizedNumber = normalizeNumber(tableNumber);
+    const normalizedZone = normalizeZone(tableZone);
+
+    return workflowRepository.runInTransaction(async (tx) => {
+      const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
+      if (!table) {
+        throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
+      }
+
+      const workflow = await workflowRepository.getTableWorkflow(table.id, tx);
+      if (!workflowHasConfirmedProducts(workflow)) {
+        throw new ApiError(409, 'No confirmed items to mark as printed', 'EMPTY_PRINTED_TICKET');
+      }
+
+      const updatedTable = await workflowRepository.markTableTicketPrinted(table.id, tx);
+      return {
+        ...updatedTable,
+        hasPrintedTicket: true,
+      };
+    });
   }
 
   async addPreOrderMenuItem(tableNumber: number, tableZone: string, menuItemId: number) {
@@ -207,6 +262,8 @@ export class WorkflowService {
         }, tx);
       }
 
+      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+
       return {
         tableNumber: table.number,
         tableZone: table.zone ?? normalizedZone
@@ -228,6 +285,8 @@ export class WorkflowService {
       if (session) {
         await workflowRepository.clearDraftItems(session.id, tx);
       }
+
+      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
 
       return {
         tableNumber: table.number,
@@ -318,6 +377,8 @@ export class WorkflowService {
         await workflowRepository.updateOrderTotal(orderId, totalCents, tx);
       }
 
+      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+
       return {
         tableNumber: table.number,
         tableZone: table.zone ?? 'outside'
@@ -336,7 +397,9 @@ export class WorkflowService {
         throw new ApiError(404, 'Order not found', 'ORDER_NOT_FOUND');
       }
 
+      const tableId = order.tableId;
       await workflowRepository.deleteOrder(orderId, tx);
+      await this.clearPrintedTicketIfTableIsEmpty(tableId, tx);
       return { ok: true };
     });
   }
@@ -391,6 +454,8 @@ export class WorkflowService {
         await workflowRepository.createPayment(orderId, amountCents, normalizedMethod, tx);
         await workflowRepository.updateOrderStatus(orderId, 'paid', tx);
       }
+
+      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
 
       return {
         paidTicket,
@@ -493,6 +558,8 @@ export class WorkflowService {
         }
       }
 
+      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+
       return {
         paidTicket,
         tableNumber: table.number,
@@ -567,6 +634,8 @@ export class WorkflowService {
           await workflowRepository.updateOrderTotal(line.orderId, nextTotal, tx);
         }
       }
+
+      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
 
       return {
         tableNumber: table.number,

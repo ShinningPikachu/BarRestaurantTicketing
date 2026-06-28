@@ -105,6 +105,8 @@ export interface BackendTable {
   zone?: string | null;
   seats?: number | null;
   name?: string | null;
+  ticketPrintedAt?: string | null;
+  hasPrintedTicket?: boolean;
   totalCents?: number;
   pendingItemCount?: number;
   confirmedItemCount?: number;

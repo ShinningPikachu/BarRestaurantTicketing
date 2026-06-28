@@ -169,6 +169,26 @@ router.post(
 );
 
 router.post(
+  '/:zone/:number/ticket-printed',
+  validateParams(tableParamsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const zone = req.params.zone;
+      const number = Number(req.params.number);
+
+      logger.info({ zone, number }, 'Marking table ticket as printed');
+
+      const table = await workflowService.markTableTicketPrinted(number, zone);
+      signalDataChange('orders');
+      res.json(successResponse(table));
+    } catch (error) {
+      logger.error({ error }, 'Failed to mark table ticket as printed');
+      next(error);
+    }
+  }
+);
+
+router.post(
   '/:zone/:number/send-to-kitchen',
   validateParams(tableParamsSchema),
   async (req: Request, res: Response, next: NextFunction) => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { getCurrentTableTotal } from '../app/app.helpers';
-import { Order, PaymentMethod, TableId, TableKitchenStatus, TableZone } from '../types';
+import { Order, PaymentMethod, TableId, TableKitchenStatus, TableZone, tableKey } from '../types';
 import { useMenuController } from './menu.controller';
 import { useTableController } from './table.controller';
 import { useTicketController } from './ticket.controller';
@@ -27,15 +27,21 @@ export function useTicketingController(enabled = true) {
     () => getCurrentTableTotal(workflowController.state.preorderItems, tableConfirmedOrders),
     [workflowController.state.preorderItems, tableConfirmedOrders]
   );
+  const selectedTableStatus = tableController.state.tableKitchenStatuses.get(tableKey(selectedTable));
   const currentTableKitchenStatus = useMemo<TableKitchenStatus>(() => {
-    if (workflowController.state.preorderItems.some((item) => item.qty > 0)) {
+    const hasPendingItems = workflowController.state.preorderItems.some((item) => item.qty > 0);
+    const hasConfirmedItems = tableConfirmedOrders.some((order) => order.items.some((item) => item.qty > 0));
+    if (selectedTableStatus === 'printed' && (hasPendingItems || hasConfirmedItems)) {
+      return 'printed';
+    }
+    if (hasPendingItems) {
       return 'pending';
     }
-    if (tableConfirmedOrders.some((order) => order.items.some((item) => item.qty > 0))) {
+    if (hasConfirmedItems) {
       return 'sent';
     }
     return 'empty';
-  }, [workflowController.state.preorderItems, tableConfirmedOrders]);
+  }, [workflowController.state.preorderItems, selectedTableStatus, tableConfirmedOrders]);
 
   useEffect(() => {
     tableController.actions.updateTableTotal(selectedTable, currentTableTotal);
@@ -201,16 +207,19 @@ export function useTicketingController(enabled = true) {
   async function printTicket(options?: { confirmedOrders?: Order[]; splitPeople?: number; ticketNote?: string }): Promise<void> {
     try {
       logger.info({ selectedTable }, 'Printing ticket');
-      await ticketController.actions.printTicket({
+      const didPrint = await ticketController.actions.printTicket({
         selectedTable,
         confirmedOrders: options?.confirmedOrders ?? tableConfirmedOrders,
         preorderItems: workflowController.state.preorderItems,
         splitPeople: options?.splitPeople,
         ticketNote: options?.ticketNote,
       });
+      if (didPrint) {
+        await tableController.actions.markTableTicketPrinted(selectedTable);
+      }
     } catch (error) {
-      logger.error({ error }, 'Failed to print ticket');
-      Alert.alert('Error', 'No se pudo generar el ticket');
+      logger.error({ error, selectedTable }, 'Failed to update printed ticket table state');
+      Alert.alert('Ticket impreso', 'El ticket se generó, pero no se pudo actualizar el color de la mesa.');
     }
   }
 

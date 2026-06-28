@@ -104,12 +104,14 @@ export interface BackendTable {
   zone?: string | null;
   seats?: number | null;
   name?: string | null;
+  ticketPrintedAt?: string | null;
+  hasPrintedTicket?: boolean;
   totalCents?: number;
   pendingItemCount?: number;
   confirmedItemCount?: number;
 }
 
-export type TableKitchenStatus = 'empty' | 'pending' | 'sent';
+export type TableKitchenStatus = 'empty' | 'pending' | 'sent' | 'printed';
 
 export interface TableWorkflow {
   table: BackendTable;
