@@ -1,6 +1,6 @@
 import { ComponentProps } from 'react';
 import { DesktopPosScreen, MobilePosScreen } from '../components';
-import { MenuItem, PaidTicket, SessionSummary } from '../types';
+import { MenuItem, PaidTicket, SessionSummary, TicketHistorySummary, TicketPeriodPreset } from '../types';
 
 export type AppSection = 'home' | 'pos' | 'history' | 'products' | 'mobile-connect';
 export type PosScreenProps = ComponentProps<typeof DesktopPosScreen> & ComponentProps<typeof MobilePosScreen>;
@@ -17,13 +17,26 @@ export interface MainScreenProps {
   computerPairingUrl: string;
   posScreenProps: PosScreenProps;
   sessionSummary: SessionSummary | null;
+  ticketHistorySummary: TicketHistorySummary;
   filteredPaidTickets: PaidTicket[];
+  selectedPaidTicket: PaidTicket | null;
   ticketSearchText: string;
   setTicketSearchText: (value: string) => void;
+  ticketPeriodPreset: TicketPeriodPreset;
+  setTicketPeriodPreset: (value: TicketPeriodPreset) => void;
+  ticketCustomStartDate: string;
+  setTicketCustomStartDate: (value: string) => void;
+  ticketCustomEndDate: string;
+  setTicketCustomEndDate: (value: string) => void;
+  ticketDateRangeLabel: string;
+  ticketDateRangeError: string | null;
+  selectPaidTicket: (ticket: PaidTicket) => void;
+  clearSelectedPaidTicket: () => void;
   refreshSessionSummary: (showFeedback?: boolean) => Promise<void>;
   loadTicketHistory: () => Promise<void>;
   printSimplifiedPaidTicket: (ticket: PaidTicket) => Promise<void>;
   downloadTicket: (ticket: PaidTicket) => Promise<void>;
+  downloadFilteredTicketPdfs: () => Promise<void>;
   managedCategories: string[];
   managedMenuItems: MenuItem[];
   productName: string;

@@ -169,13 +169,60 @@ export const desktopStyles = StyleSheet.create({
     gap: 8,
     marginBottom: 10
   },
+  historyFiltersPanel: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    padding: 10,
+    marginBottom: 10,
+    gap: 8
+  },
+  periodButtonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  periodButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    minHeight: 40,
+    justifyContent: 'center'
+  },
+  periodButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  periodButtonText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 13
+  },
+  periodButtonTextSelected: {
+    color: colors.textLight
+  },
+  customDateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  dateInput: {
+    minWidth: 160
+  },
   historySearchInput: {
     flex: 1,
     marginBottom: 0
   },
+  historyListContent: {
+    paddingBottom: 12
+  },
   historyRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
     borderColor: colors.border,
@@ -190,6 +237,133 @@ export const desktopStyles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     justifyContent: 'flex-end'
+  },
+  historyTicketTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  historyStatusPill: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: colors.surface
+  },
+  historyTaxLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 4
+  },
+  accountingSummaryPanel: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    padding: 10,
+    marginBottom: 10
+  },
+  accountingSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 10
+  },
+  accountingSummaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  accountingStat: {
+    minWidth: 148,
+    flexGrow: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  accountingStatLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 3
+  },
+  accountingStatValue: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '700'
+  },
+  ticketDetailPanel: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    padding: 12,
+    marginBottom: 10
+  },
+  ticketDetailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10
+  },
+  ticketDetailTotals: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: 10,
+    paddingTop: 10
+  },
+  ticketLineHeader: {
+    flexDirection: 'row',
+    gap: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    marginTop: 10,
+    paddingVertical: 6
+  },
+  ticketLineRow: {
+    flexDirection: 'row',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 7
+  },
+  ticketLineCell: {
+    width: 88,
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'right'
+  },
+  ticketLineName: {
+    flex: 1,
+    minWidth: 180,
+    textAlign: 'left'
+  },
+  ticketLineMeta: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    marginTop: 2
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 4
   },
   sessionSummaryPanel: {
     borderWidth: 1,

@@ -352,8 +352,17 @@ export class ApiService {
     return parseOrThrow<{ created: number; updated: number; total: number }>(response, 'Failed to import menu CSV');
   }
 
-  async fetchPaidTickets(): Promise<PaidTicket[]> {
-    const response = await this.request('/tickets');
+  async fetchPaidTickets(params: { startAt?: string; endAt?: string } = {}): Promise<PaidTicket[]> {
+    const query = new URLSearchParams();
+    if (params.startAt) {
+      query.set('startAt', params.startAt);
+    }
+    if (params.endAt) {
+      query.set('endAt', params.endAt);
+    }
+
+    const queryString = query.toString();
+    const response = await this.request(`/tickets${queryString ? `?${queryString}` : ''}`);
     return parseOrThrow<PaidTicket[]>(response, 'Failed to fetch paid tickets');
   }
 

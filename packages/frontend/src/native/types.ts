@@ -120,6 +120,7 @@ export interface TableWorkflow {
 }
 
 export type PaymentMethod = 'cash' | 'card';
+export type TicketPeriodPreset = 'today' | 'yesterday' | 'thisWeek' | 'thisMonth' | 'previousMonth' | 'custom';
 
 export interface PaidTicketItem {
   id: number;
@@ -147,8 +148,31 @@ export interface PaidTicket {
   vatCents: number;
   vatRatePercent: number;
   splitPeople?: number | null;
+  businessName?: string;
+  tradeName?: string;
+  businessTaxId?: string;
+  businessAddress?: string | null;
+  businessCity?: string | null;
+  businessPhone?: string | null;
+  terminalId?: string | null;
+  cashierName?: string | null;
+  customerName?: string | null;
+  customerTaxId?: string | null;
+  status?: string;
+  relatedTicketNumber?: string | null;
+  pdfFileReference?: string | null;
+  auditMetadata?: string | null;
   createdAt: string;
   items: PaidTicketItem[];
+}
+
+export interface TicketHistorySummary {
+  ticketCount: number;
+  itemQuantity: number;
+  totalCents: number;
+  taxableBaseCents: number;
+  vatCents: number;
+  paymentTotals: Record<PaymentMethod, number>;
 }
 
 export interface SessionTicketSummary {

@@ -289,13 +289,43 @@ export class WorkflowRepository {
       vatCents: number;
       vatRatePercent: number;
       splitPeople?: number | null;
+      businessName?: string;
+      tradeName?: string;
+      businessTaxId?: string;
+      businessAddress?: string | null;
+      businessCity?: string | null;
+      businessPhone?: string | null;
+      terminalId?: string | null;
+      cashierName?: string | null;
+      customerName?: string | null;
+      customerTaxId?: string | null;
+      status?: string;
+      relatedTicketNumber?: string | null;
+      pdfFileReference?: string | null;
+      auditMetadata?: string | null;
       items: PaidTicketLine[];
     },
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
+    const snapshot = {
+      businessName: payload.businessName ?? '',
+      tradeName: payload.tradeName ?? '',
+      businessTaxId: payload.businessTaxId ?? '',
+      businessAddress: payload.businessAddress ?? null,
+      businessCity: payload.businessCity ?? null,
+      businessPhone: payload.businessPhone ?? null,
+      terminalId: payload.terminalId ?? null,
+      cashierName: payload.cashierName ?? null,
+      customerName: payload.customerName ?? null,
+      customerTaxId: payload.customerTaxId ?? null,
+      status: payload.status ?? 'paid',
+      relatedTicketNumber: payload.relatedTicketNumber ?? null,
+      pdfFileReference: payload.pdfFileReference ?? null,
+      auditMetadata: payload.auditMetadata ?? null,
+    };
 
-    return db.paidTicket.create({
+    const paidTicket = await db.paidTicket.create({
       data: {
         ticketNumber: payload.ticketNumber,
         mode: payload.mode,
@@ -323,6 +353,31 @@ export class WorkflowRepository {
       },
       include: { items: true },
     });
+
+    await db.$executeRaw`
+      UPDATE "PaidTicket"
+      SET
+        "businessName" = ${snapshot.businessName},
+        "tradeName" = ${snapshot.tradeName},
+        "businessTaxId" = ${snapshot.businessTaxId},
+        "businessAddress" = ${snapshot.businessAddress},
+        "businessCity" = ${snapshot.businessCity},
+        "businessPhone" = ${snapshot.businessPhone},
+        "terminalId" = ${snapshot.terminalId},
+        "cashierName" = ${snapshot.cashierName},
+        "customerName" = ${snapshot.customerName},
+        "customerTaxId" = ${snapshot.customerTaxId},
+        "status" = ${snapshot.status},
+        "relatedTicketNumber" = ${snapshot.relatedTicketNumber},
+        "pdfFileReference" = ${snapshot.pdfFileReference},
+        "auditMetadata" = ${snapshot.auditMetadata}
+      WHERE "id" = ${paidTicket.id}
+    `;
+
+    return {
+      ...paidTicket,
+      ...snapshot,
+    };
   }
 
   async createPayment(orderId: string, amountCents: number, method: string, tx?: Prisma.TransactionClient) {

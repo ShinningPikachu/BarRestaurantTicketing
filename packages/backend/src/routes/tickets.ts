@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../db';
 import { errorResponse, successResponse } from '../types/api';
 import { logger } from '../utils/logger.js';
@@ -27,15 +28,117 @@ function formatSessionDate(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+function parseOptionalDate(value: unknown, fieldName: string): Date | null {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid ${fieldName}`);
+  }
+
+  return date;
+}
+
+type TicketSnapshotFields = {
+  id: string;
+  businessName: string;
+  tradeName: string;
+  businessTaxId: string;
+  businessAddress: string | null;
+  businessCity: string | null;
+  businessPhone: string | null;
+  terminalId: string | null;
+  cashierName: string | null;
+  customerName: string | null;
+  customerTaxId: string | null;
+  status: string;
+  relatedTicketNumber: string | null;
+  pdfFileReference: string | null;
+  auditMetadata: string | null;
+};
+
+async function attachTicketSnapshots<T extends { id: string }>(tickets: T[]): Promise<Array<T & TicketSnapshotFields>> {
+  if (tickets.length === 0) {
+    return [];
+  }
+
+  const rows = await prisma.$queryRaw<TicketSnapshotFields[]>`
+    SELECT
+      "id",
+      "businessName",
+      "tradeName",
+      "businessTaxId",
+      "businessAddress",
+      "businessCity",
+      "businessPhone",
+      "terminalId",
+      "cashierName",
+      "customerName",
+      "customerTaxId",
+      "status",
+      "relatedTicketNumber",
+      "pdfFileReference",
+      "auditMetadata"
+    FROM "PaidTicket"
+    WHERE "id" IN (${Prisma.join(tickets.map((ticket) => ticket.id))})
+  `;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+
+  return tickets.map((ticket) => ({
+    ...ticket,
+    ...(rowById.get(ticket.id) ?? {
+      id: ticket.id,
+      businessName: '',
+      tradeName: '',
+      businessTaxId: '',
+      businessAddress: null,
+      businessCity: null,
+      businessPhone: null,
+      terminalId: null,
+      cashierName: null,
+      customerName: null,
+      customerTaxId: null,
+      status: 'paid',
+      relatedTicketNumber: null,
+      pdfFileReference: null,
+      auditMetadata: null,
+    }),
+  }));
+}
+
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const startAt = parseOptionalDate(req.query.startAt, 'startAt');
+    const endAt = parseOptionalDate(req.query.endAt, 'endAt');
+
+    if ((startAt && !endAt) || (!startAt && endAt)) {
+      res.status(400).json(errorResponse('INVALID_TICKET_DATE_RANGE', 'Both startAt and endAt are required for ticket date filtering'));
+      return;
+    }
+
+    if (startAt && endAt && startAt >= endAt) {
+      res.status(400).json(errorResponse('INVALID_TICKET_DATE_RANGE', 'Ticket date range startAt must be before endAt'));
+      return;
+    }
+
     const tickets = await prisma.paidTicket.findMany({
+      where: startAt && endAt ? {
+        createdAt: {
+          gte: startAt,
+          lt: endAt,
+        },
+      } : undefined,
       orderBy: { createdAt: 'desc' },
       include: { items: true },
-      take: 200,
     });
-    res.json(successResponse(tickets));
+    res.json(successResponse(await attachTicketSnapshots(tickets)));
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid ')) {
+      res.status(400).json(errorResponse('INVALID_TICKET_DATE_RANGE', error.message));
+      return;
+    }
     logger.error({ error }, 'Failed to fetch paid tickets');
     next(error);
   }
@@ -122,7 +225,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    res.json(successResponse(ticket));
+    const [ticketWithSnapshot] = await attachTicketSnapshots([ticket]);
+    res.json(successResponse(ticketWithSnapshot));
   } catch (error) {
     logger.error({ error }, 'Failed to fetch paid ticket');
     next(error);

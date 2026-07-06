@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useTicketingController } from './src/native/controllers';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
-import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel } from './src/native/types';
+import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel, TicketHistorySummary, TicketPeriodPreset } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
 import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
@@ -43,6 +43,13 @@ const API_BASE_URL_STORAGE_KEY = 'bar-ticketing-api-base-url';
 const DATA_SYNC_SIGNAL_INTERVAL_MS = 5000;
 const DATA_SYNC_MIN_REFRESH_INTERVAL_MS = 5000;
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
+
+interface TicketDateRangeState {
+  startAt: string | null;
+  endAt: string | null;
+  label: string;
+  error: string | null;
+}
 
 interface ExpoLikeGlobal {
   process?: {
@@ -156,6 +163,150 @@ function formatDateTime(value: string): string {
   });
 }
 
+function formatDateOnly(value: Date): string {
+  return value.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+function formatDateInputValue(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateInputValue(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function startOfDay(value: Date): Date {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(value: Date, days: number): Date {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function startOfMonth(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), 1);
+}
+
+function addMonths(value: Date, months: number): Date {
+  return new Date(value.getFullYear(), value.getMonth() + months, 1);
+}
+
+function startOfWeek(value: Date): Date {
+  const start = startOfDay(value);
+  const day = start.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  return addDays(start, offset);
+}
+
+function resolveTicketDateRange(
+  preset: TicketPeriodPreset,
+  customStartDate: string,
+  customEndDate: string,
+  reference = new Date()
+): TicketDateRangeState {
+  const today = startOfDay(reference);
+  let start: Date;
+  let end: Date;
+
+  if (preset === 'today') {
+    start = today;
+    end = addDays(today, 1);
+  } else if (preset === 'yesterday') {
+    start = addDays(today, -1);
+    end = today;
+  } else if (preset === 'thisWeek') {
+    start = startOfWeek(today);
+    end = addDays(start, 7);
+  } else if (preset === 'thisMonth') {
+    start = startOfMonth(today);
+    end = addMonths(start, 1);
+  } else if (preset === 'previousMonth') {
+    end = startOfMonth(today);
+    start = addMonths(end, -1);
+  } else {
+    const customStart = parseDateInputValue(customStartDate);
+    const customEnd = parseDateInputValue(customEndDate);
+    if (!customStart || !customEnd) {
+      return {
+        startAt: null,
+        endAt: null,
+        label: 'Rango personalizado',
+        error: 'Usa fechas con formato AAAA-MM-DD.',
+      };
+    }
+    start = startOfDay(customStart);
+    end = addDays(startOfDay(customEnd), 1);
+  }
+
+  if (start >= end) {
+    return {
+      startAt: null,
+      endAt: null,
+      label: 'Rango no válido',
+      error: 'La fecha inicial debe ser anterior o igual a la fecha final.',
+    };
+  }
+
+  return {
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    label: `${formatDateOnly(start)} - ${formatDateOnly(addDays(end, -1))}`,
+    error: null,
+  };
+}
+
+function getPaymentMethodLabel(method: string): string {
+  return method === 'cash' ? 'Efectivo' : method === 'card' ? 'Tarjeta' : method;
+}
+
+function getTicketModeLabel(mode: string): string {
+  if (mode === 'aa') {
+    return 'Pago parcial / AA';
+  }
+  if (mode === 'split') {
+    return 'Cuenta dividida';
+  }
+  return 'Ticket completo';
+}
+
+function getTicketStatusLabel(status: string | null | undefined): string {
+  if (status === 'refunded') {
+    return 'Devuelto';
+  }
+  if (status === 'cancelled') {
+    return 'Cancelado';
+  }
+  return 'Cobrado';
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -165,9 +316,22 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function buildPaidTicketHtml(ticket: PaidTicket): string {
+function buildPaidTicketArticle(ticket: PaidTicket): string {
+  const invoiceConfig = getSimplifiedInvoiceConfig();
+  const businessName = ticket.businessName || invoiceConfig.businessName;
+  const tradeName = ticket.tradeName || invoiceConfig.tradeName;
+  const businessTaxId = ticket.businessTaxId || invoiceConfig.nif;
+  const businessAddress = ticket.businessAddress || invoiceConfig.address;
+  const businessCity = ticket.businessCity || invoiceConfig.city;
+  const businessPhone = ticket.businessPhone || invoiceConfig.phone;
+  const terminalId = ticket.terminalId || 'TPV-1';
+  const cashierName = ticket.cashierName || 'No registrado';
+  const customerName = ticket.customerName || 'Cliente no identificado';
+  const customerTaxId = ticket.customerTaxId || 'No registrado';
   const rows = ticket.items.map((item) => {
     const displayName = getItemDisplayName(item);
+    const lineTaxableBaseCents = Math.round(item.totalPriceCents / (1 + ticket.vatRatePercent / 100));
+    const lineVatCents = item.totalPriceCents - lineTaxableBaseCents;
     return `
       <tr>
         <td>${item.qty}</td>
@@ -176,23 +340,83 @@ function buildPaidTicketHtml(ticket: PaidTicket): string {
           ${displayName.secondary ? `<div class="item-secondary">${escapeHtml(displayName.secondary)}</div>` : ''}
         </td>
         <td>${centsToCurrency(item.unitPriceCents)}</td>
+        <td>${centsToCurrency(lineTaxableBaseCents)}</td>
+        <td>${ticket.vatRatePercent}%</td>
+        <td>${centsToCurrency(lineVatCents)}</td>
         <td>${centsToCurrency(item.totalPriceCents)}</td>
       </tr>`;
   }).join('');
 
+  return `
+  <section class="ticket">
+    <header class="ticket-header">
+      <div>
+        <h1>Factura simplificada ${escapeHtml(ticket.ticketNumber)}</h1>
+        <div class="meta">${escapeHtml(tradeName)} · ${escapeHtml(businessName)}</div>
+        <div class="meta">NIF/CIF: ${escapeHtml(businessTaxId)}</div>
+        <div class="meta">${escapeHtml(businessAddress)}${businessCity ? ` · ${escapeHtml(businessCity)}` : ''}${businessPhone ? ` · Tel. ${escapeHtml(businessPhone)}` : ''}</div>
+      </div>
+      <div class="status-box">${escapeHtml(getTicketStatusLabel(ticket.status))}</div>
+    </header>
+    <section class="meta-grid">
+      <div><strong>Numero / factura</strong>${escapeHtml(ticket.ticketNumber)}</div>
+      <div><strong>Fecha y hora</strong>${escapeHtml(formatDateTime(ticket.createdAt))}</div>
+      <div><strong>Mesa</strong>${escapeHtml(tableZoneLabel(normalizeTableZone(ticket.tableZone)))} ${ticket.tableNumber}</div>
+      <div><strong>Terminal</strong>${escapeHtml(terminalId)}</div>
+      <div><strong>Cajero / usuario</strong>${escapeHtml(cashierName)}</div>
+      <div><strong>Pago</strong>${escapeHtml(getPaymentMethodLabel(ticket.method))}</div>
+      <div><strong>Modalidad</strong>${escapeHtml(getTicketModeLabel(ticket.mode))}</div>
+      <div><strong>Cliente</strong>${escapeHtml(customerName)}</div>
+      <div><strong>NIF cliente</strong>${escapeHtml(customerTaxId)}</div>
+      <div><strong>Ticket relacionado</strong>${escapeHtml(ticket.relatedTicketNumber || 'No aplica')}</div>
+    </section>
+    <table>
+      <thead>
+        <tr>
+          <th>Ud.</th>
+          <th>Concepto</th>
+          <th>Precio</th>
+          <th>Base</th>
+          <th>IVA</th>
+          <th>Cuota</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals">
+      <div><span>Descuentos</span><span>${centsToCurrency(0)}</span></div>
+      <div><span>Base imponible</span><span>${centsToCurrency(ticket.taxableBaseCents)}</span></div>
+      <div><span>IVA ${ticket.vatRatePercent}%</span><span>${centsToCurrency(ticket.vatCents)}</span></div>
+      <div class="total"><span>Total</span><span>${centsToCurrency(ticket.totalCents)}</span></div>
+    </div>
+  </section>`;
+}
+
+function buildPaidTicketDocumentHtml(content: string, title: string): string {
   return `<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>${ticket.ticketNumber}</title>
+  <title>${escapeHtml(title)}</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
-    .ticket { max-width: 420px; }
-    h1 { font-size: 18px; margin: 0 0 8px; }
-    .meta { font-size: 12px; color: #475569; margin-bottom: 12px; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; color: #111827; }
+    .ticket { width: 100%; max-width: 174mm; min-height: calc(297mm - 36mm); margin: 0 auto; break-after: page; page-break-after: always; break-inside: avoid; page-break-inside: avoid; }
+    .ticket:last-child { break-after: auto; page-break-after: auto; }
+    .ticket-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    .meta { font-size: 12px; color: #475569; margin-bottom: 3px; }
+    .status-box { border: 1px solid #111827; padding: 8px 10px; font-weight: 700; font-size: 12px; text-transform: uppercase; white-space: nowrap; }
+    .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; margin-bottom: 14px; font-size: 12px; }
+    .meta-grid strong { display: block; color: #475569; font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { border-bottom: 1px solid #E2E8F0; padding: 6px 4px; text-align: left; }
     td:last-child, th:last-child { text-align: right; }
+    td:nth-child(3), th:nth-child(3),
+    td:nth-child(4), th:nth-child(4),
+    td:nth-child(5), th:nth-child(5),
+    td:nth-child(6), th:nth-child(6) { text-align: right; }
     .item-primary { font-weight: 700; }
     .item-secondary { color: #475569; font-size: 11px; margin-top: 2px; }
     .totals { margin-top: 12px; font-size: 13px; }
@@ -202,21 +426,17 @@ function buildPaidTicketHtml(ticket: PaidTicket): string {
   </style>
 </head>
 <body>
-  <section class="ticket">
-    <h1>Factura simplificada ${escapeHtml(ticket.ticketNumber)}</h1>
-    <div class="meta">Mesa ${escapeHtml(ticket.tableZone)}-${ticket.tableNumber} · ${formatDateTime(ticket.createdAt)} · ${ticket.method === 'cash' ? 'Efectivo' : 'Tarjeta'}</div>
-    <table>
-      <thead><tr><th>Ud.</th><th>Producto</th><th>Precio</th><th>Total</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="totals">
-      <div><span>Base imponible</span><span>${centsToCurrency(ticket.taxableBaseCents)}</span></div>
-      <div><span>IVA ${ticket.vatRatePercent}%</span><span>${centsToCurrency(ticket.vatCents)}</span></div>
-      <div class="total"><span>Total</span><span>${centsToCurrency(ticket.totalCents)}</span></div>
-    </div>
-  </section>
+  ${content}
 </body>
 </html>`;
+}
+
+function buildPaidTicketHtml(ticket: PaidTicket): string {
+  return buildPaidTicketDocumentHtml(buildPaidTicketArticle(ticket), ticket.ticketNumber);
+}
+
+function buildPaidTicketBatchHtml(tickets: PaidTicket[], title: string): string {
+  return buildPaidTicketDocumentHtml(tickets.map(buildPaidTicketArticle).join('\n'), title);
 }
 
 export default function App(): React.JSX.Element {
@@ -244,8 +464,12 @@ export default function App(): React.JSX.Element {
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
   const [menuSearchText, setMenuSearchText] = useState('');
   const [paidTickets, setPaidTickets] = useState<PaidTicket[]>([]);
+  const [selectedPaidTicket, setSelectedPaidTicket] = useState<PaidTicket | null>(null);
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
   const [ticketSearchText, setTicketSearchText] = useState('');
+  const [ticketPeriodPreset, setTicketPeriodPreset] = useState<TicketPeriodPreset>('today');
+  const [ticketCustomStartDate, setTicketCustomStartDate] = useState(() => formatDateInputValue(new Date()));
+  const [ticketCustomEndDate, setTicketCustomEndDate] = useState(() => formatDateInputValue(new Date()));
   const [managedMenuItems, setManagedMenuItems] = useState<MenuItem[]>([]);
   const [productName, setProductName] = useState('');
   const [productPrimaryName, setProductPrimaryName] = useState('');
@@ -416,6 +640,10 @@ export default function App(): React.JSX.Element {
   const isSearching = normalizedMenuSearch.length >= MIN_SEARCH_LENGTH;
   const displayedMenuCategory = isSearching ? 'Resultados' : visibleMenuCategory;
   const displayedMenuItems = isSearching ? searchedMenuItems : visibleMenuItems;
+  const ticketDateRange = useMemo(
+    () => resolveTicketDateRange(ticketPeriodPreset, ticketCustomStartDate, ticketCustomEndDate),
+    [ticketPeriodPreset, ticketCustomStartDate, ticketCustomEndDate]
+  );
   const filteredPaidTickets = useMemo(() => {
     const query = normalizeSearchText(ticketSearchText);
     if (!query) return paidTickets;
@@ -425,11 +653,39 @@ export default function App(): React.JSX.Element {
         ticket.tableZone,
         String(ticket.tableNumber),
         ticket.method,
+        ticket.mode,
+        ticket.status,
+        ticket.businessName,
+        ticket.tradeName,
+        ticket.businessTaxId,
+        ticket.customerName,
+        ticket.customerTaxId,
         ...ticket.items.map((item) => item.name),
       ].join(' '));
       return searchableText.includes(query);
     });
   }, [paidTickets, ticketSearchText]);
+  const ticketHistorySummary = useMemo<TicketHistorySummary>(() => {
+    return filteredPaidTickets.reduce<TicketHistorySummary>((summary, ticket) => {
+      summary.ticketCount += 1;
+      summary.itemQuantity += ticket.items.reduce((sum, item) => sum + item.qty, 0);
+      summary.totalCents += ticket.totalCents;
+      summary.taxableBaseCents += ticket.taxableBaseCents;
+      summary.vatCents += ticket.vatCents;
+      summary.paymentTotals[ticket.method] = (summary.paymentTotals[ticket.method] ?? 0) + ticket.totalCents;
+      return summary;
+    }, {
+      ticketCount: 0,
+      itemQuantity: 0,
+      totalCents: 0,
+      taxableBaseCents: 0,
+      vatCents: 0,
+      paymentTotals: {
+        cash: 0,
+        card: 0,
+      },
+    });
+  }, [filteredPaidTickets]);
   const managedCategories = useMemo(
     () => Array.from(new Set(managedMenuItems.map((item) => item.category))).sort((a, b) => a.localeCompare(b)),
     [managedMenuItems]
@@ -452,6 +708,15 @@ export default function App(): React.JSX.Element {
   }, [selectedMenuCategory, visibleMenuCategory]);
 
   useEffect(() => {
+    if (!selectedPaidTicket) {
+      return;
+    }
+
+    const refreshedTicket = paidTickets.find((ticket) => ticket.id === selectedPaidTicket.id);
+    setSelectedPaidTicket(refreshedTicket ?? null);
+  }, [paidTickets, selectedPaidTicket?.id]);
+
+  useEffect(() => {
     if (Platform.OS === 'web' || authStatus !== 'signedIn' || activeSection === 'home' || activeSection === 'pos') {
       return;
     }
@@ -465,8 +730,18 @@ export default function App(): React.JSX.Element {
   }, [activeSection, authStatus, sectionHistory]);
 
   async function loadTicketHistory(options: { showError?: boolean } = {}): Promise<void> {
+    if (ticketDateRange.error || !ticketDateRange.startAt || !ticketDateRange.endAt) {
+      if (options.showError !== false) {
+        Alert.alert('Rango de fechas no válido', ticketDateRange.error ?? 'Selecciona un periodo válido.');
+      }
+      return;
+    }
+
     try {
-      setPaidTickets(await apiService.fetchPaidTickets());
+      setPaidTickets(await apiService.fetchPaidTickets({
+        startAt: ticketDateRange.startAt,
+        endAt: ticketDateRange.endAt,
+      }));
     } catch {
       if (options.showError !== false) {
         Alert.alert('Error', 'No se pudo cargar el historial de tickets.');
@@ -906,6 +1181,53 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function downloadFilteredTicketPdfs(): Promise<void> {
+    if (filteredPaidTickets.length === 0) {
+      Alert.alert('Sin tickets', 'No hay tickets en el periodo y búsqueda seleccionados.');
+      return;
+    }
+
+    const title = `Tickets ${ticketDateRange.label}`;
+    const html = buildPaidTicketBatchHtml(filteredPaidTickets, title);
+
+    if (Platform.OS === 'web') {
+      const windowRef = (globalThis as typeof globalThis & { window?: Window }).window;
+      const printWindow = windowRef?.open('', '_blank', 'width=900,height=900');
+      if (!printWindow) {
+        Alert.alert('PDF bloqueado', 'Permite ventanas emergentes para guardar los tickets como PDF.');
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.setTimeout(() => printWindow.print(), 250);
+      return;
+    }
+
+    try {
+      const pdf = await Print.printToFileAsync({
+        html,
+        width: 595,
+        height: 842,
+      });
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('PDF generado', pdf.uri);
+        return;
+      }
+
+      await Sharing.shareAsync(pdf.uri, {
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+        dialogTitle: `Guardar tickets ${ticketDateRange.label}.pdf`,
+      });
+    } catch {
+      Alert.alert('Error', 'No se pudieron generar los PDFs del periodo.');
+    }
+  }
+
   async function printSimplifiedPaidTicket(ticket: PaidTicket): Promise<void> {
     const config = getSimplifiedInvoiceConfig();
     const lines = ticket.items.map((item) => ({
@@ -1043,8 +1365,15 @@ export default function App(): React.JSX.Element {
   };
 
   useEffect(() => {
+    if (activeSection !== 'history' || ticketDateRange.error || !ticketDateRange.startAt || !ticketDateRange.endAt) {
+      return;
+    }
+
+    void loadTicketHistory({ showError: false });
+  }, [activeSection, ticketDateRange.startAt, ticketDateRange.endAt, ticketDateRange.error]);
+
+  useEffect(() => {
     if (activeSection === 'history') {
-      void loadTicketHistory();
       void refreshSessionSummary();
     }
     if (activeSection === 'products') {
@@ -1296,13 +1625,26 @@ export default function App(): React.JSX.Element {
     computerPairingUrl: getApiBaseUrl(),
     posScreenProps,
     sessionSummary,
+    ticketHistorySummary,
     filteredPaidTickets,
+    selectedPaidTicket,
     ticketSearchText,
     setTicketSearchText,
+    ticketPeriodPreset,
+    setTicketPeriodPreset,
+    ticketCustomStartDate,
+    setTicketCustomStartDate,
+    ticketCustomEndDate,
+    setTicketCustomEndDate,
+    ticketDateRangeLabel: ticketDateRange.label,
+    ticketDateRangeError: ticketDateRange.error,
+    selectPaidTicket: setSelectedPaidTicket,
+    clearSelectedPaidTicket: () => setSelectedPaidTicket(null),
     refreshSessionSummary,
     loadTicketHistory,
     printSimplifiedPaidTicket,
     downloadTicket,
+    downloadFilteredTicketPdfs,
     managedCategories,
     managedMenuItems,
     productName,

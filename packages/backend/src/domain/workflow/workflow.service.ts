@@ -1,4 +1,5 @@
 import { ApiError } from '../../middleware/errorHandler';
+import { config } from '../../config';
 import { PaidTicketLine, workflowRepository } from './workflow.repository';
 
 const VALID_TABLE_ZONES = new Set(['outside', 'floor1', 'floor2']);
@@ -30,11 +31,15 @@ function normalizePaymentMethod(method: string): string {
 }
 
 function calculateTax(totalCents: number) {
-  const taxableBaseCents = Math.round(totalCents / (1 + DEFAULT_VAT_RATE_PERCENT / 100));
+  const configuredVatRate = config.ticket.vatRatePercent;
+  const vatRatePercent = Number.isFinite(configuredVatRate) && configuredVatRate > 0
+    ? Math.round(configuredVatRate)
+    : DEFAULT_VAT_RATE_PERCENT;
+  const taxableBaseCents = Math.round(totalCents / (1 + vatRatePercent / 100));
   return {
     taxableBaseCents,
     vatCents: totalCents - taxableBaseCents,
-    vatRatePercent: DEFAULT_VAT_RATE_PERCENT
+    vatRatePercent
   };
 }
 
@@ -48,6 +53,43 @@ function groupPaymentTotalsByOrder(lines: PaidTicketLine[]): Map<string, number>
     totals.set(line.orderId, (totals.get(line.orderId) ?? 0) + line.totalPriceCents);
   }
   return totals;
+}
+
+function getTicketAccountingSnapshot(params: {
+  mode: string;
+  method: string;
+  tableId: number;
+  tableNumber: number;
+  tableZone: string;
+  lines: PaidTicketLine[];
+  selectedItems?: Array<{ orderId: string; itemId: number; qty: number }>;
+}) {
+  const orderIds = Array.from(new Set(params.lines.map((line) => line.orderId)));
+
+  return {
+    businessName: config.ticket.businessName,
+    tradeName: config.ticket.tradeName,
+    businessTaxId: config.ticket.businessTaxId,
+    businessAddress: config.ticket.businessAddress,
+    businessCity: config.ticket.businessCity,
+    businessPhone: config.ticket.businessPhone,
+    terminalId: config.ticket.terminalId,
+    cashierName: config.ticket.cashierName || null,
+    status: 'paid',
+    auditMetadata: JSON.stringify({
+      source: 'pos-payment',
+      mode: params.mode,
+      method: params.method,
+      tableId: params.tableId,
+      tableNumber: params.tableNumber,
+      tableZone: params.tableZone,
+      orderIds,
+      selectedItems: params.selectedItems ?? null,
+      lineCount: params.lines.length,
+      itemQuantity: params.lines.reduce((sum, line) => sum + line.qty, 0),
+      capturedAt: new Date().toISOString(),
+    }),
+  };
 }
 
 function getSmallestAvailableTableNumber(existingNumbers: number[]): number {
@@ -438,15 +480,24 @@ export class WorkflowService {
       const totalCents = lines.reduce((sum, line) => sum + line.totalPriceCents, 0);
       const sequence = await workflowRepository.countPaidTickets(tx) + 1;
       const tax = calculateTax(totalCents);
+      const mode = splitPeople && splitPeople > 1 ? 'split' : 'full';
       const paidTicket = await workflowRepository.createPaidTicket({
         ticketNumber: nextPaidTicketNumber(sequence),
-        mode: splitPeople && splitPeople > 1 ? 'split' : 'full',
+        mode,
         method: normalizedMethod,
         tableNumber: table.number,
         tableZone: table.zone ?? normalizedZone,
         totalCents,
         ...tax,
         splitPeople: splitPeople && splitPeople > 1 ? splitPeople : null,
+        ...getTicketAccountingSnapshot({
+          mode,
+          method: normalizedMethod,
+          tableId: table.id,
+          tableNumber: table.number,
+          tableZone: table.zone ?? normalizedZone,
+          lines,
+        }),
         items: lines,
       }, tx);
 
@@ -522,14 +573,24 @@ export class WorkflowService {
       const totalCents = lines.reduce((sum, line) => sum + line.totalPriceCents, 0);
       const sequence = await workflowRepository.countPaidTickets(tx) + 1;
       const tax = calculateTax(totalCents);
+      const mode = 'aa';
       const paidTicket = await workflowRepository.createPaidTicket({
         ticketNumber: nextPaidTicketNumber(sequence),
-        mode: 'aa',
+        mode,
         method: normalizedMethod,
         tableNumber: table.number,
         tableZone: table.zone ?? normalizedZone,
         totalCents,
         ...tax,
+        ...getTicketAccountingSnapshot({
+          mode,
+          method: normalizedMethod,
+          tableId: table.id,
+          tableNumber: table.number,
+          tableZone: table.zone ?? normalizedZone,
+          lines,
+          selectedItems: groupedSelectedItems,
+        }),
         items: lines,
       }, tx);
 

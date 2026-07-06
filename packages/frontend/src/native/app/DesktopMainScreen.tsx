@@ -4,7 +4,8 @@ import { toQR } from 'toqr';
 import { DesktopPosScreen } from '../components';
 import { MainScreenProps } from './MainScreen.types';
 import { desktopStyles as styles } from './DesktopMain.styles';
-import { MenuItem } from '../types';
+import { MenuItem, PaidTicket, TicketPeriodPreset, tableZoneLabel, normalizeTableZone } from '../types';
+import { getSimplifiedInvoiceConfig } from '../helpers/kitchenTicketPrinter';
 
 type ProductEditValues = {
   name: string;
@@ -170,6 +171,211 @@ function PairingQrCode({ value }: { value: string }): React.JSX.Element {
   );
 }
 
+const ticketPeriodOptions: Array<{ value: TicketPeriodPreset; label: string }> = [
+  { value: 'today', label: 'Hoy' },
+  { value: 'yesterday', label: 'Ayer' },
+  { value: 'thisWeek', label: 'Esta semana' },
+  { value: 'thisMonth', label: 'Este mes' },
+  { value: 'previousMonth', label: 'Mes anterior' },
+  { value: 'custom', label: 'Personalizado' },
+];
+
+function getPaymentLabel(method: string): string {
+  return method === 'cash' ? 'Efectivo' : method === 'card' ? 'Tarjeta' : method;
+}
+
+function getStatusLabel(status: string | null | undefined): string {
+  if (status === 'refunded') return 'Devuelto';
+  if (status === 'cancelled') return 'Cancelado';
+  return 'Cobrado';
+}
+
+function getModeLabel(mode: string): string {
+  if (mode === 'aa') return 'Pago AA/parcial';
+  if (mode === 'split') return 'Cuenta dividida';
+  return 'Ticket completo';
+}
+
+function getTicketBusinessLine(ticket: PaidTicket): string {
+  const invoiceConfig = getSimplifiedInvoiceConfig();
+  const business = [
+    ticket.tradeName || invoiceConfig.tradeName,
+    ticket.businessName || invoiceConfig.businessName,
+  ].filter(Boolean).join(' · ');
+  return business || 'Empresa no registrada en el ticket';
+}
+
+function getTicketBusinessTaxId(ticket: PaidTicket): string {
+  return ticket.businessTaxId || getSimplifiedInvoiceConfig().nif || 'No registrado';
+}
+
+function getTicketLineSummary(ticket: PaidTicket): string {
+  return ticket.items.map((item) => `${item.qty}x ${item.name}`).join(', ');
+}
+
+function DesktopHistorySummary(props: MainScreenProps): React.JSX.Element {
+  const summary = props.ticketHistorySummary;
+  return (
+    <View style={styles.accountingSummaryPanel}>
+      <View style={styles.accountingSummaryHeader}>
+        <View style={styles.flex1}>
+          <Text style={styles.itemName}>Resultado fiscal</Text>
+          <Text style={styles.itemPrice}>{props.ticketDateRangeLabel}</Text>
+          {props.ticketDateRangeError ? <Text style={styles.errorText}>{props.ticketDateRangeError}</Text> : null}
+        </View>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void props.downloadFilteredTicketPdfs()}>
+          <Text style={styles.primaryButtonText}>Exportar PDFs</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.accountingSummaryGrid}>
+        <View style={styles.accountingStat}>
+          <Text style={styles.accountingStatLabel}>Tickets</Text>
+          <Text style={styles.accountingStatValue}>{summary.ticketCount}</Text>
+        </View>
+        <View style={styles.accountingStat}>
+          <Text style={styles.accountingStatLabel}>Total</Text>
+          <Text style={styles.accountingStatValue}>{props.centsToCurrency(summary.totalCents)}</Text>
+        </View>
+        <View style={styles.accountingStat}>
+          <Text style={styles.accountingStatLabel}>Base imponible</Text>
+          <Text style={styles.accountingStatValue}>{props.centsToCurrency(summary.taxableBaseCents)}</Text>
+        </View>
+        <View style={styles.accountingStat}>
+          <Text style={styles.accountingStatLabel}>IVA</Text>
+          <Text style={styles.accountingStatValue}>{props.centsToCurrency(summary.vatCents)}</Text>
+        </View>
+        <View style={styles.accountingStat}>
+          <Text style={styles.accountingStatLabel}>Efectivo</Text>
+          <Text style={styles.accountingStatValue}>{props.centsToCurrency(summary.paymentTotals.cash)}</Text>
+        </View>
+        <View style={styles.accountingStat}>
+          <Text style={styles.accountingStatLabel}>Tarjeta</Text>
+          <Text style={styles.accountingStatValue}>{props.centsToCurrency(summary.paymentTotals.card)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function DesktopTicketPeriodControls(props: MainScreenProps): React.JSX.Element {
+  return (
+    <View style={styles.historyFiltersPanel}>
+      <View style={styles.periodButtonRow}>
+        {ticketPeriodOptions.map((option) => {
+          const selected = props.ticketPeriodPreset === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.periodButton, selected ? styles.periodButtonSelected : null]}
+              onPress={() => props.setTicketPeriodPreset(option.value)}
+            >
+              <Text style={[styles.periodButtonText, selected ? styles.periodButtonTextSelected : null]}>{option.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {props.ticketPeriodPreset === 'custom' ? (
+        <View style={styles.customDateRow}>
+          <TextInput
+            style={[styles.formInput, styles.dateInput]}
+            value={props.ticketCustomStartDate}
+            onChangeText={props.setTicketCustomStartDate}
+            placeholder="AAAA-MM-DD inicio"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={[styles.formInput, styles.dateInput]}
+            value={props.ticketCustomEndDate}
+            onChangeText={props.setTicketCustomEndDate}
+            placeholder="AAAA-MM-DD fin"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+      ) : null}
+      <View style={styles.historyToolbar}>
+        <TextInput
+          style={[styles.menuSearchInput, styles.historySearchInput]}
+          value={props.ticketSearchText}
+          onChangeText={props.setTicketSearchText}
+          placeholder="Buscar por numero, NIF, cliente, mesa, pago o producto"
+          placeholderTextColor="#6B7280"
+        />
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.loadTicketHistory()}>
+          <Text style={styles.secondaryButtonText}>Actualizar tickets</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function DesktopTicketDetail({ ticket, props }: { ticket: PaidTicket; props: MainScreenProps }): React.JSX.Element {
+  return (
+    <View style={styles.ticketDetailPanel}>
+      <View style={styles.panelHeaderRow}>
+        <View style={styles.flex1}>
+          <Text style={styles.itemName}>{ticket.ticketNumber}</Text>
+          <Text style={styles.itemPrice}>{`${getTicketBusinessLine(ticket)} · NIF ${getTicketBusinessTaxId(ticket)}`}</Text>
+        </View>
+        <View style={styles.historyInlineActions}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.printSimplifiedPaidTicket(ticket)}>
+            <Text style={styles.secondaryButtonText}>Imprimir</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.downloadTicket(ticket)}>
+            <Text style={styles.secondaryButtonText}>PDF fiscal</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={props.clearSelectedPaidTicket}>
+            <Text style={styles.secondaryButtonText}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <View style={styles.ticketDetailGrid}>
+        <Text style={styles.itemPrice}>{`Fecha: ${props.formatDateTime(ticket.createdAt)}`}</Text>
+        <Text style={styles.itemPrice}>{`Mesa: ${tableZoneLabel(normalizeTableZone(ticket.tableZone))} ${ticket.tableNumber}`}</Text>
+        <Text style={styles.itemPrice}>{`Terminal: ${ticket.terminalId || 'No registrado'}`}</Text>
+        <Text style={styles.itemPrice}>{`Cajero: ${ticket.cashierName || 'No registrado'}`}</Text>
+        <Text style={styles.itemPrice}>{`Pago: ${getPaymentLabel(ticket.method)}`}</Text>
+        <Text style={styles.itemPrice}>{`Estado: ${getStatusLabel(ticket.status)}`}</Text>
+        <Text style={styles.itemPrice}>{`Modalidad: ${getModeLabel(ticket.mode)}`}</Text>
+        <Text style={styles.itemPrice}>{`Cliente: ${ticket.customerName || 'No registrado'}`}</Text>
+        <Text style={styles.itemPrice}>{`NIF cliente: ${ticket.customerTaxId || 'No registrado'}`}</Text>
+        <Text style={styles.itemPrice}>{`Relacionado: ${ticket.relatedTicketNumber || 'No aplica'}`}</Text>
+        <Text style={styles.itemPrice}>{`PDF: ${ticket.pdfFileReference || 'Generado desde datos estructurados'}`}</Text>
+        <Text style={styles.itemPrice}>{`ID auditoria: ${ticket.id}`}</Text>
+      </View>
+      <View style={styles.ticketDetailTotals}>
+        <Text style={styles.itemPrice}>{`Base: ${props.centsToCurrency(ticket.taxableBaseCents)}`}</Text>
+        <Text style={styles.itemPrice}>{`IVA ${ticket.vatRatePercent}%: ${props.centsToCurrency(ticket.vatCents)}`}</Text>
+        <Text style={styles.totalText}>{props.centsToCurrency(ticket.totalCents)}</Text>
+      </View>
+      <View style={styles.ticketLineHeader}>
+        <Text style={[styles.ticketLineCell, styles.ticketLineName]}>Producto / servicio</Text>
+        <Text style={styles.ticketLineCell}>Ud.</Text>
+        <Text style={styles.ticketLineCell}>Precio</Text>
+        <Text style={styles.ticketLineCell}>Base</Text>
+        <Text style={styles.ticketLineCell}>IVA</Text>
+        <Text style={styles.ticketLineCell}>Total</Text>
+      </View>
+      {ticket.items.map((item) => {
+        const lineBase = Math.round(item.totalPriceCents / (1 + ticket.vatRatePercent / 100));
+        const lineVat = item.totalPriceCents - lineBase;
+        return (
+          <View key={item.id} style={styles.ticketLineRow}>
+            <View style={[styles.ticketLineCell, styles.ticketLineName]}>
+              <Text style={styles.itemPrice}>{item.name}</Text>
+              <Text style={styles.ticketLineMeta}>{`Pedido ${item.orderId || 'sin ref'} · Item ${item.orderItemId ?? 'sin ref'}`}</Text>
+            </View>
+            <Text style={styles.ticketLineCell}>{item.qty}</Text>
+            <Text style={styles.ticketLineCell}>{props.centsToCurrency(item.unitPriceCents)}</Text>
+            <Text style={styles.ticketLineCell}>{props.centsToCurrency(lineBase)}</Text>
+            <Text style={styles.ticketLineCell}>{props.centsToCurrency(lineVat)}</Text>
+            <Text style={styles.ticketLineCell}>{props.centsToCurrency(item.totalPriceCents)}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
   return (
     <SafeAreaView style={styles.container}>
@@ -239,62 +445,33 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
         <View style={styles.fullPanel}>
           <View style={styles.panelHeaderRow}>
             <Text style={styles.sectionTitle}>Historial de tickets</Text>
+            <Text style={styles.itemPrice}>{`${props.filteredPaidTickets.length} tickets visibles`}</Text>
           </View>
-          {props.sessionSummary ? (
-            <View style={styles.sessionSummaryPanel}>
-              <View style={styles.panelHeaderRow}>
-                <View style={styles.flex1}>
-                  <Text style={styles.itemName}>{`Sesion ${props.sessionSummary.sessionDate}`}</Text>
-                  <Text style={styles.itemPrice}>
-                    {`${props.formatDateTime(props.sessionSummary.startAt)} - ${props.formatDateTime(props.sessionSummary.endAt)} · ${props.sessionSummary.ticketCount} tickets`}
-                  </Text>
-                </View>
-                <View style={styles.historyInlineActions}>
-                  <Text style={styles.totalText}>{props.centsToCurrency(props.sessionSummary.totalCents)}</Text>
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.refreshSessionSummary(true)}>
-                    <Text style={styles.secondaryButtonText}>Actualizar totales</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.sessionSummaryGrid}>
-                <Text style={styles.itemPrice}>{`Efectivo: ${props.centsToCurrency(props.sessionSummary.paymentTotals.cash)}`}</Text>
-                <Text style={styles.itemPrice}>{`Tarjeta: ${props.centsToCurrency(props.sessionSummary.paymentTotals.card)}`}</Text>
-                <Text style={styles.itemPrice}>{`Base: ${props.centsToCurrency(props.sessionSummary.taxableBaseCents)}`}</Text>
-                <Text style={styles.itemPrice}>{`IVA: ${props.centsToCurrency(props.sessionSummary.vatCents)}`}</Text>
-              </View>
-              <Text style={styles.subTitle}>Productos vendidos</Text>
-              {props.sessionSummary.items.slice(0, 8).map((item) => (
-                <View key={item.name} style={styles.sessionSummaryRow}>
-                  <Text style={styles.itemPrice}>{`${item.qty}x ${item.name}`}</Text>
-                  <Text style={styles.itemPrice}>{props.centsToCurrency(item.totalCents)}</Text>
-                </View>
-              ))}
-              {props.sessionSummary.items.length === 0 ? <Text style={styles.emptyText}>No hay ventas en esta sesion.</Text> : null}
-            </View>
-          ) : null}
-          <View style={styles.historyToolbar}>
-            <TextInput
-              style={[styles.menuSearchInput, styles.historySearchInput]}
-              value={props.ticketSearchText}
-              onChangeText={props.setTicketSearchText}
-              placeholder="Buscar por numero, mesa, pago o producto"
-              placeholderTextColor="#6B7280"
-            />
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.loadTicketHistory()}>
-              <Text style={styles.secondaryButtonText}>Actualizar tickets</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.columnScroll}>
+          <DesktopTicketPeriodControls {...props} />
+          <DesktopHistorySummary {...props} />
+          {props.selectedPaidTicket ? <DesktopTicketDetail ticket={props.selectedPaidTicket} props={props} /> : null}
+          <ScrollView style={styles.columnScroll} contentContainerStyle={styles.historyListContent}>
             {props.filteredPaidTickets.map((ticket) => (
               <View key={ticket.id} style={styles.historyRow}>
                 <View style={styles.flex1}>
-                  <Text style={styles.itemName}>{ticket.ticketNumber}</Text>
-                  <Text style={styles.itemPrice}>
-                    {`Mesa ${ticket.tableZone}-${ticket.tableNumber} · ${props.formatDateTime(ticket.createdAt)} · ${ticket.method === 'cash' ? 'Efectivo' : 'Tarjeta'}`}
-                  </Text>
-                  <Text style={styles.itemPrice}>{ticket.items.map((item) => `${item.qty}x ${item.name}`).join(', ')}</Text>
+                  <View style={styles.historyTicketTopLine}>
+                    <Text style={styles.itemName}>{ticket.ticketNumber}</Text>
+                    <Text style={styles.historyStatusPill}>{getStatusLabel(ticket.status)}</Text>
+                  </View>
+                  <Text style={styles.itemPrice}>{`${props.formatDateTime(ticket.createdAt)} · ${getPaymentLabel(ticket.method)} · ${getModeLabel(ticket.mode)}`}</Text>
+                  <Text style={styles.itemPrice}>{`${getTicketBusinessLine(ticket)} · NIF ${getTicketBusinessTaxId(ticket)}`}</Text>
+                  <Text style={styles.itemPrice}>{`Mesa ${tableZoneLabel(normalizeTableZone(ticket.tableZone))} ${ticket.tableNumber} · Terminal ${ticket.terminalId || 'No registrado'} · Cajero ${ticket.cashierName || 'No registrado'}`}</Text>
+                  <Text style={styles.itemPrice} numberOfLines={1}>{getTicketLineSummary(ticket)}</Text>
+                  <View style={styles.historyTaxLine}>
+                    <Text style={styles.itemPrice}>{`Base ${props.centsToCurrency(ticket.taxableBaseCents)}`}</Text>
+                    <Text style={styles.itemPrice}>{`IVA ${ticket.vatRatePercent}% ${props.centsToCurrency(ticket.vatCents)}`}</Text>
+                    <Text style={styles.itemPrice}>{`PDF ${ticket.pdfFileReference || 'generable'}`}</Text>
+                  </View>
                 </View>
                 <Text style={styles.totalText}>{props.centsToCurrency(ticket.totalCents)}</Text>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => props.selectPaidTicket(ticket)}>
+                  <Text style={styles.secondaryButtonText}>Detalle</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.printSimplifiedPaidTicket(ticket)}>
                   <Text style={styles.secondaryButtonText}>Imprimir</Text>
                 </TouchableOpacity>

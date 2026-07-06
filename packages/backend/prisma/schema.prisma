@@ -81,22 +81,37 @@ model Payment {
 }
 
 model PaidTicket {
-  id               String           @id @default(cuid())
-  ticketNumber     String           @unique
-  mode             String
-  method           String
-  tableNumber      Int
-  tableZone        String
-  totalCents       Int
-  taxableBaseCents Int
-  vatCents         Int
-  vatRatePercent   Int
-  splitPeople      Int?
-  createdAt        DateTime         @default(now())
-  items            PaidTicketItem[]
+  id                  String           @id @default(cuid())
+  ticketNumber        String           @unique
+  mode                String
+  method              String
+  tableNumber         Int
+  tableZone           String
+  totalCents          Int
+  taxableBaseCents    Int
+  vatCents            Int
+  vatRatePercent      Int
+  splitPeople         Int?
+  businessName        String           @default("")
+  tradeName           String           @default("")
+  businessTaxId       String           @default("")
+  businessAddress     String?
+  businessCity        String?
+  businessPhone       String?
+  terminalId          String?
+  cashierName         String?
+  customerName        String?
+  customerTaxId       String?
+  status              String           @default("paid")
+  relatedTicketNumber String?
+  pdfFileReference    String?
+  auditMetadata       String?
+  createdAt           DateTime         @default(now())
+  items               PaidTicketItem[]
 
   @@index([tableZone, tableNumber])
   @@index([createdAt])
+  @@index([status])
 }
 
 model PaidTicketItem {

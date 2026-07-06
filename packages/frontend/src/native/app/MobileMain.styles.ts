@@ -234,6 +234,53 @@ export const mobileStyles = StyleSheet.create({
     gap: 6,
     marginBottom: 10
   },
+  historyFiltersPanel: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    padding: 6,
+    gap: 6,
+    marginBottom: 8
+  },
+  periodButtonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5
+  },
+  periodButton: {
+    flexGrow: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  periodButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  periodButtonText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 12
+  },
+  periodButtonTextSelected: {
+    color: colors.textLight
+  },
+  customDateRow: {
+    flexDirection: 'row',
+    gap: 5
+  },
+  dateInput: {
+    flex: 1,
+    minWidth: 0,
+    flexBasis: 0
+  },
   historySearchInput: {
     flex: 1,
     minWidth: 190
@@ -316,6 +363,40 @@ export const mobileStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingVertical: 5
+  },
+  ticketDetailPanel: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    padding: 8,
+    gap: 8,
+    marginBottom: 8
+  },
+  ticketDetailGrid: {
+    gap: 4
+  },
+  ticketDetailTotals: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 7
+  },
+  ticketLineRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+    gap: 3
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3
   },
   productForm: {
     borderWidth: 1,
