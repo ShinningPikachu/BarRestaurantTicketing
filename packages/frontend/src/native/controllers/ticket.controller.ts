@@ -26,7 +26,7 @@ export function useTicketController() {
       });
       return true;
     } catch {
-      Alert.alert('Error', 'No se pudo generar el PDF del ticket.');
+      Alert.alert('Error', 'No se pudo imprimir el ticket.');
       return false;
     }
   }

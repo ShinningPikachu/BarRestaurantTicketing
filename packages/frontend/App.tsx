@@ -171,6 +171,13 @@ function formatDateOnly(value: Date): string {
   });
 }
 
+function formatDateKey(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function formatDateInputValue(value: Date): string {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, '0');
@@ -1277,6 +1284,91 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function printFilteredTicketSummary(): Promise<void> {
+    if (filteredPaidTickets.length === 0) {
+      Alert.alert('Sin tickets', 'No hay tickets seleccionados para imprimir el resumen.');
+      return;
+    }
+
+    const config = getSimplifiedInvoiceConfig();
+    const sortedTickets = [...filteredPaidTickets].sort((first, second) => (
+      new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime()
+    ));
+    const vatRates = Array.from(new Set(filteredPaidTickets.map((ticket) => ticket.vatRatePercent)));
+    const vatRateLabel = vatRates.length === 1 ? `${vatRates[0].toFixed(0)}%` : 'mixto';
+    const firstTicket = sortedTickets[0];
+    const lastTicket = sortedTickets[sortedTickets.length - 1];
+    const dailyTotalsByKey = new Map<string, {
+      dayKey: string;
+      dayLabel: string;
+      ticketCount: number;
+      itemQuantity: number;
+      taxableBaseCents: number;
+      vatCents: number;
+      totalCents: number;
+      cashCents: number;
+      cardCents: number;
+    }>();
+
+    for (const ticket of sortedTickets) {
+      const createdAt = new Date(ticket.createdAt);
+      const dayKey = formatDateKey(createdAt);
+      const existing = dailyTotalsByKey.get(dayKey) ?? {
+        dayKey,
+        dayLabel: formatDateOnly(createdAt),
+        ticketCount: 0,
+        itemQuantity: 0,
+        taxableBaseCents: 0,
+        vatCents: 0,
+        totalCents: 0,
+        cashCents: 0,
+        cardCents: 0,
+      };
+
+      existing.ticketCount += 1;
+      existing.itemQuantity += ticket.items.reduce((sum, item) => sum + item.qty, 0);
+      existing.taxableBaseCents += ticket.taxableBaseCents;
+      existing.vatCents += ticket.vatCents;
+      existing.totalCents += ticket.totalCents;
+      if (ticket.method === 'cash') {
+        existing.cashCents += ticket.totalCents;
+      } else if (ticket.method === 'card') {
+        existing.cardCents += ticket.totalCents;
+      }
+      dailyTotalsByKey.set(dayKey, existing);
+    }
+
+    const dailyTotals = Array.from(dailyTotalsByKey.values())
+      .sort((first, second) => first.dayKey.localeCompare(second.dayKey))
+      .map(({ dayKey: _dayKey, ...dayTotals }) => dayTotals);
+
+    try {
+      await apiService.printXprinterFinancialSummary({
+        businessName: config.businessName,
+        tradeName: config.tradeName,
+        nif: config.nif,
+        periodLabel: ticketDateRange.label,
+        issuedAt: formatDateTime(new Date().toISOString()),
+        ticketCount: ticketHistorySummary.ticketCount,
+        itemQuantity: ticketHistorySummary.itemQuantity,
+        taxableBaseCents: ticketHistorySummary.taxableBaseCents,
+        vatCents: ticketHistorySummary.vatCents,
+        vatRateLabel,
+        totalCents: ticketHistorySummary.totalCents,
+        cashCents: ticketHistorySummary.paymentTotals.cash,
+        cardCents: ticketHistorySummary.paymentTotals.card,
+        firstTicketNumber: firstTicket?.ticketNumber ?? null,
+        lastTicketNumber: lastTicket?.ticketNumber ?? null,
+        dailyTotals,
+        ...getOptionalXprinterTarget(),
+      });
+      Alert.alert('Resumen impreso', 'Se ha enviado el resultado financiero a la impresora.');
+    } catch (error) {
+      const details = error instanceof ApiRequestError ? `\n\n${error.message}` : '';
+      Alert.alert('Error', `No se pudo imprimir el resumen financiero.${details}`);
+    }
+  }
+
   async function openCashDrawer(): Promise<void> {
     try {
       await apiService.openXprinterCashDrawer(getOptionalXprinterTarget());
@@ -1654,6 +1746,7 @@ export default function App(): React.JSX.Element {
     refreshSessionSummary,
     loadTicketHistory,
     printSimplifiedPaidTicket,
+    printFilteredTicketSummary,
     downloadTicket,
     downloadFilteredTicketPdfs,
     managedCategories,

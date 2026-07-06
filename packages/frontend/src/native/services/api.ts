@@ -407,6 +407,45 @@ export class ApiService {
     return parseOrThrow<{ printed: boolean }>(response, 'Failed to print Xprinter ticket');
   }
 
+  async printXprinterFinancialSummary(payload: {
+    businessName: string;
+    tradeName: string;
+    nif: string;
+    periodLabel: string;
+    issuedAt: string;
+    ticketCount: number;
+    itemQuantity: number;
+    taxableBaseCents: number;
+    vatCents: number;
+    vatRateLabel?: string | null;
+    totalCents: number;
+    cashCents: number;
+    cardCents: number;
+    firstTicketNumber?: string | null;
+    lastTicketNumber?: string | null;
+    dailyTotals: Array<{
+      dayLabel: string;
+      ticketCount: number;
+      itemQuantity: number;
+      taxableBaseCents: number;
+      vatCents: number;
+      totalCents: number;
+      cashCents: number;
+      cardCents: number;
+    }>;
+    printerHost?: string;
+    printerPort?: number;
+    printerName?: string;
+    usbDevice?: string;
+  }): Promise<{ printed: boolean }> {
+    const response = await this.request('/printers/xprinter/financial-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return parseOrThrow<{ printed: boolean }>(response, 'Failed to print Xprinter financial summary');
+  }
+
   async openXprinterCashDrawer(payload: {
     printerHost?: string;
     printerPort?: number;

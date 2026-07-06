@@ -229,7 +229,7 @@ function MobileHistorySummary(props: MainScreenProps): React.JSX.Element {
     <View style={styles.sessionSummaryPanel}>
       <View style={styles.summaryTopRow}>
         <View style={styles.flex1}>
-          <Text style={styles.itemName}>Resultado fiscal</Text>
+          <Text style={styles.itemName}>Resultado financiero</Text>
           <Text style={styles.itemPrice}>{props.ticketDateRangeLabel}</Text>
           {props.ticketDateRangeError ? <Text style={styles.errorText}>{props.ticketDateRangeError}</Text> : null}
         </View>
@@ -256,9 +256,14 @@ function MobileHistorySummary(props: MainScreenProps): React.JSX.Element {
           <Text style={styles.summaryStatValue}>{props.centsToCurrency(summary.paymentTotals.card)}</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.downloadFilteredTicketPdfs()}>
-        <Text style={styles.secondaryButtonText}>Exportar PDFs del periodo</Text>
-      </TouchableOpacity>
+      <View style={styles.historyInlineActions}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.printFilteredTicketSummary()} disabled={summary.ticketCount === 0}>
+          <Text style={styles.secondaryButtonText}>Imprimir resumen</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.downloadFilteredTicketPdfs()}>
+          <Text style={styles.secondaryButtonText}>Exportar PDFs</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

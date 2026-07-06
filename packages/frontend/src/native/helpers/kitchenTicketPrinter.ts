@@ -8,30 +8,6 @@ import { getItemDisplayName } from './itemDisplayName';
 
 const SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY = 'bar-ticketing-simplified-invoice-sequence';
 
-type ExpoLikeGlobal = typeof globalThis & {
-  process?: {
-    env?: {
-      EXPO_PUBLIC_TICKET_BUSINESS_NAME?: string;
-      EXPO_PUBLIC_TICKET_TRADE_NAME?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_NIF?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_CITY?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_PHONE?: string;
-      EXPO_PUBLIC_TICKET_ISSUER_NAME?: string;
-      EXPO_PUBLIC_TICKET_ISSUER_NIF?: string;
-      EXPO_PUBLIC_TICKET_ISSUER_ADDRESS?: string;
-      EXPO_PUBLIC_TICKET_SERIES?: string;
-      EXPO_PUBLIC_TICKET_VAT_RATE?: string;
-      EXPO_PUBLIC_TICKET_PRINT_MODE?: string;
-      EXPO_PUBLIC_XPRINTER_HOST?: string;
-      EXPO_PUBLIC_XPRINTER_PORT?: string;
-      EXPO_PUBLIC_XPRINTER_PRINTER_NAME?: string;
-      EXPO_PUBLIC_XPRINTER_USB_DEVICE?: string;
-      EXPO_PUBLIC_XPRINTER_OPEN_DRAWER?: string;
-    };
-  };
-};
-
 export interface SimplifiedInvoiceConfig {
   businessName: string;
   tradeName: string;
@@ -44,17 +20,16 @@ export interface SimplifiedInvoiceConfig {
 }
 
 export function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
-  const env = (globalThis as ExpoLikeGlobal).process?.env;
-  const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
+  const vatRateRaw = Number(process.env.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
 
   return {
-    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'YUYE CHEN',
-    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'Star Bar',
-    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'X5126994-H',
-    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'Gran Via de les Corts Catalanes 669. Bis',
-    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '08013 Barcelona',
-    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '672295395',
-    series: env?.EXPO_PUBLIC_TICKET_SERIES ?? 'FS',
+    businessName: process.env.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? process.env.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'YUYE CHEN',
+    tradeName: process.env.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'Star Bar',
+    nif: process.env.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? process.env.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'X5126994-H',
+    address: process.env.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? process.env.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'Gran Via de les Corts Catalanes 669. Bis',
+    city: process.env.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '08013 Barcelona',
+    phone: process.env.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '672295395',
+    series: process.env.EXPO_PUBLIC_TICKET_SERIES ?? 'FS',
     vatRatePercent: Number.isFinite(vatRateRaw) && vatRateRaw > 0 ? vatRateRaw : 10,
   };
 }
@@ -108,9 +83,9 @@ function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; to
 }
 
 function shouldUseXprinterBridge(): boolean {
-  const env = (globalThis as ExpoLikeGlobal).process?.env;
-  return env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-lan'
-    || env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-usb';
+  const printMode = process.env.EXPO_PUBLIC_TICKET_PRINT_MODE?.trim().toLowerCase();
+
+  return printMode === 'xprinter-lan' || printMode === 'xprinter-usb';
 }
 
 export function getOptionalXprinterTarget(): {
@@ -120,14 +95,13 @@ export function getOptionalXprinterTarget(): {
   usbDevice?: string;
   openCashDrawer?: boolean;
 } {
-  const env = (globalThis as ExpoLikeGlobal).process?.env;
-  const printerPort = Number(env?.EXPO_PUBLIC_XPRINTER_PORT);
+  const printerPort = Number(process.env.EXPO_PUBLIC_XPRINTER_PORT);
   return {
-    printerHost: env?.EXPO_PUBLIC_XPRINTER_HOST || undefined,
+    printerHost: process.env.EXPO_PUBLIC_XPRINTER_HOST || undefined,
     printerPort: Number.isInteger(printerPort) && printerPort > 0 ? printerPort : undefined,
-    printerName: env?.EXPO_PUBLIC_XPRINTER_PRINTER_NAME || undefined,
-    usbDevice: env?.EXPO_PUBLIC_XPRINTER_USB_DEVICE || undefined,
-    openCashDrawer: env?.EXPO_PUBLIC_XPRINTER_OPEN_DRAWER === 'true' ? true : undefined,
+    printerName: process.env.EXPO_PUBLIC_XPRINTER_PRINTER_NAME || undefined,
+    usbDevice: process.env.EXPO_PUBLIC_XPRINTER_USB_DEVICE || undefined,
+    openCashDrawer: process.env.EXPO_PUBLIC_XPRINTER_OPEN_DRAWER === 'true' ? true : undefined,
   };
 }
 

@@ -35,6 +35,7 @@ export interface MainScreenProps {
   refreshSessionSummary: (showFeedback?: boolean) => Promise<void>;
   loadTicketHistory: () => Promise<void>;
   printSimplifiedPaidTicket: (ticket: PaidTicket) => Promise<void>;
+  printFilteredTicketSummary: () => Promise<void>;
   downloadTicket: (ticket: PaidTicket) => Promise<void>;
   downloadFilteredTicketPdfs: () => Promise<void>;
   managedCategories: string[];

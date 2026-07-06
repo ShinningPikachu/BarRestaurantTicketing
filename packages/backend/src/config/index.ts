@@ -15,6 +15,7 @@ export const config = {
     host: process.env.XPRINTER_HOST || '',
     port: parseInt(process.env.XPRINTER_PORT || '9100', 10),
     printerName: process.env.XPRINTER_PRINTER_NAME || '',
+    systemPrinterRaw: process.env.XPRINTER_SYSTEM_PRINTER_RAW === 'true',
     usbDevice: process.env.XPRINTER_USB_DEVICE || '',
     openDrawer: process.env.XPRINTER_OPEN_DRAWER === 'true',
   },

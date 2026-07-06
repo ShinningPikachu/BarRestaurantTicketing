@@ -40,6 +40,40 @@ const xprinterTicketSchema = z.object({
   usbDevice: z.string().trim().optional(),
 });
 
+const financialSummaryDaySchema = z.object({
+  dayLabel: z.string().trim().min(1),
+  ticketCount: z.number().int().min(0),
+  itemQuantity: z.number().int().min(0),
+  taxableBaseCents: z.number().int().min(0),
+  vatCents: z.number().int().min(0),
+  totalCents: z.number().int().min(0),
+  cashCents: z.number().int().min(0),
+  cardCents: z.number().int().min(0),
+});
+
+const xprinterFinancialSummarySchema = z.object({
+  businessName: z.string().trim().min(1),
+  tradeName: z.string().trim().min(1),
+  nif: z.string().trim().min(1),
+  periodLabel: z.string().trim().min(1),
+  issuedAt: z.string().trim().min(1),
+  ticketCount: z.number().int().min(0),
+  itemQuantity: z.number().int().min(0),
+  taxableBaseCents: z.number().int().min(0),
+  vatCents: z.number().int().min(0),
+  vatRateLabel: z.string().trim().optional().nullable(),
+  totalCents: z.number().int().min(0),
+  cashCents: z.number().int().min(0),
+  cardCents: z.number().int().min(0),
+  firstTicketNumber: z.string().trim().optional().nullable(),
+  lastTicketNumber: z.string().trim().optional().nullable(),
+  dailyTotals: z.array(financialSummaryDaySchema).min(1),
+  printerHost: z.string().trim().optional(),
+  printerPort: z.number().int().positive().optional(),
+  printerName: z.string().trim().optional(),
+  usbDevice: z.string().trim().optional(),
+});
+
 const xprinterTargetSchema = z.object({
   printerHost: z.string().trim().optional(),
   printerPort: z.number().int().positive().optional(),
@@ -61,6 +95,25 @@ router.post(
     try {
       const { printerHost, printerPort, printerName, usbDevice, ...payload } = req.body;
       await xprinterService.printTicket(payload, {
+        host: printerHost,
+        port: printerPort,
+        printerName,
+        usbDevice,
+      });
+      res.json(successResponse({ printed: true }));
+    } catch (error) {
+      next(toPrinterApiError(error));
+    }
+  }
+);
+
+router.post(
+  '/xprinter/financial-summary',
+  validateBody(xprinterFinancialSummarySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { printerHost, printerPort, printerName, usbDevice, ...payload } = req.body;
+      await xprinterService.printFinancialSummary(payload, {
         host: printerHost,
         port: printerPort,
         printerName,
