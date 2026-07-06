@@ -586,22 +586,33 @@ export default function App(): React.JSX.Element {
     });
 
     async function restoreLogin(): Promise<void> {
-      const savedApiBaseUrl = await AsyncStorage.getItem(API_BASE_URL_STORAGE_KEY);
-      if (savedApiBaseUrl) {
-        try {
-          const restoredUrl = setApiBaseUrl(savedApiBaseUrl);
-          setConfiguredApiBaseUrl(restoredUrl);
-          setApiBaseUrlDraft(restoredUrl);
-        } catch {
-          await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY);
+      const forcedTpvScreen = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TPV_SCREEN;
+      if (forcedTpvScreen === 'desktop') {
+        await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY);
+      } else {
+        const savedApiBaseUrl = await AsyncStorage.getItem(API_BASE_URL_STORAGE_KEY);
+        if (savedApiBaseUrl) {
+          try {
+            const restoredUrl = setApiBaseUrl(savedApiBaseUrl);
+            setConfiguredApiBaseUrl(restoredUrl);
+            setApiBaseUrlDraft(restoredUrl);
+          } catch {
+            await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY);
+          }
         }
       }
 
       const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
       if (token) {
         apiService.setAuthToken(token);
-        setAuthStatus('signedIn');
-        return;
+        try {
+          await apiService.fetchSyncRevision();
+          setAuthStatus('signedIn');
+          return;
+        } catch {
+          apiService.setAuthToken(null);
+          await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+        }
       }
 
       setAuthStatus('signedOut');

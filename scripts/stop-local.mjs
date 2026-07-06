@@ -125,10 +125,11 @@ function sleep(ms) {
 loadEnvFile(resolve(process.cwd(), '.env'));
 
 const pidFile = resolve(process.cwd(), '.cache', 'bar-restaurant-ticketing.pids');
+const useStaticDesktop = process.env.BAR_TICKETING_DESKTOP_STATIC === '1';
 const ports = [
   process.env.PORT || '3000',
   process.env.DESKTOP_EXPO_PORT || '8081',
-  process.env.PHONE_EXPO_PORT || '8082',
+  ...(useStaticDesktop ? [] : [process.env.PHONE_EXPO_PORT || '8082']),
 ];
 
 const pids = new Set();

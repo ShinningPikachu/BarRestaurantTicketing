@@ -109,10 +109,11 @@ function findPidsByPort(port) {
 loadEnvFile(resolve(process.cwd(), '.env'));
 
 const pidFile = resolve(process.cwd(), '.cache', 'bar-restaurant-ticketing.pids');
+const useStaticDesktop = process.env.BAR_TICKETING_DESKTOP_STATIC === '1';
 const ports = [
   { label: 'backend API', port: process.env.PORT || '3000' },
   { label: 'desktop POS', port: process.env.DESKTOP_EXPO_PORT || '8081' },
-  { label: 'phone POS', port: process.env.PHONE_EXPO_PORT || '8082' },
+  ...(useStaticDesktop ? [] : [{ label: 'phone POS', port: process.env.PHONE_EXPO_PORT || '8082' }]),
 ];
 
 const pidFileHasAppProcess = existsSync(pidFile) && parsePids(readFileSync(pidFile, 'utf8')).some((pid) => (

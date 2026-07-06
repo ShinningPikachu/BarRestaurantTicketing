@@ -128,13 +128,15 @@ On Linux desktops, you can start the local POS without typing terminal commands:
 Start_BarRestaurantTicketing.desktop
 ```
 
-Double-click it from the repository folder and choose to run it if your file manager asks. It installs missing locked npm libraries when needed, opens a terminal window, starts the backend and frontend, then opens the desktop POS at:
+Double-click it from the repository folder and choose to run it if your file manager asks. It installs missing locked npm libraries when needed, opens a terminal window, builds the desktop web POS, starts the backend and a static web server without development file watching, then opens the desktop POS at:
 
 ```text
 http://localhost:8081
 ```
 
 Keep the terminal window open while using the app. Press `Ctrl+C` in that window to stop it.
+
+The desktop start icon does not start the phone Expo QR server. Use `npm run dev` from a terminal when you want the development servers and phone Expo pairing.
 
 If the POS is already running, double-clicking the same start icon again only opens or focuses the existing POS screen. It does not start a second copy. If someone accidentally closes only the POS browser window, double-click the start icon again to reopen it.
 
@@ -196,6 +198,12 @@ Backend only:
 
 ```bash
 npm run -w backend dev
+```
+
+Backend only without hot reload:
+
+```bash
+npm run -w backend serve
 ```
 
 Frontend web only:

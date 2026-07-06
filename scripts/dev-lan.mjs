@@ -1,5 +1,5 @@
 import net from 'node:net';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { printExpoGoLink, printInstalledAppPairingCode } from './expo-terminal.mjs';
@@ -42,9 +42,14 @@ const runtimeEnv = ensureRuntimeEnv(resolve(process.cwd(), '.env'));
 loadEnvFile(resolve(process.cwd(), '.env'));
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const backendScript = process.env.BAR_TICKETING_BACKEND_SCRIPT || 'dev';
+const useStaticDesktop = process.env.BAR_TICKETING_DESKTOP_STATIC === '1';
 const backendPort = process.env.PORT || '3000';
 const hostIp = getHostIp({ fallback: 'localhost' });
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${hostIp}:${backendPort}/api`;
+const desktopApiBaseUrl = useStaticDesktop
+  ? (process.env.EXPO_PUBLIC_DESKTOP_API_BASE_URL || `http://localhost:${backendPort}/api`)
+  : apiBaseUrl;
 const pairingApiBaseUrl = `http://${hostIp}:${backendPort}/api`;
 const desktopPort = process.env.DESKTOP_EXPO_PORT || '8081';
 const phonePort = process.env.PHONE_EXPO_PORT || '8082';
@@ -77,7 +82,7 @@ function verifyPortAvailable(label, port) {
 const configuredPorts = [
   { label: 'Backend API', port: backendPort },
   { label: 'Desktop POS', port: desktopPort },
-  { label: 'Phone POS', port: phonePort },
+  ...(useStaticDesktop ? [] : [{ label: 'Phone POS', port: phonePort }]),
 ];
 const distinctPorts = new Set(configuredPorts.map(({ port }) => String(port)));
 
@@ -96,6 +101,23 @@ try {
 
 mkdirSync(desktopExpoHome, { recursive: true });
 mkdirSync(phoneExpoHome, { recursive: true });
+
+if (useStaticDesktop) {
+  console.log('Building the desktop POS web bundle...');
+  const build = spawnSync(npmCommand, ['run', 'build', '-w', 'frontend', '--', '--clear'], {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      BROWSER: 'none',
+      EXPO_PUBLIC_API_BASE_URL: desktopApiBaseUrl,
+      EXPO_PUBLIC_TPV_SCREEN: 'desktop',
+    },
+  });
+
+  if (build.status !== 0) {
+    process.exit(build.status ?? 1);
+  }
+}
 
 let shuttingDown = false;
 const childProcesses = [];
@@ -130,51 +152,69 @@ function attachExitHandler(child) {
   });
 }
 
-spawnChild(npmCommand, ['run', 'dev', '-w', 'backend'], {
+spawnChild(npmCommand, ['run', backendScript, '-w', 'backend'], {
   stdio: 'inherit',
   env: process.env,
 });
 
-spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', desktopPort, ...expoDevToolsArgs], {
-  stdio: 'inherit',
-  env: {
-    ...process.env,
-    BROWSER: 'none',
-    EXPO_HOME: desktopExpoHome,
-    __UNSAFE_EXPO_HOME_DIRECTORY: desktopExpoHome,
-    EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
-    EXPO_PUBLIC_TPV_SCREEN: 'desktop',
-  },
-});
-
-setTimeout(() => {
-  if (shuttingDown) {
-    return;
-  }
-
-  spawnChild(npmCommand, ['run', 'dev:phone', '-w', 'frontend', '--', '--port', phonePort, ...expoDevToolsArgs], {
+if (useStaticDesktop) {
+  spawnChild(process.execPath, ['scripts/serve-static-web.mjs'], {
     stdio: 'inherit',
     env: {
       ...process.env,
-      EXPO_HOME: phoneExpoHome,
-      __UNSAFE_EXPO_HOME_DIRECTORY: phoneExpoHome,
-      EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
-      EXPO_PUBLIC_TPV_SCREEN: 'mobile',
+      EXPO_PUBLIC_API_BASE_URL: desktopApiBaseUrl,
+      EXPO_PUBLIC_TPV_SCREEN: 'desktop',
+    },
+  });
+} else {
+  spawnChild(npmCommand, ['run', 'web:desktop', '-w', 'frontend', '--', '--port', desktopPort, ...expoDevToolsArgs], {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      BROWSER: 'none',
+      EXPO_HOME: desktopExpoHome,
+      __UNSAFE_EXPO_HOME_DIRECTORY: desktopExpoHome,
+      EXPO_PUBLIC_API_BASE_URL: desktopApiBaseUrl,
+      EXPO_PUBLIC_TPV_SCREEN: 'desktop',
     },
   });
 
-  if (!enableNativeDevTools) {
-    printExpoGoLink(phoneExpoUrl);
-  }
-}, 1500);
+  setTimeout(() => {
+    if (shuttingDown) {
+      return;
+    }
+
+    spawnChild(npmCommand, ['run', 'dev:phone', '-w', 'frontend', '--', '--port', phonePort, ...expoDevToolsArgs], {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        EXPO_HOME: phoneExpoHome,
+        __UNSAFE_EXPO_HOME_DIRECTORY: phoneExpoHome,
+        EXPO_PUBLIC_API_BASE_URL: apiBaseUrl,
+        EXPO_PUBLIC_TPV_SCREEN: 'mobile',
+      },
+    });
+
+    if (!enableNativeDevTools) {
+      printExpoGoLink(phoneExpoUrl);
+    }
+  }, 1500);
+}
 
 console.log(`\nSelected computer address for phone pairing: ${hostIp}`);
 console.log('Tip: if you use the computer hotspot and the QR shows the wrong address, restart with BAR_TICKETING_HOST_IP set to the hotspot IP.');
-console.log(`Backend API shared by both screens: ${apiBaseUrl}`);
+console.log(`Desktop backend API: ${desktopApiBaseUrl}`);
+if (!useStaticDesktop) {
+  console.log(`Backend API shared by both screens: ${apiBaseUrl}`);
+}
 console.log(`Computer web TPV: http://localhost:${desktopPort}`);
-console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
-printInstalledAppPairingCode(pairingApiBaseUrl);
-if (!enableNativeDevTools) {
+if (useStaticDesktop) {
+  console.log('Phone Expo TPV disabled for desktop launcher mode.\n');
+} else {
+  console.log(`Phone Expo TPV: scan the QR code from the Expo server on port ${phonePort}\n`);
+  printInstalledAppPairingCode(pairingApiBaseUrl);
+}
+if (!enableNativeDevTools && !useStaticDesktop) {
   console.log('Native React DevTools disabled for the combined POS launcher. Set BAR_TICKETING_ENABLE_NATIVE_DEVTOOLS=1 to enable them.\n');
 }
 if (runtimeEnv.accessCode) {

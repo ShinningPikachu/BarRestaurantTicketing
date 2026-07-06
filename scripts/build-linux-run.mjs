@@ -60,6 +60,8 @@ set -e
 APP_NAME="BarRestaurantTicketing"
 INSTALL_DIR="\${BAR_TICKETING_HOME:-$HOME/.local/share/BarRestaurantTicketing}"
 DESKTOP_URL="\${DESKTOP_URL:-http://localhost:8081}"
+BAR_TICKETING_DESKTOP_STATIC="\${BAR_TICKETING_DESKTOP_STATIC:-1}"
+export BAR_TICKETING_DESKTOP_STATIC
 
 echo "Preparing $APP_NAME..."
 echo
@@ -222,7 +224,7 @@ echo "Keep this window open while using the application."
 echo "Press Ctrl+C here to stop it."
 echo
 
-npm run dev
+BAR_TICKETING_BACKEND_SCRIPT="\${BAR_TICKETING_BACKEND_SCRIPT:-serve}" npm run dev
 
 exit $?
 

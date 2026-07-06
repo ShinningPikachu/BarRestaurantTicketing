@@ -5,6 +5,8 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DESKTOP_URL="${DESKTOP_URL:-http://localhost:8081}"
 REQUIRED_NODE_VERSION="20.19.4"
 MAX_NODE_MAJOR="22"
+BAR_TICKETING_DESKTOP_STATIC="${BAR_TICKETING_DESKTOP_STATIC:-1}"
+export BAR_TICKETING_DESKTOP_STATIC
 
 cd "$APP_DIR" || exit 1
 
@@ -122,7 +124,7 @@ echo "Keep this window open while using the application."
 echo "Press Ctrl+C here to stop the application."
 echo
 
-npm run dev
+BAR_TICKETING_BACKEND_SCRIPT="${BAR_TICKETING_BACKEND_SCRIPT:-serve}" npm run dev
 
 echo
 echo "Application stopped."
