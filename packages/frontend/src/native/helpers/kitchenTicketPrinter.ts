@@ -1,12 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import { Platform } from 'react-native';
 import { Order, tableZoneLabel } from '../types';
 import { SelectedTable } from '../app/app.types';
 import { apiService } from '../services/api';
 import { getItemDisplayName } from './itemDisplayName';
-
-const SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY = 'bar-ticketing-simplified-invoice-sequence';
+import { getOrderLineIdentity } from './orderLineIdentity';
 
 type ExpoLikeGlobal = typeof globalThis & {
   process?: {
@@ -20,14 +18,8 @@ type ExpoLikeGlobal = typeof globalThis & {
       EXPO_PUBLIC_TICKET_ISSUER_NAME?: string;
       EXPO_PUBLIC_TICKET_ISSUER_NIF?: string;
       EXPO_PUBLIC_TICKET_ISSUER_ADDRESS?: string;
-      EXPO_PUBLIC_TICKET_SERIES?: string;
       EXPO_PUBLIC_TICKET_VAT_RATE?: string;
       EXPO_PUBLIC_TICKET_PRINT_MODE?: string;
-      EXPO_PUBLIC_XPRINTER_HOST?: string;
-      EXPO_PUBLIC_XPRINTER_PORT?: string;
-      EXPO_PUBLIC_XPRINTER_PRINTER_NAME?: string;
-      EXPO_PUBLIC_XPRINTER_USB_DEVICE?: string;
-      EXPO_PUBLIC_XPRINTER_OPEN_DRAWER?: string;
     };
   };
 };
@@ -39,7 +31,6 @@ export interface SimplifiedInvoiceConfig {
   address: string;
   city: string;
   phone: string;
-  series: string;
   vatRatePercent: number;
 }
 
@@ -48,14 +39,13 @@ export function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
   const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
 
   return {
-    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'YUYE CHEN',
-    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'Star Bar',
-    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'X5126994-H',
-    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'Gran Via de les Corts Catalanes 669. Bis',
-    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '08013 Barcelona',
-    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '672295395',
-    series: env?.EXPO_PUBLIC_TICKET_SERIES ?? 'FS',
-    vatRatePercent: Number.isFinite(vatRateRaw) && vatRateRaw > 0 ? vatRateRaw : 10,
+    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'NEGOCIO SIN CONFIGURAR',
+    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'TPV Restaurante',
+    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'NIF SIN CONFIGURAR',
+    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'Dirección sin configurar',
+    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '',
+    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '',
+    vatRatePercent: Number.isInteger(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? vatRateRaw : 10,
   };
 }
 
@@ -91,14 +81,6 @@ function formatDateTime(date: Date): string {
   });
 }
 
-async function nextInvoiceNumber(series: string): Promise<string> {
-  const currentRaw = await AsyncStorage.getItem(SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY);
-  const currentNumber = Number(currentRaw ?? '0');
-  const nextNumber = Number.isFinite(currentNumber) && currentNumber >= 0 ? currentNumber + 1 : 1;
-  await AsyncStorage.setItem(SIMPLIFIED_INVOICE_SEQUENCE_STORAGE_KEY, String(nextNumber));
-  return `${series}-${String(nextNumber).padStart(6, '0')}`;
-}
-
 function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; totalPriceCents?: number }): number {
   if (typeof item.totalPriceCents === 'number') {
     return item.totalPriceCents;
@@ -113,30 +95,12 @@ function shouldUseXprinterBridge(): boolean {
     || env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-usb';
 }
 
-export function getOptionalXprinterTarget(): {
-  printerHost?: string;
-  printerPort?: number;
-  printerName?: string;
-  usbDevice?: string;
-  openCashDrawer?: boolean;
-} {
-  const env = (globalThis as ExpoLikeGlobal).process?.env;
-  const printerPort = Number(env?.EXPO_PUBLIC_XPRINTER_PORT);
-  return {
-    printerHost: env?.EXPO_PUBLIC_XPRINTER_HOST || undefined,
-    printerPort: Number.isInteger(printerPort) && printerPort > 0 ? printerPort : undefined,
-    printerName: env?.EXPO_PUBLIC_XPRINTER_PRINTER_NAME || undefined,
-    usbDevice: env?.EXPO_PUBLIC_XPRINTER_USB_DEVICE || undefined,
-    openCashDrawer: env?.EXPO_PUBLIC_XPRINTER_OPEN_DRAWER === 'true' ? true : undefined,
-  };
-}
-
 function getCombinedOrderLines(orders: Order[]): Array<{ name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }> {
   const lineByKey = new Map<string, { name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }>();
 
   for (const item of orders.flatMap((order) => order.items)) {
     const unitPriceCents = item.unitPriceCents ?? 0;
-    const key = `${item.name.trim().toLowerCase()}|${unitPriceCents}`;
+    const key = getOrderLineIdentity({ ...item, unitPriceCents });
     const existing = lineByKey.get(key);
 
     if (existing) {
@@ -178,13 +142,12 @@ function buildLineRows(orders: Order[]): string {
 function buildSimplifiedInvoiceHtml(params: {
   selectedTable: SelectedTable;
   confirmedOrders: Order[];
-  invoiceNumber: string;
   issuedAt: Date;
   config: SimplifiedInvoiceConfig;
   splitPeople?: number;
   ticketNote?: string;
 }): string {
-  const { selectedTable, confirmedOrders, invoiceNumber, issuedAt, config, splitPeople, ticketNote } = params;
+  const { selectedTable, confirmedOrders, issuedAt, config, splitPeople, ticketNote } = params;
   const combinedLines = getCombinedOrderLines(confirmedOrders);
   const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
   const vatRate = config.vatRatePercent / 100;
@@ -197,7 +160,7 @@ function buildSimplifiedInvoiceHtml(params: {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Factura simplificada ${escapeHtml(invoiceNumber)}</title>
+  <title>Cuenta provisional · No fiscal</title>
   <style>
     * { box-sizing: border-box; }
     @page { margin: 8mm; }
@@ -334,11 +297,10 @@ function buildSimplifiedInvoiceHtml(params: {
     <div class="divider"></div>
 
     <section>
-      <p class="title center">Factura simplificada</p>
+      <p class="title center">Cuenta provisional · No fiscal</p>
       <div class="meta">
-        <div><strong>Numero / serie</strong>${escapeHtml(invoiceNumber)}</div>
-        <div><strong>Fecha expedicion</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
-        <div><strong>Fecha operacion</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
+        <div><strong>Documento</strong>PROVISIONAL / NO FISCAL</div>
+        <div><strong>Fecha</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
         <div><strong>Mesa</strong>${escapeHtml(tableZoneLabel(selectedTable.zone))} ${selectedTable.number}</div>
       </div>
     </section>
@@ -395,7 +357,8 @@ function buildSimplifiedInvoiceHtml(params: {
     <div class="divider"></div>
 
     <footer class="legal center">
-      <div>IVA incluido. Documento emitido como factura simplificada.</div>
+      <div>DOCUMENTO PROVISIONAL. NO ES FACTURA NI JUSTIFICANTE DE PAGO.</div>
+      <div>Los importes fiscales son únicamente informativos hasta registrar el cobro.</div>
       <div>Gracias por su visita.</div>
     </footer>
   </main>
@@ -449,7 +412,6 @@ export async function printKitchenTicket(params: {
   ticketNote?: string;
 }): Promise<void> {
   const config = getSimplifiedInvoiceConfig();
-  const invoiceNumber = await nextInvoiceNumber(config.series);
   const issuedAt = new Date();
   const combinedLines = getCombinedOrderLines(params.confirmedOrders);
   const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
@@ -465,7 +427,7 @@ export async function printKitchenTicket(params: {
       address: config.address,
       city: config.city || null,
       phone: config.phone || null,
-      invoiceNumber,
+      invoiceNumber: 'PROVISIONAL-NO-FISCAL',
       issuedAt: formatDateTime(issuedAt),
       tableLabel: `${tableZoneLabel(params.selectedTable.zone)} ${params.selectedTable.number}`,
       lines: combinedLines,
@@ -473,9 +435,8 @@ export async function printKitchenTicket(params: {
       vatCents,
       vatRatePercent: config.vatRatePercent,
       totalCents,
-      ticketNote: params.ticketNote ?? null,
+      ticketNote: ['DOCUMENTO PROVISIONAL - NO FISCAL', params.ticketNote].filter(Boolean).join(' · '),
       splitPeople: params.splitPeople ?? null,
-      ...getOptionalXprinterTarget(),
     });
     return;
   }
@@ -483,7 +444,6 @@ export async function printKitchenTicket(params: {
   const html = buildSimplifiedInvoiceHtml({
     selectedTable: params.selectedTable,
     confirmedOrders: params.confirmedOrders,
-    invoiceNumber,
     issuedAt,
     config,
     splitPeople: params.splitPeople,

@@ -1,13 +1,12 @@
 import { Alert } from 'react-native';
 import { printKitchenTicket } from '../helpers';
 import { SelectedTable } from '../app/app.types';
-import { Order, PreOrderItem } from '../types';
+import { Order } from '../types';
 
 export function useTicketController() {
   async function printTicket(params: {
     selectedTable: SelectedTable;
     confirmedOrders: Order[];
-    preorderItems: PreOrderItem[];
     splitPeople?: number;
     ticketNote?: string;
   }): Promise<boolean> {
@@ -26,7 +25,7 @@ export function useTicketController() {
       });
       return true;
     } catch {
-      Alert.alert('Error', 'No se pudo generar el PDF del ticket.');
+      Alert.alert('Error', 'No se pudo generar o imprimir el ticket.');
       return false;
     }
   }

@@ -1,4 +1,5 @@
-import { ErrorRequestHandler } from 'express';
+import { Prisma } from '@prisma/client';
+import { ErrorRequestHandler, RequestHandler } from 'express';
 import { logger } from '../utils/logger.js';
 
 export class ApiError extends Error {
@@ -12,63 +13,68 @@ export class ApiError extends Error {
   }
 }
 
-export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
-  // Log the error with more details
-  const errorData: any = {
-    name: err.name,
-    message: err.message,
-  };
-  
-  // Handle Prisma errors
-  if (err.name && err.name.includes('Prisma')) {
-    errorData.code = (err as any).code;
-    errorData.clientVersion = (err as any).clientVersion;
-    if ((err as any).meta) {
-      errorData.meta = (err as any).meta;
+type RequestError = Error & {
+  code?: string;
+  status?: number;
+  statusCode?: number;
+  type?: string;
+};
+
+function normalizeError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2025') return new ApiError(404, 'Requested resource was not found', 'NOT_FOUND');
+    if (error.code === 'P2002') return new ApiError(409, 'A resource with that value already exists', 'CONFLICT');
+    if (error.code === 'P2003') return new ApiError(409, 'The resource is still in use', 'RESOURCE_IN_USE');
+    if (['P2000', 'P2006', 'P2023'].includes(error.code)) {
+      return new ApiError(400, 'The request contains an invalid database value', 'VALIDATION_ERROR');
     }
   }
-  
+
+  const requestError = error as RequestError;
+  if (requestError?.type === 'entity.parse.failed' || (requestError instanceof SyntaxError && requestError.status === 400)) {
+    return new ApiError(400, 'Request body must contain valid JSON', 'INVALID_JSON');
+  }
+  if (requestError?.type === 'entity.too.large' || requestError?.status === 413) {
+    return new ApiError(413, 'Request body is too large', 'PAYLOAD_TOO_LARGE');
+  }
+
+  return new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
+}
+
+export const notFoundHandler: RequestHandler = (req, _res, next) => {
+  next(new ApiError(404, `Route not found: ${req.method} ${req.path}`, 'ROUTE_NOT_FOUND'));
+};
+
+export const errorHandler: ErrorRequestHandler = (err: RequestError, req, res, next) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+
+  const apiError = normalizeError(err);
+  const errorData: Record<string, unknown> = {
+    name: err?.name ?? 'Error',
+    message: err?.message ?? String(err),
+  };
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    errorData.code = err.code;
+    errorData.meta = err.meta;
+  }
+
   logger.error({
     error: errorData,
     path: req.path,
     method: req.method,
-    statusCode: err.statusCode || 500,
+    statusCode: apiError.statusCode,
   }, 'Request error');
 
-  // Handle ApiError
-  if (err instanceof ApiError) {
-    return res.status(err.statusCode).json({
-      success: false,
-      error: {
-        code: err.code,
-        message: err.message,
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Handle validation errors
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: err.message,
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Handle unknown errors
-  res.status(500).json({
+  res.status(apiError.statusCode).json({
     success: false,
     error: {
-      code: 'INTERNAL_ERROR',
-      message: 'Internal server error',
+      code: apiError.code,
+      message: apiError.message,
     },
     meta: {
       timestamp: new Date().toISOString(),

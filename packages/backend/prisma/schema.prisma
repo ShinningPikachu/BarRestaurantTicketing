@@ -10,28 +10,28 @@ datasource db {
 model Table {
   id               Int               @id @default(autoincrement())
   number           Int
-  zone             String?
+  zone             String            @default("outside")
   seats            Int?              @default(4)
   name             String?
   ticketPrintedAt  DateTime?
   orders           Order[]
   preOrderSessions PreOrderSession[]
-  kitchenTickets   KitchenTicket[]
 
   @@unique([number, zone])
 }
 
 model Order {
-  id             String          @id @default(cuid())
-  tableId        Int
-  table          Table           @relation(fields: [tableId], references: [id])
-  status         String          @default("open")
-  totalCents     Int             @default(0)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  items          OrderItem[]
-  payments       Payment[]
-  kitchenTickets KitchenTicket[]
+  id         String      @id @default(cuid())
+  tableId    Int
+  table      Table       @relation(fields: [tableId], references: [id])
+  status     String      @default("open")
+  totalCents Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  items      OrderItem[]
+  payments   Payment[]
+
+  @@index([tableId, status])
 }
 
 model OrderItem {
@@ -46,29 +46,26 @@ model OrderItem {
   qty             Int
   unitPriceCents  Int       @default(0)
   totalPriceCents Int       @default(0)
+
+  @@index([orderId])
+  @@index([menuItemId])
 }
 
 model MenuItem {
-  id                 Int                 @id @default(autoincrement())
-  name               String
-  primaryName        String?
-  secondaryName      String?
-  priceCents         Int
-  costCents          Int?
-  sku                String?
-  category           String              @default("Uncategorized")
-  description        String?
-  imageDataUrl       String?
-  available          Boolean             @default(true)
-  orderItems         OrderItem[]
-  preOrderItems      PreOrderItem[]
-  kitchenTicketItems KitchenTicketItem[]
-}
+  id            Int            @id @default(autoincrement())
+  name          String
+  primaryName   String?
+  secondaryName String?
+  priceCents    Int
+  costCents     Int?
+  sku           String?        @unique
+  category      String         @default("Uncategorized")
+  description   String?
+  imageDataUrl  String?
+  available     Boolean        @default(true)
+  orderItems    OrderItem[]
+  preOrderItems PreOrderItem[]
 
-model User {
-  id   Int    @id @default(autoincrement())
-  name String
-  role String @default("staff")
 }
 
 model Payment {
@@ -78,36 +75,40 @@ model Payment {
   amountCents Int
   method      String?
   createdAt   DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model PaidTicket {
-  id                  String           @id @default(cuid())
-  ticketNumber        String           @unique
-  mode                String
-  method              String
-  tableNumber         Int
-  tableZone           String
-  totalCents          Int
-  taxableBaseCents    Int
-  vatCents            Int
-  vatRatePercent      Int
-  splitPeople         Int?
-  businessName        String           @default("")
-  tradeName           String           @default("")
-  businessTaxId       String           @default("")
-  businessAddress     String?
-  businessCity        String?
-  businessPhone       String?
-  terminalId          String?
-  cashierName         String?
-  customerName        String?
-  customerTaxId       String?
-  status              String           @default("paid")
-  relatedTicketNumber String?
-  pdfFileReference    String?
-  auditMetadata       String?
-  createdAt           DateTime         @default(now())
-  items               PaidTicketItem[]
+  id                     String           @id @default(cuid())
+  ticketNumber           String           @unique
+  idempotencyKey         String?          @unique
+  idempotencyFingerprint String?
+  mode                   String
+  method                 String
+  tableNumber            Int
+  tableZone              String
+  totalCents             Int
+  taxableBaseCents       Int
+  vatCents               Int
+  vatRatePercent         Int
+  splitPeople            Int?
+  businessName           String           @default("")
+  tradeName              String           @default("")
+  businessTaxId          String           @default("")
+  businessAddress        String?
+  businessCity           String?
+  businessPhone          String?
+  terminalId             String?
+  cashierName            String?
+  customerName           String?
+  customerTaxId          String?
+  status                 String           @default("paid")
+  relatedTicketNumber    String?
+  pdfFileReference       String?
+  auditMetadata          String?
+  createdAt              DateTime         @default(now())
+  items                  PaidTicketItem[]
 
   @@index([tableZone, tableNumber])
   @@index([createdAt])
@@ -127,6 +128,8 @@ model PaidTicketItem {
   qty             Int
   unitPriceCents  Int
   totalPriceCents Int
+
+  @@index([ticketId])
 }
 
 model PreOrderSession {
@@ -153,31 +156,24 @@ model PreOrderItem {
   qty             Int
   unitPriceCents  Int             @default(0)
   totalPriceCents Int             @default(0)
+
+  @@index([sessionId])
+  @@index([menuItemId])
 }
 
-model KitchenTicket {
-  id        String              @id @default(cuid())
-  orderId   String
-  order     Order               @relation(fields: [orderId], references: [id])
-  tableId   Int
-  table     Table               @relation(fields: [tableId], references: [id])
-  status    String              @default("queued")
-  createdAt DateTime            @default(now())
-  items     KitchenTicketItem[]
-
-  @@index([tableId, status])
+model TicketSequence {
+  series    String   @id
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
-model KitchenTicketItem {
-  id              Int           @id @default(autoincrement())
-  ticketId        String
-  ticket          KitchenTicket @relation(fields: [ticketId], references: [id])
-  menuItemId      Int?
-  menuItem        MenuItem?     @relation(fields: [menuItemId], references: [id])
-  name            String
-  primaryName     String?
-  secondaryName   String?
-  qty             Int
-  unitPriceCents  Int           @default(0)
-  totalPriceCents Int           @default(0)
+model MutationReceipt {
+  idempotencyKey String   @id
+  fingerprint    String
+  operation      String
+  tableNumber    Int
+  tableZone      String
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
 }

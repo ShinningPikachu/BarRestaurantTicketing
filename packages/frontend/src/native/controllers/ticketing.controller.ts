@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
-import { getCurrentTableTotal } from '../app/app.helpers';
+import { getConfirmedOrdersTotal, getCurrentTableTotal, getPreOrderTotal } from '../app/app.helpers';
 import { Order, PaymentMethod, TableId, TableKitchenStatus, TableZone, tableKey } from '../types';
 import { useMenuController } from './menu.controller';
 import { useTableController } from './table.controller';
@@ -18,30 +18,34 @@ export function useTicketingController(enabled = true) {
   const ticketController = useTicketController();
 
   const selectedTable = tableController.state.selectedTable;
+  const selectedWorkflowIsCurrent = workflowController.state.workflowTableKey === tableKey(selectedTable);
+  const selectedPreorderItems = selectedWorkflowIsCurrent ? workflowController.state.preorderItems : [];
 
   const tableConfirmedOrders = useMemo(
     () => workflowController.selectors.getTableConfirmedOrders(selectedTable),
-    [workflowController.selectors, selectedTable, workflowController.state.orders]
+    [selectedTable, workflowController.state.orders, workflowController.state.workflowTableKey]
   );
+  const preorderTotal = useMemo(() => getPreOrderTotal(selectedPreorderItems), [selectedPreorderItems]);
+  const confirmedTotal = useMemo(() => getConfirmedOrdersTotal(tableConfirmedOrders), [tableConfirmedOrders]);
   const currentTableTotal = useMemo(
-    () => getCurrentTableTotal(workflowController.state.preorderItems, tableConfirmedOrders),
-    [workflowController.state.preorderItems, tableConfirmedOrders]
+    () => getCurrentTableTotal(selectedPreorderItems, tableConfirmedOrders),
+    [selectedPreorderItems, tableConfirmedOrders]
   );
   const selectedTableStatus = tableController.state.tableKitchenStatuses.get(tableKey(selectedTable));
   const currentTableKitchenStatus = useMemo<TableKitchenStatus>(() => {
-    const hasPendingItems = workflowController.state.preorderItems.some((item) => item.qty > 0);
+    const hasPendingItems = selectedPreorderItems.some((item) => item.qty > 0);
     const hasConfirmedItems = tableConfirmedOrders.some((order) => order.items.some((item) => item.qty > 0));
-    if (selectedTableStatus === 'printed' && (hasPendingItems || hasConfirmedItems)) {
-      return 'printed';
-    }
     if (hasPendingItems) {
       return 'pending';
+    }
+    if (selectedTableStatus === 'printed' && hasConfirmedItems) {
+      return 'printed';
     }
     if (hasConfirmedItems) {
       return 'sent';
     }
     return 'empty';
-  }, [workflowController.state.preorderItems, selectedTableStatus, tableConfirmedOrders]);
+  }, [selectedPreorderItems, selectedTableStatus, tableConfirmedOrders]);
 
   useEffect(() => {
     tableController.actions.updateTableTotal(selectedTable, currentTableTotal);
@@ -54,6 +58,9 @@ export function useTicketingController(enabled = true) {
   // Initialization - separated for clarity
   useEffect(() => {
     if (!enabled) {
+      menuController.actions.resetMenu();
+      tableController.actions.resetTables();
+      workflowController.actions.resetWorkflow();
       setLoading(false);
       return;
     }
@@ -65,15 +72,18 @@ export function useTicketingController(enabled = true) {
         logger.debug({}, 'Initializing application');
         
         // Load menu
-        await menuController.actions.loadMenu();
+        const menuLoaded = await menuController.actions.loadMenu();
+        if (!active || !menuLoaded) return;
         logger.debug({}, 'Menu loaded');
 
         // Load tables
         const initialTable = await tableController.actions.loadTables();
+        if (!active || !initialTable) return;
         logger.debug({ initialTable }, 'Tables loaded');
 
         // Load workflow for initial table
-        await workflowController.actions.refreshWorkflow(initialTable);
+        const workflowLoaded = await workflowController.actions.refreshWorkflow(initialTable);
+        if (!active || !workflowLoaded) return;
         logger.info({}, 'Application initialized successfully');
       } catch (error) {
         logger.error({ error }, 'Initialization failed');
@@ -93,6 +103,13 @@ export function useTicketingController(enabled = true) {
       active = false;
     };
   }, [enabled]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Table selection - with workflow refresh
   async function selectTable(table: TableId): Promise<void> {
@@ -127,79 +144,87 @@ export function useTicketingController(enabled = true) {
   }
 
   // Menu item management
-  async function addMenuItem(menuId: number): Promise<void> {
+  async function addMenuItem(menuId: number): Promise<boolean> {
     try {
       logger.debug({ menuId, selectedTable }, 'Adding menu item');
-      await workflowController.actions.addMenuItem(selectedTable, menuId);
+      return await workflowController.actions.addMenuItem(selectedTable, menuId);
     } catch (error) {
       logger.error({ error, menuId }, 'Failed to add menu item');
       Alert.alert('Error', 'No se pudo añadir el artículo del menú');
+      return false;
     }
   }
 
   // Pre-order item quantity management
-  async function incrementPendingItem(itemId: number): Promise<void> {
+  async function incrementPendingItem(itemId: number): Promise<boolean> {
     try {
-      await workflowController.actions.incrementPendingItem(selectedTable, itemId);
+      return await workflowController.actions.incrementPendingItem(selectedTable, itemId);
     } catch (error) {
       logger.error({ error, itemId }, 'Failed to increment item');
+      return false;
     }
   }
 
-  async function decrementPendingItem(itemId: number): Promise<void> {
+  async function decrementPendingItem(itemId: number): Promise<boolean> {
     try {
-      await workflowController.actions.decrementPendingItem(selectedTable, itemId);
+      return await workflowController.actions.decrementPendingItem(selectedTable, itemId);
     } catch (error) {
       logger.error({ error, itemId }, 'Failed to decrement item');
+      return false;
     }
   }
 
   // Price management
-  async function commitPriceDraft(itemId: number): Promise<void> {
+  async function commitPriceDraft(itemId: number): Promise<boolean> {
     try {
       logger.debug({ itemId }, 'Committing price draft');
-      await workflowController.actions.commitPriceDraft(selectedTable, itemId);
+      return await workflowController.actions.commitPriceDraft(selectedTable, itemId);
     } catch (error) {
       logger.error({ error, itemId }, 'Failed to commit price');
+      return false;
     }
   }
 
-  async function adjustItemPrice(itemId: number, deltaCents: number): Promise<void> {
+  async function adjustItemPrice(itemId: number, deltaCents: number): Promise<boolean> {
     try {
-      await workflowController.actions.adjustItemPrice(selectedTable, itemId, deltaCents);
+      return await workflowController.actions.adjustItemPrice(selectedTable, itemId, deltaCents);
     } catch (error) {
       logger.error({ error, itemId, deltaCents }, 'Failed to adjust price');
+      return false;
     }
   }
 
   // Kitchen workflow
-  async function sendToKitchen(): Promise<void> {
+  async function sendToKitchen(): Promise<boolean> {
     try {
       logger.info({ selectedTable }, 'Sending order to kitchen');
-      await workflowController.actions.sendToKitchen(selectedTable);
+      return await workflowController.actions.sendToKitchen(selectedTable);
     } catch (error) {
       logger.error({ error, selectedTable }, 'Failed to send to kitchen');
       Alert.alert('Error', 'No se pudo enviar el pedido a cocina');
+      return false;
     }
   }
 
-  async function clearPreOrder(): Promise<void> {
+  async function clearPreOrder(): Promise<boolean> {
     try {
       logger.debug({ selectedTable }, 'Clearing pre-order');
-      await workflowController.actions.clearPreOrder(selectedTable);
+      return await workflowController.actions.clearPreOrder(selectedTable);
     } catch (error) {
       logger.error({ error, selectedTable }, 'Failed to clear pre-order');
+      return false;
     }
   }
 
   // Order management
-  async function removeOrder(orderId: string): Promise<void> {
+  async function removeOrder(orderId: string): Promise<boolean> {
     try {
       logger.debug({ orderId }, 'Removing order');
-      await workflowController.actions.removeOrder(selectedTable, orderId);
+      return await workflowController.actions.removeOrder(selectedTable, orderId);
     } catch (error) {
       logger.error({ error, orderId }, 'Failed to remove order');
       Alert.alert('Error', 'No se pudo eliminar el pedido');
+      return false;
     }
   }
 
@@ -210,11 +235,10 @@ export function useTicketingController(enabled = true) {
       const didPrint = await ticketController.actions.printTicket({
         selectedTable,
         confirmedOrders: options?.confirmedOrders ?? tableConfirmedOrders,
-        preorderItems: workflowController.state.preorderItems,
         splitPeople: options?.splitPeople,
         ticketNote: options?.ticketNote,
       });
-      if (didPrint) {
+      if (didPrint && !options?.confirmedOrders) {
         await tableController.actions.markTableTicketPrinted(selectedTable);
       }
     } catch (error) {
@@ -223,44 +247,62 @@ export function useTicketingController(enabled = true) {
     }
   }
 
-  async function payTable(method: PaymentMethod, splitPeople?: number): Promise<void> {
+  async function payTable(method: PaymentMethod, splitPeople?: number): Promise<boolean> {
     try {
-      await workflowController.actions.payTable(selectedTable, method, splitPeople);
+      return await workflowController.actions.payTable(selectedTable, method, splitPeople);
     } catch (error) {
       logger.error({ error, method, splitPeople }, 'Failed to pay table');
       Alert.alert('Error', 'No se pudo registrar el pago');
+      return false;
     }
   }
 
   async function paySelectedItems(
     method: PaymentMethod,
     items: Array<{ orderId: string; itemId: number; qty: number }>
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
-      await workflowController.actions.paySelectedItems(selectedTable, method, items);
+      return await workflowController.actions.paySelectedItems(selectedTable, method, items);
     } catch (error) {
       logger.error({ error, method }, 'Failed to pay selected items');
       Alert.alert('Error', 'No se pudo registrar el pago AA');
+      return false;
     }
   }
 
   async function removeSelectedItems(
     items: Array<{ orderId: string; itemId: number; qty: number }>
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
-      await workflowController.actions.removeSelectedItems(selectedTable, items);
+      return await workflowController.actions.removeSelectedItems(selectedTable, items);
     } catch (error) {
       logger.error({ error }, 'Failed to remove selected items');
       Alert.alert('Error', 'No se pudieron eliminar los productos seleccionados');
+      return false;
     }
   }
 
   async function refreshData(): Promise<void> {
     const refreshedTable = await tableController.actions.refreshTables();
+    if (!refreshedTable) return;
     await Promise.all([
       menuController.actions.loadMenu({ showError: false }),
       workflowController.actions.refreshWorkflow(refreshedTable),
     ]);
+  }
+
+  function resetData(prepareForLogin = false): void {
+    menuController.actions.resetMenu();
+    tableController.actions.resetTables();
+    workflowController.actions.resetWorkflow();
+    setLoading(prepareForLogin);
+  }
+
+  async function moveConfirmedItemToPreOrder(
+    orderId: Parameters<typeof workflowController.actions.moveConfirmedItemToPreOrder>[1],
+    item: Parameters<typeof workflowController.actions.moveConfirmedItemToPreOrder>[2]
+  ): Promise<boolean> {
+    return workflowController.actions.moveConfirmedItemToPreOrder(selectedTable, orderId, item);
   }
 
   return {
@@ -277,11 +319,14 @@ export function useTicketingController(enabled = true) {
       tableKitchenStatuses: tableController.state.tableKitchenStatuses,
       selectedTable,
       menuByCategory: menuController.state.menuByCategory,
-      preorderItems: workflowController.state.preorderItems,
+      preorderItems: selectedPreorderItems,
       tableConfirmedOrders,
-      preorderTotal: workflowController.state.preorderTotal,
+      preorderTotal,
+      confirmedTotal,
       currentTableTotal,
       priceDraftByItemId: workflowController.state.priceDraftByItemId,
+      isMutating: workflowController.state.isMutating,
+      paymentPending: workflowController.state.paymentPending,
     },
     actions: {
       selectTable,
@@ -300,9 +345,10 @@ export function useTicketingController(enabled = true) {
       paySelectedItems,
       removeSelectedItems,
       refreshData,
+      resetData,
       reloadMenu: menuController.actions.loadMenu,
       removeOrder,
-      moveConfirmedItemToPreOrder: workflowController.actions.moveConfirmedItemToPreOrder,
+      moveConfirmedItemToPreOrder,
     }
   };
 }

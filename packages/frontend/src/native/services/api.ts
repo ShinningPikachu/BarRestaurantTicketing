@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
-import type { BackendTable, MenuItem, Order, PaidTicket, PaymentMethod, PaymentResult, SessionSummary, TableWorkflow } from '../types';
+import type { BackendTable, MenuItem, PaidTicket, PaymentMethod, PaymentResult, SessionSummary, TableWorkflow } from '../types';
 import { logger } from '../utils/logger';
 
 export interface SyncRevision {
+  instanceId: string;
   revision: number;
   changedAt: string;
   scope: 'menu' | 'orders' | 'tables' | null;
@@ -16,6 +17,9 @@ interface ApiResponse<T = unknown> {
     message: string;
   };
 }
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const CONNECTION_TEST_TIMEOUT_MS = 7_500;
 
 let unauthorizedHandler: (() => void | Promise<void>) | null = null;
 
@@ -32,6 +36,47 @@ export class ApiRequestError extends Error {
     this.name = 'ApiRequestError';
     this.status = status;
     this.code = code;
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const externalSignal = init.signal;
+  const abortFromExternalSignal = () => controller.abort();
+
+  if (externalSignal?.aborted) {
+    controller.abort();
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternalSignal, { once: true });
+  }
+
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      const wasExternallyAborted = externalSignal?.aborted ?? false;
+      throw new ApiRequestError(
+        wasExternallyAborted ? 'Request cancelled' : 'Request timed out',
+        0,
+        wasExternallyAborted ? 'REQUEST_ABORTED' : 'REQUEST_TIMEOUT'
+      );
+    }
+    throw new ApiRequestError('Network request failed', 0, 'NETWORK_ERROR');
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', abortFromExternalSignal);
   }
 }
 
@@ -77,15 +122,26 @@ export function setApiBaseUrl(value: string): string {
 export async function testApiConnection(value: string): Promise<string> {
   const normalized = normalizeApiBaseUrl(value);
   const backendBase = normalized.replace(/\/api$/, '');
-  const response = await fetch(`${backendBase}/health`);
-  if (!response.ok) {
-    throw new Error(`El servidor devolvió ${response.status}.`);
+  const response = await fetchWithTimeout(`${backendBase}/health`, {}, CONNECTION_TEST_TIMEOUT_MS);
+  const result = await parseOrThrow<{ status: string }>(response, 'No se pudo validar el servidor');
+  if (result?.status !== 'ok') {
+    throw new ApiRequestError('El servidor no devolvió una respuesta de salud válida.', response.status, 'INVALID_HEALTH_RESPONSE');
   }
   return normalized;
 }
 
 async function parseOrThrow<T>(response: Response, message: string): Promise<T> {
-  const json = await response.json().catch(() => undefined);
+  const responseText = await response.text();
+  let json: unknown;
+  if (responseText.trim()) {
+    try {
+      json = JSON.parse(responseText) as unknown;
+    } catch {
+      const errorMessage = `${message}: invalid JSON response (${response.status})`;
+      logger.error({ status: response.status }, errorMessage);
+      throw new ApiRequestError(errorMessage, response.status, 'INVALID_RESPONSE');
+    }
+  }
 
   if (!response.ok) {
     const apiResponse = json as ApiResponse<T> | undefined;
@@ -93,9 +149,6 @@ async function parseOrThrow<T>(response: Response, message: string): Promise<T> 
     const errorMessage = apiError?.message ? `${message}: ${apiError.message}` : `${message} (${response.status})`;
 
     logger.error({ status: response.status, error: apiError }, errorMessage);
-    if (response.status === 401 && apiError?.code === 'UNAUTHORIZED') {
-      void unauthorizedHandler?.();
-    }
     throw new ApiRequestError(errorMessage, response.status, apiError?.code);
   }
 
@@ -110,21 +163,32 @@ async function parseOrThrow<T>(response: Response, message: string): Promise<T> 
       logger.error({ error: apiResponse.error }, error);
       throw new ApiRequestError(error, response.status, apiResponse.error.code);
     }
+
+    const error = `${message}: malformed API response`;
+    logger.error({ response: apiResponse }, error);
+    throw new ApiRequestError(error, response.status, 'INVALID_RESPONSE');
   }
 
   // Fallback for direct data response (backward compatibility)
+  if (json === undefined) {
+    const error = `${message}: empty response`;
+    logger.error({ status: response.status }, error);
+    throw new ApiRequestError(error, response.status, 'INVALID_RESPONSE');
+  }
   return json as T;
 }
 
 export class ApiService {
   private authToken: string | null = null;
+  private authGeneration = 0;
 
   setAuthToken(token: string | null): void {
     this.authToken = token;
+    this.authGeneration += 1;
   }
 
   async login(accessCode: string): Promise<{ token: string }> {
-    const response = await fetch(`${apiBaseUrl}/auth/login`, {
+    const response = await fetchWithTimeout(`${apiBaseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ accessCode })
@@ -134,16 +198,22 @@ export class ApiService {
     return result;
   }
 
-  private request(path: string, init: RequestInit = {}): Promise<Response> {
+  private async request(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
+    const authGeneration = this.authGeneration;
     if (this.authToken) {
       headers.set('Authorization', `Bearer ${this.authToken}`);
     }
 
-    return fetch(`${apiBaseUrl}${path}`, {
+    const response = await fetchWithTimeout(`${apiBaseUrl}${path}`, {
       ...init,
       headers,
     });
+    // Ignore an unauthorized response belonging to an older login or server.
+    if (response.status === 401 && authGeneration === this.authGeneration) {
+      void unauthorizedHandler?.();
+    }
+    return response;
   }
 
   async fetchTables(): Promise<BackendTable[]> {
@@ -158,6 +228,15 @@ export class ApiService {
       body: JSON.stringify({ zone })
     });
     return parseOrThrow<BackendTable>(response, 'Failed to add table');
+  }
+
+  async ensureTableZone(zone: string): Promise<BackendTable> {
+    const response = await this.request('/tables/ensure-zone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zone })
+    });
+    return parseOrThrow<BackendTable>(response, 'Failed to ensure table zone');
   }
 
   async deleteTable(zone: string, number: number): Promise<{ ok: boolean }> {
@@ -216,20 +295,6 @@ export class ApiService {
     return parseOrThrow<TableWorkflow>(response, 'Failed to send pre-order to kitchen');
   }
 
-  async fetchOrders(): Promise<Order[]> {
-    const response = await this.request('/orders');
-    return parseOrThrow<Order[]>(response, 'Failed to fetch orders');
-  }
-
-  async createOrder(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
-    const response = await this.request('/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableNumber, tableZone })
-    });
-    return parseOrThrow<TableWorkflow>(response, 'Failed to create order');
-  }
-
   async moveConfirmedItemToPreOrder(orderId: string, itemId: number): Promise<TableWorkflow> {
     const response = await this.request(`/orders/${orderId}/items/${itemId}/move-to-preorder`, {
       method: 'POST'
@@ -246,12 +311,13 @@ export class ApiService {
     tableNumber: number,
     tableZone: string,
     method: PaymentMethod,
-    splitPeople?: number
+    splitPeople: number | undefined,
+    idempotencyKey: string
   ): Promise<PaymentResult> {
     const response = await this.request('/orders/pay-table', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableNumber, tableZone, method, splitPeople })
+      body: JSON.stringify({ tableNumber, tableZone, method, splitPeople, idempotencyKey })
     });
     return parseOrThrow<PaymentResult>(response, 'Failed to pay table');
   }
@@ -260,12 +326,13 @@ export class ApiService {
     tableNumber: number,
     tableZone: string,
     method: PaymentMethod,
-    items: Array<{ orderId: string; itemId: number; qty: number }>
+    items: Array<{ orderId: string; itemId: number; qty: number }>,
+    idempotencyKey: string
   ): Promise<PaymentResult> {
     const response = await this.request('/orders/pay-items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableNumber, tableZone, method, items })
+      body: JSON.stringify({ tableNumber, tableZone, method, items, idempotencyKey })
     });
     return parseOrThrow<PaymentResult>(response, 'Failed to pay selected items');
   }
@@ -273,12 +340,13 @@ export class ApiService {
   async removeSelectedItems(
     tableNumber: number,
     tableZone: string,
-    items: Array<{ orderId: string; itemId: number; qty: number }>
+    items: Array<{ orderId: string; itemId: number; qty: number }>,
+    idempotencyKey: string
   ): Promise<TableWorkflow> {
     const response = await this.request('/orders/remove-items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableNumber, tableZone, items })
+      body: JSON.stringify({ tableNumber, tableZone, items, idempotencyKey })
     });
     return parseOrThrow<TableWorkflow>(response, 'Failed to remove selected items');
   }
@@ -393,11 +461,6 @@ export class ApiService {
     totalCents: number;
     ticketNote?: string | null;
     splitPeople?: number | null;
-    openCashDrawer?: boolean | null;
-    printerHost?: string;
-    printerPort?: number;
-    printerName?: string;
-    usbDevice?: string;
   }): Promise<{ printed: boolean }> {
     const response = await this.request('/printers/xprinter/ticket', {
       method: 'POST',
@@ -407,16 +470,20 @@ export class ApiService {
     return parseOrThrow<{ printed: boolean }>(response, 'Failed to print Xprinter ticket');
   }
 
-  async openXprinterCashDrawer(payload: {
-    printerHost?: string;
-    printerPort?: number;
-    printerName?: string;
-    usbDevice?: string;
-  } = {}): Promise<{ opened: boolean }> {
+  async printPaidTicket(ticketId: string, openCashDrawer = false): Promise<{ printed: boolean }> {
+    const response = await this.request(`/printers/xprinter/paid-ticket/${encodeURIComponent(ticketId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ openCashDrawer })
+    });
+    return parseOrThrow<{ printed: boolean }>(response, 'Failed to reprint paid ticket');
+  }
+
+  async openXprinterCashDrawer(): Promise<{ opened: boolean }> {
     const response = await this.request('/printers/xprinter/drawer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({})
     });
     return parseOrThrow<{ opened: boolean }>(response, 'Failed to open cash drawer');
   }

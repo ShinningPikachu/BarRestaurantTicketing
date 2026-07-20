@@ -24,13 +24,15 @@ export function getPreOrderTotal(preorderItems: PreOrderItem[]): number {
 }
 
 export function getCurrentTableTotal(preorderItems: PreOrderItem[], confirmedOrders: Order[]): number {
-  const confirmedTotal = confirmedOrders.reduce(
+  return getPreOrderTotal(preorderItems) + getConfirmedOrdersTotal(confirmedOrders);
+}
+
+export function getConfirmedOrdersTotal(confirmedOrders: Order[]): number {
+  return confirmedOrders.reduce(
     (sum, order) => sum + order.items.reduce(
       (orderSum, item) => orderSum + item.qty * (item.unitPriceCents ?? 0),
       0
     ),
     0
   );
-
-  return getPreOrderTotal(preorderItems) + confirmedTotal;
 }

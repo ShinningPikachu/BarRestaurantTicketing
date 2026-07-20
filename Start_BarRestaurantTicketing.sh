@@ -2,7 +2,6 @@
 set -u
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DESKTOP_URL="${DESKTOP_URL:-http://localhost:8081}"
 REQUIRED_NODE_VERSION="20.19.4"
 MAX_NODE_MAJOR="22"
 
@@ -41,18 +40,12 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d "$APP_DIR/node_modules" ]; then
-  echo "Installing exact application libraries from package-lock.json. This can take a few minutes..."
-  npm ci
-  if [ "$?" -ne 0 ]; then
-    echo
-    echo "Library installation failed. Check the messages above."
-    read -r -p "Press Enter to close this window..."
-    exit 1
-  fi
+if ! node -e "const major = Number(process.argv[1].split('.')[0]); process.exit(major >= 10 ? 0 : 1)" "$(npm --version)"; then
+  echo "npm 10 or newer is required. Current version: $(npm --version)"
+  echo
+  read -r -p "Press Enter to close this window..."
+  exit 1
 fi
-
-node scripts/ensure-runtime-env.mjs
 
 RUNNING_MESSAGE="$(node scripts/is-running.mjs 2>&1)"
 RUNNING_STATUS=$?
@@ -61,7 +54,7 @@ if [ "$RUNNING_STATUS" -eq 0 ]; then
   echo
   echo "The application is already running."
   echo "Opening the POS screen..."
-  node scripts/open-web.mjs
+  node scripts/wait-for-ready.mjs && node scripts/open-web.mjs
   echo
   sleep 2
   exit 0
@@ -83,47 +76,66 @@ if [ "$RUNNING_STATUS" -eq 3 ]; then
   exit 1
 fi
 
-if [ ! -f "$APP_DIR/packages/backend/prisma/dev.db" ]; then
-  echo "Creating local database..."
-  npm run -w backend prisma:migrate:dev
-  if [ "$?" -ne 0 ]; then
-    echo
-    echo "Database setup failed. Check the messages above."
-    read -r -p "Press Enter to close this window..."
-    exit 1
-  fi
-  npm run -w backend seed
-  if [ "$?" -ne 0 ]; then
-    echo
-    echo "Database seed failed. Check the messages above."
-    read -r -p "Press Enter to close this window..."
-    exit 1
-  fi
+if ! node scripts/ensure-dependencies.mjs; then
+  echo
+  echo "Library installation failed. Check the messages above."
+  read -r -p "Press Enter to close this window..."
+  exit 1
 fi
 
-if [ ! -d "$APP_DIR/packages/backend/node_modules/.prisma/client" ]; then
-  echo "Preparing Prisma client..."
-  npm run -w backend prisma:generate
-  if [ "$?" -ne 0 ]; then
-    echo
-    echo "Prisma setup failed. Check the messages above."
-    read -r -p "Press Enter to close this window..."
-    exit 1
-  fi
+if ! node scripts/ensure-runtime-env.mjs; then
+  echo
+  echo "Runtime settings setup failed. The application was not started."
+  read -r -p "Press Enter to close this window..."
+  exit 1
+fi
+
+if ! npm run build:production; then
+  echo
+  echo "Production build failed. The database was not migrated and the application was not started."
+  read -r -p "Press Enter to close this window..."
+  exit 1
+fi
+
+if ! node scripts/validate-production-env.mjs; then
+  echo
+  echo "Production settings are incomplete or unsafe. Update the private .env file before migration."
+  read -r -p "Press Enter to close this window..."
+  exit 1
+fi
+
+if ! node scripts/prepare-database.mjs; then
+  echo
+  echo "Database setup failed. The previous database was preserved or restored."
+  read -r -p "Press Enter to close this window..."
+  exit 1
 fi
 
 (
-  sleep 8
-  DESKTOP_URL="$DESKTOP_URL" node scripts/open-web.mjs >/dev/null 2>&1
+  node scripts/wait-for-ready.mjs && node scripts/open-web.mjs
 ) &
+READY_PID=$!
 
-echo "Opening the desktop POS at $DESKTOP_URL"
+cleanup_ready_waiter() {
+  kill "$READY_PID" >/dev/null 2>&1 || true
+}
+trap cleanup_ready_waiter EXIT INT TERM
+
+echo "Opening the configured desktop POS when it is ready."
 echo "Keep this window open while using the application."
 echo "Press Ctrl+C here to stop the application."
 echo
 
-npm run dev
+set +e
+npm run start:production
+RUN_STATUS=$?
+set -e
 
 echo
-echo "Application stopped."
+if [ "$RUN_STATUS" -eq 0 ]; then
+  echo "Application stopped."
+else
+  echo "Application stopped after an error (exit code $RUN_STATUS)."
+fi
 read -r -p "Press Enter to close this window..."
+exit "$RUN_STATUS"

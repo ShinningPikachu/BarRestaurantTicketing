@@ -11,7 +11,7 @@ echo
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is not installed or is not available in PATH."
-  echo "Install Node.js 18 or newer, then run this stop launcher again."
+  echo "Install Node.js 20.19.4 through 22.x, then run this stop launcher again."
   echo
   read -r -p "Press Enter to close this window..."
   exit 1

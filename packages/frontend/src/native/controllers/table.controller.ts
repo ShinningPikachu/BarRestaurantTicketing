@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { SelectedTable } from '../app/app.types';
 import { ApiRequestError, apiService, logger } from '../services';
@@ -77,11 +77,11 @@ function mapTableTotals(tables: BackendTable[]): Map<string, number> {
 function getTableKitchenStatus(table: BackendTable): TableKitchenStatus {
   const pendingItemCount = table.pendingItemCount ?? 0;
   const confirmedItemCount = table.confirmedItemCount ?? 0;
-  if (table.hasPrintedTicket && pendingItemCount + confirmedItemCount > 0) {
-    return 'printed';
-  }
   if (pendingItemCount > 0) {
     return 'pending';
+  }
+  if (table.hasPrintedTicket && confirmedItemCount > 0) {
+    return 'printed';
   }
   if (confirmedItemCount > 0) {
     return 'sent';
@@ -107,7 +107,7 @@ function confirmDeleteTable(table: TableId, onConfirm: () => void): void {
 
   if (Platform.OS === 'web') {
     const webConfirm = (globalThis as typeof globalThis & { confirm?: (message: string) => boolean }).confirm;
-    if (!webConfirm || webConfirm(message)) {
+    if (webConfirm?.(message)) {
       onConfirm();
     }
     return;
@@ -132,13 +132,27 @@ export function useTableController() {
   const [tableTotals, setTableTotals] = useState<Map<string, number>>(new Map());
   const [tableKitchenStatuses, setTableKitchenStatuses] = useState<Map<string, TableKitchenStatus>>(new Map());
   const [selectedTable, setSelectedTable] = useState<SelectedTable>({ zone: TableZone.OUTSIDE, number: 1 });
+  const selectedTableRef = useRef<SelectedTable>(selectedTable);
+  const committedSelectedTableRef = useRef<SelectedTable>(selectedTable);
+  const selectionGenerationRef = useRef(0);
+  const sessionGenerationRef = useRef(0);
+  const tableLoadGenerationRef = useRef(0);
 
-  async function loadTables(): Promise<SelectedTable> {
-    let loadedTablesRaw: BackendTable[] = [];
-    try {
-      loadedTablesRaw = await apiService.fetchTables();
-    } catch (error) {
-      logger.warn({ error }, 'Failed to load tables, will create default');
+  function commitSelectedTable(table: SelectedTable): void {
+    selectedTableRef.current = table;
+    committedSelectedTableRef.current = table;
+    setSelectedTable(table);
+  }
+
+  async function loadTables(): Promise<SelectedTable | null> {
+    const sessionGeneration = sessionGenerationRef.current;
+    const loadGeneration = ++tableLoadGenerationRef.current;
+    const loadedTablesRaw = await apiService.fetchTables();
+    if (
+      sessionGeneration !== sessionGenerationRef.current
+      || loadGeneration !== tableLoadGenerationRef.current
+    ) {
+      return null;
     }
 
     const groupedLoaded = mapTablesByZone(loadedTablesRaw);
@@ -146,7 +160,13 @@ export function useTableController() {
 
     const createdTables: BackendTable[] = [];
     for (const zone of missingZones) {
-      createdTables.push(await apiService.addTable(zone));
+      createdTables.push(await apiService.ensureTableZone(zone));
+      if (
+        sessionGeneration !== sessionGenerationRef.current
+        || loadGeneration !== tableLoadGenerationRef.current
+      ) {
+        return null;
+      }
     }
 
     const ensuredTablesRaw = [...loadedTablesRaw, ...createdTables];
@@ -156,38 +176,72 @@ export function useTableController() {
     setTables(loadedTables);
     setTableTotals(mapTableTotals(ensuredTablesRaw));
     setTableKitchenStatuses(mapTableKitchenStatuses(ensuredTablesRaw));
-    setSelectedTable(initialTable);
+    commitSelectedTable(initialTable);
 
     return initialTable;
   }
 
-  async function refreshTables(): Promise<SelectedTable> {
+  async function refreshTables(): Promise<SelectedTable | null> {
+    const sessionGeneration = sessionGenerationRef.current;
+    const loadGeneration = ++tableLoadGenerationRef.current;
     const loadedTablesRaw = await apiService.fetchTables();
+    if (
+      sessionGeneration !== sessionGenerationRef.current
+      || loadGeneration !== tableLoadGenerationRef.current
+    ) {
+      return null;
+    }
     const loadedTables = mapTablesByZone(loadedTablesRaw);
-    const selectedStillExists = loadedTables.get(selectedTable.zone)?.includes(selectedTable.number) ?? false;
-    const nextSelectedTable = selectedStillExists ? selectedTable : getInitialTable(loadedTables);
+    const requestedTable = selectedTableRef.current;
+    const selectedStillExists = loadedTables.get(requestedTable.zone)?.includes(requestedTable.number) ?? false;
+    const nextSelectedTable = selectedStillExists ? requestedTable : getInitialTable(loadedTables);
 
     setTables(loadedTables);
     setTableTotals(mapTableTotals(loadedTablesRaw));
     setTableKitchenStatuses(mapTableKitchenStatuses(loadedTablesRaw));
-    setSelectedTable(nextSelectedTable);
+    if (!selectedStillExists) {
+      selectionGenerationRef.current += 1;
+      commitSelectedTable(nextSelectedTable);
+    }
 
     return nextSelectedTable;
   }
 
-  async function selectTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
+  async function selectTable(table: TableId, onSelected: (tableId: TableId) => Promise<boolean>): Promise<void> {
+    const previousTable = committedSelectedTableRef.current;
+    const generation = ++selectionGenerationRef.current;
+    selectedTableRef.current = table;
     try {
-      await onSelected(table);
-      setSelectedTable(table);
+      const didLoad = await onSelected(table);
+      if (generation !== selectionGenerationRef.current || !didLoad) {
+        if (generation === selectionGenerationRef.current) {
+          selectedTableRef.current = previousTable;
+        }
+        return;
+      }
+      commitSelectedTable(table);
     } catch {
+      if (generation === selectionGenerationRef.current) {
+        selectedTableRef.current = previousTable;
+        try {
+          await onSelected(previousTable);
+        } catch {
+          // Keep the committed selection visible; the next manual or sync
+          // refresh will retry if restoring its workflow also fails.
+        }
+      }
       Alert.alert('Error', 'No se pudo cambiar de mesa.');
     }
   }
 
-  async function addTable(zone: TableZone, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
+  async function addTable(zone: TableZone, onSelected: (tableId: TableId) => Promise<boolean>): Promise<void> {
+    const sessionGeneration = sessionGenerationRef.current;
     try {
       const newTable = await apiService.addTable(zone);
+      if (sessionGeneration !== sessionGenerationRef.current) return;
+      const loadGeneration = ++tableLoadGenerationRef.current;
       const loadedTables = await apiService.fetchTables();
+      if (sessionGeneration !== sessionGenerationRef.current || loadGeneration !== tableLoadGenerationRef.current) return;
       setTables(mapTablesByZone(loadedTables));
       setTableTotals(mapTableTotals(loadedTables));
       setTableKitchenStatuses(mapTableKitchenStatuses(loadedTables));
@@ -197,52 +251,102 @@ export function useTableController() {
         number: newTable.number
       };
 
-      setSelectedTable(nextTable);
-      await onSelected(nextTable);
+      const previousTable = committedSelectedTableRef.current;
+      const generation = ++selectionGenerationRef.current;
+      selectedTableRef.current = nextTable;
+      let didLoad: boolean;
+      try {
+        didLoad = await onSelected(nextTable);
+      } catch (error) {
+        if (generation === selectionGenerationRef.current) {
+          selectedTableRef.current = previousTable;
+          await onSelected(previousTable).catch(() => false);
+        }
+        throw error;
+      }
+      if (generation !== selectionGenerationRef.current || !didLoad) {
+        if (generation === selectionGenerationRef.current) {
+          selectedTableRef.current = previousTable;
+        }
+        return;
+      }
+      commitSelectedTable(nextTable);
     } catch {
-      Alert.alert('Error', 'No se pudo añadir la mesa.');
+      if (sessionGeneration === sessionGenerationRef.current) {
+        Alert.alert('Error', 'No se pudo añadir la mesa.');
+      }
     }
   }
 
-  async function removeTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
+  async function removeTable(table: TableId, onSelected: (tableId: TableId) => Promise<boolean>): Promise<void> {
     confirmDeleteTable(table, () => {
       void deleteTable(table, onSelected);
     });
   }
 
-  async function deleteTable(table: TableId, onSelected: (tableId: TableId) => Promise<void>): Promise<void> {
+  async function deleteTable(table: TableId, onSelected: (tableId: TableId) => Promise<boolean>): Promise<void> {
+    const sessionGeneration = sessionGenerationRef.current;
     try {
       await apiService.deleteTable(table.zone, table.number);
+      if (sessionGeneration !== sessionGenerationRef.current) return;
+      const loadGeneration = ++tableLoadGenerationRef.current;
       const loadedTables = await apiService.fetchTables();
+      if (sessionGeneration !== sessionGenerationRef.current || loadGeneration !== tableLoadGenerationRef.current) return;
       const groupedTables = mapTablesByZone(loadedTables);
       setTables(groupedTables);
       setTableTotals(mapTableTotals(loadedTables));
       setTableKitchenStatuses(mapTableKitchenStatuses(loadedTables));
 
       const nextTable = getFirstTableInZone(groupedTables, table.zone) ?? getInitialTable(groupedTables);
-      setSelectedTable(nextTable);
-      await onSelected(nextTable);
+      const generation = ++selectionGenerationRef.current;
+      selectedTableRef.current = nextTable;
+      const didLoad = await onSelected(nextTable);
+      if (generation === selectionGenerationRef.current) {
+        // The old selection no longer exists after a successful deletion.
+        // Keep table/workflow context aligned even if the workflow refresh
+        // failed; a later refresh can retry loading this replacement table.
+        commitSelectedTable(nextTable);
+        if (!didLoad) {
+          Alert.alert('Mesa eliminada', 'La mesa se eliminó, pero no se pudo cargar la mesa seleccionada. Actualiza los datos para reintentarlo.');
+        }
+      }
     } catch (error) {
+      if (sessionGeneration !== sessionGenerationRef.current) return;
       if (error instanceof ApiRequestError) {
+        if (error.code === 'TABLE_HAS_PAYMENT_HISTORY') {
+          Alert.alert('Mesa protegida', 'No se puede eliminar una mesa que contiene pedidos con historial de pagos.');
+          return;
+        }
+
         if (error.code === 'LAST_TABLE_IN_ZONE') {
           Alert.alert('No se puede eliminar la mesa', 'Cada zona debe conservar al menos una mesa.');
           return;
         }
 
         if (error.code === 'TABLE_NOT_FOUND') {
+          const loadGeneration = ++tableLoadGenerationRef.current;
           const loadedTables = await apiService.fetchTables();
+          if (sessionGeneration !== sessionGenerationRef.current || loadGeneration !== tableLoadGenerationRef.current) return;
           const groupedTables = mapTablesByZone(loadedTables);
           setTables(groupedTables);
           setTableTotals(mapTableTotals(loadedTables));
           setTableKitchenStatuses(mapTableKitchenStatuses(loadedTables));
 
-          const zoneHasSelectedTable = groupedTables.get(selectedTable.zone)?.includes(selectedTable.number) ?? false;
+          const currentSelection = selectedTableRef.current;
+          const zoneHasSelectedTable = groupedTables.get(currentSelection.zone)?.includes(currentSelection.number) ?? false;
           const nextTable = zoneHasSelectedTable
-            ? selectedTable
+            ? currentSelection
             : (getFirstTableInZone(groupedTables, table.zone) ?? getInitialTable(groupedTables));
 
-          setSelectedTable(nextTable);
-          await onSelected(nextTable);
+          const generation = ++selectionGenerationRef.current;
+          selectedTableRef.current = nextTable;
+          const didLoad = await onSelected(nextTable);
+          if (generation === selectionGenerationRef.current) {
+            commitSelectedTable(nextTable);
+            if (!didLoad) {
+              Alert.alert('Datos no disponibles', 'No se pudo cargar la mesa seleccionada. Actualiza los datos para reintentarlo.');
+            }
+          }
           Alert.alert('Mesa ya eliminada', `La mesa M${table.number} en ${tableZoneLabel(table.zone)} ya no existe.`);
           return;
         }
@@ -280,8 +384,24 @@ export function useTableController() {
   }
 
   async function markTableTicketPrinted(table: TableId): Promise<void> {
+    const sessionGeneration = sessionGenerationRef.current;
     await apiService.markTableTicketPrinted(table.number, table.zone);
-    updateTableKitchenStatus(table, 'printed');
+    if (sessionGeneration === sessionGenerationRef.current) {
+      updateTableKitchenStatus(table, 'printed');
+    }
+  }
+
+  function resetTables(): void {
+    sessionGenerationRef.current += 1;
+    tableLoadGenerationRef.current += 1;
+    selectionGenerationRef.current += 1;
+    const initialTable = { zone: TableZone.OUTSIDE, number: 1 };
+    selectedTableRef.current = initialTable;
+    committedSelectedTableRef.current = initialTable;
+    setTables(new Map());
+    setTableTotals(new Map());
+    setTableKitchenStatuses(new Map());
+    setSelectedTable(initialTable);
   }
 
   return {
@@ -300,6 +420,7 @@ export function useTableController() {
       updateTableTotal,
       updateTableKitchenStatus,
       markTableTicketPrinted,
+      resetTables,
     }
   };
 }

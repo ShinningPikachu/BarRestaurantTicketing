@@ -1,5 +1,14 @@
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { randomBytes, randomInt } from 'node:crypto';
+import { dirname } from 'node:path';
 
 export function parseEnvContent(content) {
   const values = new Map();
@@ -43,33 +52,73 @@ export function loadEnvFile(filePath) {
   return values;
 }
 
+function writePrivateFileAtomically(filePath, content) {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+
+  try {
+    writeFileSync(temporaryPath, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+    renameSync(temporaryPath, filePath);
+  } finally {
+    rmSync(temporaryPath, { force: true });
+  }
+}
+
+function enforcePrivatePermissions(filePath) {
+  try {
+    chmodSync(filePath, 0o600);
+  } catch (error) {
+    if (process.platform !== 'win32') {
+      throw new Error(`Could not protect runtime settings at ${filePath}: ${error.message}`);
+    }
+  }
+}
+
 export function ensureRuntimeEnv(filePath) {
   const existingContent = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
   const values = parseEnvContent(existingContent);
   const additions = [];
+  const configuredAccessCode = values.get('POS_ACCESS_CODE')?.trim();
+  const environmentAccessCode = process.env.POS_ACCESS_CODE?.trim();
+  const configuredAuthToken = values.get('POS_AUTH_TOKEN')?.trim();
+  const environmentAuthToken = process.env.POS_AUTH_TOKEN?.trim();
 
-  if (!values.has('POS_ACCESS_CODE') && process.env.POS_ACCESS_CODE === undefined) {
+  if (!configuredAccessCode && !environmentAccessCode) {
     additions.push(`POS_ACCESS_CODE=${String(randomInt(100000, 1000000))}`);
   }
 
-  if (!values.has('POS_AUTH_TOKEN') && process.env.POS_AUTH_TOKEN === undefined) {
+  if (!configuredAuthToken && !environmentAuthToken) {
     additions.push(`POS_AUTH_TOKEN=${randomBytes(32).toString('hex')}`);
   }
 
   if (additions.length > 0) {
     const prefix = existingContent && !existingContent.endsWith('\n') ? '\n' : '';
     const header = existingContent ? '' : '# Local runtime settings. Keep this file private.\n';
-    writeFileSync(filePath, `${existingContent}${prefix}${header}${additions.join('\n')}\n`, 'utf8');
-    try {
-      chmodSync(filePath, 0o600);
-    } catch {
-      // Best effort only; some filesystems do not support Unix modes.
-    }
+    writePrivateFileAtomically(
+      filePath,
+      `${existingContent}${prefix}${header}${additions.join('\n')}\n`,
+    );
+  }
+
+  if (existsSync(filePath)) {
+    enforcePrivatePermissions(filePath);
   }
 
   const finalValues = loadEnvFile(filePath);
+  const fileAccessCode = finalValues.get('POS_ACCESS_CODE')?.trim();
+  const fileAuthToken = finalValues.get('POS_AUTH_TOKEN')?.trim();
+
+  // A blank inherited variable must not force the backend onto its insecure fallback.
+  if (!process.env.POS_ACCESS_CODE?.trim() && fileAccessCode) {
+    process.env.POS_ACCESS_CODE = fileAccessCode;
+  }
+  if (!process.env.POS_AUTH_TOKEN?.trim() && fileAuthToken) {
+    process.env.POS_AUTH_TOKEN = fileAuthToken;
+  }
+
   return {
-    accessCode: finalValues.get('POS_ACCESS_CODE') ?? process.env.POS_ACCESS_CODE,
+    accessCode: process.env.POS_ACCESS_CODE?.trim() || fileAccessCode,
     created: additions.length > 0,
+    createdAccessCode: additions.some((line) => line.startsWith('POS_ACCESS_CODE=')),
   };
 }

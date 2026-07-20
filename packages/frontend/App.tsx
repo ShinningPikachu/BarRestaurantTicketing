@@ -24,7 +24,6 @@ import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabe
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
 import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
-import { getOptionalXprinterTarget, getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
 import { MobileMainScreen } from './src/native/app/MobileMainScreen';
 import { AppSection, MainScreenProps } from './src/native/app/MainScreen.types';
@@ -38,7 +37,7 @@ const MIN_SEARCH_LENGTH = 2;
 const MAX_SEARCH_RESULTS = 24;
 const PRODUCT_IMAGE_MAX_SIZE = 512;
 const PRODUCT_IMAGE_QUALITY = 0.82;
-const AUTH_TOKEN_STORAGE_KEY = 'bar-ticketing-auth-token';
+const PRODUCT_IMAGE_MAX_SOURCE_BYTES = 20_000_000;
 const API_BASE_URL_STORAGE_KEY = 'bar-ticketing-api-base-url';
 const DATA_SYNC_SIGNAL_INTERVAL_MS = 5000;
 const DATA_SYNC_MIN_REFRESH_INTERVAL_MS = 5000;
@@ -61,6 +60,10 @@ interface ExpoLikeGlobal {
 
 function resizeImageFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/') || file.size <= 0 || file.size > PRODUCT_IMAGE_MAX_SOURCE_BYTES) {
+      reject(new Error('La imagen seleccionada no es válida o es demasiado grande.'));
+      return;
+    }
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
     reader.onload = () => {
@@ -317,13 +320,15 @@ function escapeHtml(value: string): string {
 }
 
 function buildPaidTicketArticle(ticket: PaidTicket): string {
-  const invoiceConfig = getSimplifiedInvoiceConfig();
-  const businessName = ticket.businessName || invoiceConfig.businessName;
-  const tradeName = ticket.tradeName || invoiceConfig.tradeName;
-  const businessTaxId = ticket.businessTaxId || invoiceConfig.nif;
-  const businessAddress = ticket.businessAddress || invoiceConfig.address;
-  const businessCity = ticket.businessCity || invoiceConfig.city;
-  const businessPhone = ticket.businessPhone || invoiceConfig.phone;
+  // Historical documents must use the issuer snapshot captured at payment.
+  // Missing legacy data stays visibly unknown instead of borrowing today's
+  // configuration and silently changing an old fiscal document.
+  const businessName = ticket.businessName || 'EMISOR NO REGISTRADO';
+  const tradeName = ticket.tradeName || 'Ticket pagado';
+  const businessTaxId = ticket.businessTaxId || 'NIF NO REGISTRADO';
+  const businessAddress = ticket.businessAddress || 'Dirección no registrada';
+  const businessCity = ticket.businessCity || '';
+  const businessPhone = ticket.businessPhone || '';
   const terminalId = ticket.terminalId || 'TPV-1';
   const cashierName = ticket.cashierName || 'No registrado';
   const customerName = ticket.customerName || 'Cliente no identificado';
@@ -453,10 +458,15 @@ export default function App(): React.JSX.Element {
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   const isRefreshingDataRef = useRef(false);
   const isCheckingSyncRevisionRef = useRef(false);
-  const lastSyncRevisionRef = useRef<number | null>(null);
+  const lastSyncRevisionRef = useRef<string | null>(null);
   const lastOperationalSyncAtRef = useRef(0);
-  const pendingSyncRevisionRef = useRef<number | null>(null);
+  const pendingSyncRevisionRef = useRef<string | null>(null);
   const syncRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataScopeGenerationRef = useRef(0);
+  const ticketHistoryRequestGenerationRef = useRef(0);
+  const sessionSummaryRequestGenerationRef = useRef(0);
+  const managedProductsRequestGenerationRef = useRef(0);
+  const operationalRefreshGenerationRef = useRef(0);
   const { state, actions } = useTicketingController(authStatus === 'signedIn');
   const { width } = useWindowDimensions();
   const [activeSection, setActiveSection] = useState<AppSection>('home');
@@ -468,8 +478,19 @@ export default function App(): React.JSX.Element {
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
   const [ticketSearchText, setTicketSearchText] = useState('');
   const [ticketPeriodPreset, setTicketPeriodPreset] = useState<TicketPeriodPreset>('today');
+  const [dateRangeReferenceMs, setDateRangeReferenceMs] = useState(() => Date.now());
   const [ticketCustomStartDate, setTicketCustomStartDate] = useState(() => formatDateInputValue(new Date()));
   const [ticketCustomEndDate, setTicketCustomEndDate] = useState(() => formatDateInputValue(new Date()));
+  const ticketDateFilterRef = useRef({
+    preset: ticketPeriodPreset,
+    customStartDate: ticketCustomStartDate,
+    customEndDate: ticketCustomEndDate,
+  });
+  ticketDateFilterRef.current = {
+    preset: ticketPeriodPreset,
+    customStartDate: ticketCustomStartDate,
+    customEndDate: ticketCustomEndDate,
+  };
   const [managedMenuItems, setManagedMenuItems] = useState<MenuItem[]>([]);
   const [productName, setProductName] = useState('');
   const [productPrimaryName, setProductPrimaryName] = useState('');
@@ -490,9 +511,53 @@ export default function App(): React.JSX.Element {
     preorderItems,
     tableConfirmedOrders,
     preorderTotal,
+    confirmedTotal,
     currentTableTotal,
-    priceDraftByItemId
+    priceDraftByItemId,
+    isMutating,
+    paymentPending,
   } = state;
+
+  function clearServerScopedState(prepareForLogin = false): void {
+    dataScopeGenerationRef.current += 1;
+    ticketHistoryRequestGenerationRef.current += 1;
+    sessionSummaryRequestGenerationRef.current += 1;
+    managedProductsRequestGenerationRef.current += 1;
+    operationalRefreshGenerationRef.current += 1;
+    isRefreshingDataRef.current = false;
+    isCheckingSyncRevisionRef.current = false;
+    lastSyncRevisionRef.current = null;
+    pendingSyncRevisionRef.current = null;
+    lastOperationalSyncAtRef.current = 0;
+    if (syncRefreshTimeoutRef.current) {
+      clearTimeout(syncRefreshTimeoutRef.current);
+      syncRefreshTimeoutRef.current = null;
+    }
+
+    actions.resetData(prepareForLogin);
+    setIsRefreshingData(false);
+    setPaidTickets([]);
+    setSelectedPaidTicket(null);
+    setSessionSummary(null);
+    setManagedMenuItems([]);
+    setSelectedMenuCategory(null);
+    setMenuSearchText('');
+    setTicketSearchText('');
+    setProductName('');
+    setProductPrimaryName('');
+    setProductSecondaryName('');
+    setProductCategory('');
+    setProductPrice('');
+    setProductCost('');
+    setProductSku('');
+    setProductDescription('');
+    setProductImageDataUrl(null);
+  }
+
+  function closePairingScanner(): void {
+    setIsPairingScannerVisible(false);
+    setIsHandlingPairScan(false);
+  }
 
   function resetNavigation(): void {
     setSectionHistory([]);
@@ -524,8 +589,7 @@ export default function App(): React.JSX.Element {
 
   function openConnectionSetup(): void {
     setApiBaseUrlDraft(configuredApiBaseUrl);
-    setIsPairingScannerVisible(false);
-    setIsHandlingPairScan(false);
+    closePairingScanner();
     setIsConnectionModalVisible(true);
   }
 
@@ -544,13 +608,13 @@ export default function App(): React.JSX.Element {
     setIsSavingConnection(true);
     try {
       const normalizedUrl = await testApiConnection(value);
-      setApiBaseUrl(normalizedUrl);
       await AsyncStorage.setItem(API_BASE_URL_STORAGE_KEY, normalizedUrl);
       apiService.setAuthToken(null);
-      await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      setApiBaseUrl(normalizedUrl);
+      clearServerScopedState(false);
       setConfiguredApiBaseUrl(normalizedUrl);
       setApiBaseUrlDraft(normalizedUrl);
-      setIsPairingScannerVisible(false);
+      closePairingScanner();
       setIsConnectionModalVisible(false);
       resetNavigation();
       setAuthStatus('signedOut');
@@ -580,30 +644,28 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     setApiUnauthorizedHandler(() => {
       apiService.setAuthToken(null);
-      void AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      clearServerScopedState(false);
+      setAccessCode('');
       setAuthStatus('signedOut');
       resetNavigation();
     });
 
     async function restoreLogin(): Promise<void> {
-      const savedApiBaseUrl = await AsyncStorage.getItem(API_BASE_URL_STORAGE_KEY);
-      if (savedApiBaseUrl) {
-        try {
+      try {
+        const savedApiBaseUrl = await AsyncStorage.getItem(API_BASE_URL_STORAGE_KEY);
+        if (savedApiBaseUrl) {
           const restoredUrl = setApiBaseUrl(savedApiBaseUrl);
           setConfiguredApiBaseUrl(restoredUrl);
           setApiBaseUrlDraft(restoredUrl);
-        } catch {
-          await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY);
         }
+      } catch {
+        await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY).catch(() => undefined);
       }
 
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      if (token) {
-        apiService.setAuthToken(token);
-        setAuthStatus('signedIn');
-        return;
-      }
-
+      // Access tokens intentionally live only in memory. Restarting the app
+      // always requires a fresh login and cannot leak a bearer token through
+      // unencrypted AsyncStorage or a device backup.
+      apiService.setAuthToken(null);
       setAuthStatus('signedOut');
     }
 
@@ -641,8 +703,13 @@ export default function App(): React.JSX.Element {
   const displayedMenuCategory = isSearching ? 'Resultados' : visibleMenuCategory;
   const displayedMenuItems = isSearching ? searchedMenuItems : visibleMenuItems;
   const ticketDateRange = useMemo(
-    () => resolveTicketDateRange(ticketPeriodPreset, ticketCustomStartDate, ticketCustomEndDate),
-    [ticketPeriodPreset, ticketCustomStartDate, ticketCustomEndDate]
+    () => resolveTicketDateRange(
+      ticketPeriodPreset,
+      ticketCustomStartDate,
+      ticketCustomEndDate,
+      new Date(dateRangeReferenceMs)
+    ),
+    [ticketPeriodPreset, ticketCustomStartDate, ticketCustomEndDate, dateRangeReferenceMs]
   );
   const filteredPaidTickets = useMemo(() => {
     const query = normalizeSearchText(ticketSearchText);
@@ -717,6 +784,16 @@ export default function App(): React.JSX.Element {
   }, [paidTickets, selectedPaidTicket?.id]);
 
   useEffect(() => {
+    const now = new Date();
+    const nextLocalDay = addDays(startOfDay(now), 1);
+    const timeout = setTimeout(
+      () => setDateRangeReferenceMs(Date.now()),
+      Math.max(1000, nextLocalDay.getTime() - Date.now() + 1000)
+    );
+    return () => clearTimeout(timeout);
+  }, [dateRangeReferenceMs]);
+
+  useEffect(() => {
     if (Platform.OS === 'web' || authStatus !== 'signedIn' || activeSection === 'home' || activeSection === 'pos') {
       return;
     }
@@ -730,28 +807,56 @@ export default function App(): React.JSX.Element {
   }, [activeSection, authStatus, sectionHistory]);
 
   async function loadTicketHistory(options: { showError?: boolean } = {}): Promise<void> {
-    if (ticketDateRange.error || !ticketDateRange.startAt || !ticketDateRange.endAt) {
+    const filter = ticketDateFilterRef.current;
+    const range = resolveTicketDateRange(
+      filter.preset,
+      filter.customStartDate,
+      filter.customEndDate,
+      new Date()
+    );
+    const scopeGeneration = dataScopeGenerationRef.current;
+    const requestGeneration = ++ticketHistoryRequestGenerationRef.current;
+
+    if (range.error || !range.startAt || !range.endAt) {
       if (options.showError !== false) {
-        Alert.alert('Rango de fechas no válido', ticketDateRange.error ?? 'Selecciona un periodo válido.');
+        Alert.alert('Rango de fechas no válido', range.error ?? 'Selecciona un periodo válido.');
       }
       return;
     }
 
     try {
-      setPaidTickets(await apiService.fetchPaidTickets({
-        startAt: ticketDateRange.startAt,
-        endAt: ticketDateRange.endAt,
-      }));
+      const tickets = await apiService.fetchPaidTickets({
+        startAt: range.startAt,
+        endAt: range.endAt,
+      });
+      if (
+        scopeGeneration === dataScopeGenerationRef.current
+        && requestGeneration === ticketHistoryRequestGenerationRef.current
+      ) {
+        setPaidTickets(tickets);
+      }
     } catch {
-      if (options.showError !== false) {
+      if (
+        options.showError !== false
+        && scopeGeneration === dataScopeGenerationRef.current
+        && requestGeneration === ticketHistoryRequestGenerationRef.current
+      ) {
         Alert.alert('Error', 'No se pudo cargar el historial de tickets.');
       }
     }
   }
 
   async function refreshSessionSummary(showFeedback = false, options: { showError?: boolean } = {}): Promise<void> {
+    const scopeGeneration = dataScopeGenerationRef.current;
+    const requestGeneration = ++sessionSummaryRequestGenerationRef.current;
     try {
       const summary = await apiService.fetchSessionSummary();
+      if (
+        scopeGeneration !== dataScopeGenerationRef.current
+        || requestGeneration !== sessionSummaryRequestGenerationRef.current
+      ) {
+        return;
+      }
       setSessionSummary(summary);
       if (showFeedback) {
         Alert.alert(
@@ -762,7 +867,11 @@ export default function App(): React.JSX.Element {
         );
       }
     } catch {
-      if (options.showError !== false) {
+      if (
+        options.showError !== false
+        && scopeGeneration === dataScopeGenerationRef.current
+        && requestGeneration === sessionSummaryRequestGenerationRef.current
+      ) {
         Alert.alert('Error', 'No se pudo cargar el resumen de sesión.');
       }
     }
@@ -777,12 +886,13 @@ export default function App(): React.JSX.Element {
 
     setLoginLoading(true);
     try {
-      const result = await apiService.login(trimmedCode);
-      await AsyncStorage.setItem(AUTH_TOKEN_STORAGE_KEY, result.token);
+      await apiService.login(trimmedCode);
+      clearServerScopedState(true);
       setAccessCode('');
       resetNavigation();
       setAuthStatus('signedIn');
     } catch (error) {
+      apiService.setAuthToken(null);
       if (error instanceof ApiRequestError && error.code === 'INVALID_LOGIN') {
         Alert.alert('Acceso denegado', 'El código de acceso no es correcto.');
       } else {
@@ -796,18 +906,31 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  async function handleLogout(): Promise<void> {
+  function handleLogout(): void {
     apiService.setAuthToken(null);
-    await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    clearServerScopedState(false);
+    setAccessCode('');
     resetNavigation();
     setAuthStatus('signedOut');
   }
 
   async function loadManagedProducts(options: { showError?: boolean } = {}): Promise<void> {
+    const scopeGeneration = dataScopeGenerationRef.current;
+    const requestGeneration = ++managedProductsRequestGenerationRef.current;
     try {
-      setManagedMenuItems(await apiService.fetchManageMenu());
+      const items = await apiService.fetchManageMenu();
+      if (
+        scopeGeneration === dataScopeGenerationRef.current
+        && requestGeneration === managedProductsRequestGenerationRef.current
+      ) {
+        setManagedMenuItems(items);
+      }
     } catch {
-      if (options.showError !== false) {
+      if (
+        options.showError !== false
+        && scopeGeneration === dataScopeGenerationRef.current
+        && requestGeneration === managedProductsRequestGenerationRef.current
+      ) {
         Alert.alert('Error', 'No se pudo cargar la gestión de productos.');
       }
     }
@@ -818,11 +941,19 @@ export default function App(): React.JSX.Element {
       return false;
     }
 
+    const scopeGeneration = dataScopeGenerationRef.current;
+    const refreshGeneration = ++operationalRefreshGenerationRef.current;
     isRefreshingDataRef.current = true;
     setIsRefreshingData(true);
 
     try {
       await actions.refreshData();
+      if (
+        scopeGeneration !== dataScopeGenerationRef.current
+        || refreshGeneration !== operationalRefreshGenerationRef.current
+      ) {
+        return false;
+      }
 
       if (activeSection === 'history') {
         await Promise.all([
@@ -833,6 +964,13 @@ export default function App(): React.JSX.Element {
 
       if (activeSection === 'products') {
         await loadManagedProducts({ showError: options.showError });
+      }
+
+      if (
+        scopeGeneration !== dataScopeGenerationRef.current
+        || refreshGeneration !== operationalRefreshGenerationRef.current
+      ) {
+        return false;
       }
 
       lastOperationalSyncAtRef.current = Date.now();
@@ -847,8 +985,13 @@ export default function App(): React.JSX.Element {
       }
       return false;
     } finally {
-      isRefreshingDataRef.current = false;
-      setIsRefreshingData(false);
+      if (
+        scopeGeneration === dataScopeGenerationRef.current
+        && refreshGeneration === operationalRefreshGenerationRef.current
+      ) {
+        isRefreshingDataRef.current = false;
+        setIsRefreshingData(false);
+      }
     }
   }
 
@@ -915,6 +1058,10 @@ export default function App(): React.JSX.Element {
 
       try {
         const asset = result.assets[0];
+        if (asset.fileSize && asset.fileSize > PRODUCT_IMAGE_MAX_SOURCE_BYTES) {
+          Alert.alert('Imagen demasiado grande', 'Selecciona una imagen de 20 MB o menos.');
+          return;
+        }
         onSelected(await resizeNativeImage(asset.uri, asset.width, asset.height));
       } catch {
         Alert.alert('Error', 'No se pudo preparar la imagen.');
@@ -976,7 +1123,7 @@ export default function App(): React.JSX.Element {
 
     if (Platform.OS === 'web') {
       const webConfirm = (globalThis as typeof globalThis & { confirm?: (prompt: string) => boolean }).confirm;
-      if (!webConfirm || webConfirm(message)) {
+      if (webConfirm?.(message)) {
         onConfirm();
       }
       return;
@@ -1229,37 +1376,10 @@ export default function App(): React.JSX.Element {
   }
 
   async function printSimplifiedPaidTicket(ticket: PaidTicket): Promise<void> {
-    const config = getSimplifiedInvoiceConfig();
-    const lines = ticket.items.map((item) => ({
-      name: item.name,
-      primaryName: item.primaryName,
-      secondaryName: item.secondaryName,
-      qty: item.qty,
-      unitPriceCents: item.unitPriceCents,
-      totalPriceCents: item.totalPriceCents,
-    }));
-
     try {
-      await apiService.printXprinterTicket({
-        businessName: config.businessName,
-        tradeName: config.tradeName,
-        nif: config.nif,
-        address: config.address,
-        city: config.city || null,
-        phone: config.phone || null,
-        invoiceNumber: ticket.ticketNumber,
-        issuedAt: formatDateTime(ticket.createdAt),
-        tableLabel: `${tableZoneLabel(normalizeTableZone(ticket.tableZone))} ${ticket.tableNumber}`,
-        lines,
-        taxableBaseCents: ticket.taxableBaseCents,
-        vatCents: ticket.vatCents,
-        vatRatePercent: ticket.vatRatePercent,
-        totalCents: ticket.totalCents,
-        ticketNote: ticket.mode === 'split' ? 'Cuenta dividida' : null,
-        splitPeople: ticket.splitPeople ?? null,
-        openCashDrawer: false,
-        ...getOptionalXprinterTarget(),
-      });
+      // The server renders the immutable issuer and line-item snapshot stored
+      // with this payment. Never rebuild a fiscal reprint from live config.
+      await apiService.printPaidTicket(ticket.id, false);
       Alert.alert('Ticket impreso', `Se ha enviado ${ticket.ticketNumber} a la impresora.`);
     } catch {
       Alert.alert('Error', 'No se pudo imprimir el ticket simplificado.');
@@ -1268,7 +1388,7 @@ export default function App(): React.JSX.Element {
 
   async function openCashDrawer(): Promise<void> {
     try {
-      await apiService.openXprinterCashDrawer(getOptionalXprinterTarget());
+      await apiService.openXprinterCashDrawer();
       Alert.alert('Caja abierta', 'Se ha enviado la orden de apertura a la caja.');
     } catch (error) {
       const details = error instanceof ApiRequestError ? `\n\n${error.message}` : '';
@@ -1282,7 +1402,10 @@ export default function App(): React.JSX.Element {
     tableOrders: tableConfirmedOrders,
     menuByCategory,
     preorderTotal,
+    confirmedTotal,
     currentTableTotal,
+    isMutating,
+    paymentPending,
     priceDraftByItemId,
     getMenuTitleById,
     formatPrice: centsToCurrency,
@@ -1300,25 +1423,25 @@ export default function App(): React.JSX.Element {
       void actions.adjustItemPrice(itemId, deltaCents);
     },
     onConfirmOrder: () => {
-      void actions.sendToKitchen();
+      return actions.sendToKitchen();
     },
     onClearPreOrder: () => {
-      void actions.clearPreOrder();
+      return actions.clearPreOrder();
     },
     onPrintTicket: (options?: Parameters<typeof actions.printTicket>[0]) => {
       void actions.printTicket(options);
     },
     onPayTicket: (method: Parameters<typeof actions.payTable>[0], splitPeople?: number) => {
-      void actions.payTable(method, splitPeople);
+      return actions.payTable(method, splitPeople);
     },
     onPaySelectedItems: (
       method: Parameters<typeof actions.paySelectedItems>[0],
       items: Parameters<typeof actions.paySelectedItems>[1]
     ) => {
-      void actions.paySelectedItems(method, items);
+      return actions.paySelectedItems(method, items);
     },
     onRemoveSelectedItems: (items: Parameters<typeof actions.removeSelectedItems>[0]) => {
-      void actions.removeSelectedItems(items);
+      return actions.removeSelectedItems(items);
     },
     onMoveConfirmedItemToPreOrder: (
       orderId: Parameters<typeof actions.moveConfirmedItemToPreOrder>[0],
@@ -1401,8 +1524,8 @@ export default function App(): React.JSX.Element {
       }
     };
 
-    const scheduleSyncRefresh = (revision: number, delayOverride?: number) => {
-      pendingSyncRevisionRef.current = revision;
+    const scheduleSyncRefresh = (revisionToken: string, delayOverride?: number) => {
+      pendingSyncRevisionRef.current = revisionToken;
       if (syncRefreshTimeoutRef.current) {
         return;
       }
@@ -1418,19 +1541,19 @@ export default function App(): React.JSX.Element {
       }, delay);
     };
 
-    async function synchronizeChangedRevision(revision: number): Promise<void> {
+    async function synchronizeChangedRevision(revisionToken: string): Promise<void> {
       if (!active) {
         return;
       }
 
       if (isRefreshingDataRef.current) {
-        scheduleSyncRefresh(revision, 250);
+        scheduleSyncRefresh(revisionToken, 250);
         return;
       }
 
       const elapsedSinceLastSync = Date.now() - lastOperationalSyncAtRef.current;
       if (elapsedSinceLastSync < DATA_SYNC_MIN_REFRESH_INTERVAL_MS) {
-        scheduleSyncRefresh(revision);
+        scheduleSyncRefresh(revisionToken);
         return;
       }
 
@@ -1441,9 +1564,9 @@ export default function App(): React.JSX.Element {
       }
 
       if (refreshed) {
-        lastSyncRevisionRef.current = revision;
+        lastSyncRevisionRef.current = revisionToken;
       } else {
-        scheduleSyncRefresh(revision, DATA_SYNC_SIGNAL_INTERVAL_MS);
+        scheduleSyncRefresh(revisionToken, DATA_SYNC_SIGNAL_INTERVAL_MS);
       }
     }
 
@@ -1455,16 +1578,17 @@ export default function App(): React.JSX.Element {
       isCheckingSyncRevisionRef.current = true;
       try {
         const syncRevision = await apiService.fetchSyncRevision();
+        const revisionToken = `${syncRevision.instanceId}:${syncRevision.revision}`;
         const previousRevision = lastSyncRevisionRef.current;
 
         if (previousRevision === null) {
-          lastSyncRevisionRef.current = syncRevision.revision;
+          lastSyncRevisionRef.current = revisionToken;
           lastOperationalSyncAtRef.current = Date.now();
           return;
         }
 
-        if (syncRevision.revision !== previousRevision) {
-          await synchronizeChangedRevision(syncRevision.revision);
+        if (revisionToken !== previousRevision) {
+          await synchronizeChangedRevision(revisionToken);
         }
       } catch {
         // The regular refresh path handles visible connection errors.
@@ -1507,7 +1631,10 @@ export default function App(): React.JSX.Element {
       visible={isConnectionModalVisible}
       transparent
       animationType="fade"
-      onRequestClose={() => setIsConnectionModalVisible(false)}
+      onRequestClose={() => {
+        closePairingScanner();
+        setIsConnectionModalVisible(false);
+      }}
     >
       <View style={styles.modalBackdrop}>
         <View style={[styles.modalPanel, styles.connectionPanel]}>
@@ -1544,7 +1671,10 @@ export default function App(): React.JSX.Element {
             <TouchableOpacity style={styles.secondaryButton} onPress={() => void saveConnection(apiBaseUrlDraft)} disabled={isSavingConnection}>
               <Text style={styles.secondaryButtonText}>{isSavingConnection ? 'Comprobando...' : 'Conectar manualmente'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => setIsConnectionModalVisible(false)}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => {
+              closePairingScanner();
+              setIsConnectionModalVisible(false);
+            }}>
               <Text style={styles.secondaryButtonText}>Cancelar</Text>
             </TouchableOpacity>
           </View>

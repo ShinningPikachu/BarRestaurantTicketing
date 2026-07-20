@@ -1,9 +1,10 @@
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getHostIp } from './network-address.mjs';
+import { loadEnvFile } from './runtime-env.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const frontendDir = resolve(repoRoot, 'packages/frontend');
@@ -17,38 +18,6 @@ const requiredSdkPackages = [
   ['cmake/3.22.1', 'cmake;3.22.1'],
   ['ndk/27.1.12297006', 'ndk;27.1.12297006'],
 ];
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const content = readFileSync(filePath, 'utf8');
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf('=');
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    let value = line.slice(separatorIndex + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    if (key && process.env[key] === undefined) {
-      process.env[key] = value;
-    }
-  }
-}
 
 function assertSupportedNodeVersion() {
   const current = process.versions.node.split('.').map(Number);
@@ -240,5 +209,15 @@ await run(gradleCommand, ['assembleRelease'], {
   env: buildEnv,
 });
 
-console.log('\nAPK ready: packages/frontend/android/app/build/outputs/apk/release/app-release.apk');
-console.log('Install with: adb install -r packages/frontend/android/app/build/outputs/apk/release/app-release.apk');
+const generatedApk = resolve(androidDir, 'app/build/outputs/apk/release/app-release.apk');
+const localApk = resolve(androidDir, 'app/build/outputs/apk/release/app-local.apk');
+if (!existsSync(generatedApk)) {
+  throw new Error(`Gradle completed but did not create ${generatedApk}`);
+}
+rmSync(localApk, { force: true });
+renameSync(generatedApk, localApk);
+
+console.warn('\nThis is a release-mode, debug-key-signed APK for trusted local sideloading only.');
+console.warn('Do not publish it to an app store or treat it as a production-signed release.');
+console.log('Local APK ready: packages/frontend/android/app/build/outputs/apk/release/app-local.apk');
+console.log('Install with: adb install -r packages/frontend/android/app/build/outputs/apk/release/app-local.apk');

@@ -4,7 +4,6 @@ import { MobilePosScreen } from '../components';
 import { AppSection, MainScreenProps } from './MainScreen.types';
 import { mobileStyles as styles } from './MobileMain.styles';
 import { MenuItem, PaidTicket, TicketPeriodPreset, normalizeTableZone, tableZoneLabel } from '../types';
-import { getSimplifiedInvoiceConfig } from '../helpers/kitchenTicketPrinter';
 
 type ProductEditValues = {
   name: string;
@@ -157,15 +156,14 @@ function getModeLabel(mode: string): string {
 }
 
 function getTicketBusinessLine(ticket: PaidTicket): string {
-  const invoiceConfig = getSimplifiedInvoiceConfig();
   return [
-    ticket.tradeName || invoiceConfig.tradeName,
-    ticket.businessName || invoiceConfig.businessName,
+    ticket.tradeName,
+    ticket.businessName,
   ].filter(Boolean).join(' · ') || 'Empresa no registrada';
 }
 
 function getTicketBusinessTaxId(ticket: PaidTicket): string {
-  return ticket.businessTaxId || getSimplifiedInvoiceConfig().nif || 'No registrado';
+  return ticket.businessTaxId || 'No registrado';
 }
 
 function getTicketLineSummary(ticket: PaidTicket): string {

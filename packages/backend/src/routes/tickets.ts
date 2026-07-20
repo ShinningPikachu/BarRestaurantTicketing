@@ -1,12 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
-import prisma from '../db';
-import { errorResponse, successResponse } from '../types/api';
+import prisma from '../db.js';
+import { errorResponse, successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-function getSessionWindow(reference = new Date()): { start: Date; end: Date } {
+function toPublicTicket<T extends { idempotencyKey: string | null; idempotencyFingerprint: string | null }>(ticket: T) {
+  const { idempotencyKey: _idempotencyKey, idempotencyFingerprint: _fingerprint, ...publicTicket } = ticket;
+  return publicTicket;
+}
+
+export function getSessionWindow(reference = new Date()): { start: Date; end: Date } {
   const start = new Date(reference);
   start.setHours(6, 0, 0, 0);
 
@@ -16,7 +20,7 @@ function getSessionWindow(reference = new Date()): { start: Date; end: Date } {
 
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-  end.setHours(4, 0, 0, 0);
+  end.setHours(6, 0, 0, 0);
 
   return { start, end };
 }
@@ -39,73 +43,6 @@ function parseOptionalDate(value: unknown, fieldName: string): Date | null {
   }
 
   return date;
-}
-
-type TicketSnapshotFields = {
-  id: string;
-  businessName: string;
-  tradeName: string;
-  businessTaxId: string;
-  businessAddress: string | null;
-  businessCity: string | null;
-  businessPhone: string | null;
-  terminalId: string | null;
-  cashierName: string | null;
-  customerName: string | null;
-  customerTaxId: string | null;
-  status: string;
-  relatedTicketNumber: string | null;
-  pdfFileReference: string | null;
-  auditMetadata: string | null;
-};
-
-async function attachTicketSnapshots<T extends { id: string }>(tickets: T[]): Promise<Array<T & TicketSnapshotFields>> {
-  if (tickets.length === 0) {
-    return [];
-  }
-
-  const rows = await prisma.$queryRaw<TicketSnapshotFields[]>`
-    SELECT
-      "id",
-      "businessName",
-      "tradeName",
-      "businessTaxId",
-      "businessAddress",
-      "businessCity",
-      "businessPhone",
-      "terminalId",
-      "cashierName",
-      "customerName",
-      "customerTaxId",
-      "status",
-      "relatedTicketNumber",
-      "pdfFileReference",
-      "auditMetadata"
-    FROM "PaidTicket"
-    WHERE "id" IN (${Prisma.join(tickets.map((ticket) => ticket.id))})
-  `;
-  const rowById = new Map(rows.map((row) => [row.id, row]));
-
-  return tickets.map((ticket) => ({
-    ...ticket,
-    ...(rowById.get(ticket.id) ?? {
-      id: ticket.id,
-      businessName: '',
-      tradeName: '',
-      businessTaxId: '',
-      businessAddress: null,
-      businessCity: null,
-      businessPhone: null,
-      terminalId: null,
-      cashierName: null,
-      customerName: null,
-      customerTaxId: null,
-      status: 'paid',
-      relatedTicketNumber: null,
-      pdfFileReference: null,
-      auditMetadata: null,
-    }),
-  }));
 }
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -133,7 +70,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       orderBy: { createdAt: 'desc' },
       include: { items: true },
     });
-    res.json(successResponse(await attachTicketSnapshots(tickets)));
+    res.json(successResponse(tickets.map(toPublicTicket)));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Invalid ')) {
       res.status(400).json(errorResponse('INVALID_TICKET_DATE_RANGE', error.message));
@@ -225,8 +162,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    const [ticketWithSnapshot] = await attachTicketSnapshots([ticket]);
-    res.json(successResponse(ticketWithSnapshot));
+    res.json(successResponse(toPublicTicket(ticket)));
   } catch (error) {
     logger.error({ error }, 'Failed to fetch paid ticket');
     next(error);

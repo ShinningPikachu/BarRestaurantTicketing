@@ -46,20 +46,9 @@ test('createPreOrderItem omits nullish menuItemId values', async () => {
   assert.equal(createdPayloads.length, 3);
 });
 
-test('deleteOrder removes ticket children before parent rows', async () => {
+test('deleteOrder removes financial and item children before the parent row', async () => {
   const calls: string[] = [];
   const repository = new WorkflowRepository({
-    kitchenTicket: {
-      findMany: async () => [{ id: 'ticket-a' }, { id: 'ticket-b' }],
-      deleteMany: async () => {
-        calls.push('kitchenTicket.deleteMany');
-      },
-    },
-    kitchenTicketItem: {
-      deleteMany: async ({ where }: { where: unknown }) => {
-        calls.push(`kitchenTicketItem.deleteMany:${JSON.stringify(where)}`);
-      },
-    },
     payment: {
       deleteMany: async () => {
         calls.push('payment.deleteMany');
@@ -81,8 +70,6 @@ test('deleteOrder removes ticket children before parent rows', async () => {
   await repository.deleteOrder('order-1');
 
   assert.deepEqual(calls, [
-    'kitchenTicketItem.deleteMany:{"ticketId":{"in":["ticket-a","ticket-b"]}}',
-    'kitchenTicket.deleteMany',
     'payment.deleteMany',
     'orderItem.deleteMany',
     'order.delete',
@@ -102,17 +89,6 @@ test('deleteTableWorkflowData removes table workflow rows before parent table', 
       findMany: async () => [{ id: 'session-a' }],
       deleteMany: async ({ where }: { where: unknown }) => {
         calls.push(`preOrderSession.deleteMany:${JSON.stringify(where)}`);
-      },
-    },
-    kitchenTicket: {
-      findMany: async () => [{ id: 'ticket-a' }],
-      deleteMany: async ({ where }: { where: unknown }) => {
-        calls.push(`kitchenTicket.deleteMany:${JSON.stringify(where)}`);
-      },
-    },
-    kitchenTicketItem: {
-      deleteMany: async ({ where }: { where: unknown }) => {
-        calls.push(`kitchenTicketItem.deleteMany:${JSON.stringify(where)}`);
       },
     },
     payment: {
@@ -135,8 +111,6 @@ test('deleteTableWorkflowData removes table workflow rows before parent table', 
   await repository.deleteTableWorkflowData(3);
 
   assert.deepEqual(calls, [
-    'kitchenTicketItem.deleteMany:{"ticketId":{"in":["ticket-a"]}}',
-    'kitchenTicket.deleteMany:{"id":{"in":["ticket-a"]}}',
     'payment.deleteMany:{"orderId":{"in":["order-a","order-b"]}}',
     'orderItem.deleteMany:{"orderId":{"in":["order-a","order-b"]}}',
     'order.deleteMany:{"id":{"in":["order-a","order-b"]}}',

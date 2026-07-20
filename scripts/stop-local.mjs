@@ -1,33 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readlinkSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { loadEnvFile } from './runtime-env.mjs';
 
 const appRoot = process.cwd();
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const content = readFileSync(filePath, 'utf8');
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf('=');
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
-    if (key && process.env[key] === undefined) {
-      process.env[key] = value;
-    }
-  }
-}
 
 function commandExists(command) {
   const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
@@ -118,8 +94,30 @@ function killPid(pid, signal) {
   }
 }
 
-function sleep(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function pidIsAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    if (process.platform !== 'win32') {
+      const state = execFileSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' }).trim();
+      if (state.startsWith('Z')) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForExit(pidsToWaitFor, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (pidsToWaitFor.every((pid) => !pidIsAlive(pid))) {
+      return [];
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  return pidsToWaitFor.filter(pidIsAlive);
 }
 
 loadEnvFile(resolve(process.cwd(), '.env'));
@@ -160,11 +158,25 @@ for (const pid of pids) {
   killPid(pid, 'SIGINT');
 }
 
-sleep(1500);
+let remainingPids = await waitForExit([...pids], 2500);
 
-for (const pid of pids) {
+for (const pid of remainingPids) {
   killPid(pid, 'SIGTERM');
 }
 
+remainingPids = await waitForExit(remainingPids, 2500);
+
+if (process.platform !== 'win32') {
+  for (const pid of remainingPids) {
+    killPid(pid, 'SIGKILL');
+  }
+  remainingPids = await waitForExit(remainingPids, 1000);
+}
+
+if (remainingPids.length > 0) {
+  console.error(`Could not stop application processes: ${remainingPids.join(', ')}`);
+  process.exit(1);
+}
+
 rmSync(pidFile, { force: true });
-console.log('Stop command sent.');
+console.log('Application processes stopped.');

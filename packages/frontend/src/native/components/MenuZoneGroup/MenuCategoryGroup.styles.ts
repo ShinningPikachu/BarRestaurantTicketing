@@ -89,5 +89,10 @@ export const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 17,
     color: colors.textSecondary
+  },
+  emptyText: {
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    paddingVertical: 12,
   }
 });

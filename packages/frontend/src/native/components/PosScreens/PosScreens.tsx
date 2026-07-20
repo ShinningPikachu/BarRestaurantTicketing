@@ -18,9 +18,10 @@ import {
 import { styles } from '../../app/App.styles';
 import { getItemDisplayName } from '../../helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from '../../helpers/kitchenTicketPrinter';
+import { getOrderLineIdentity } from '../../helpers/orderLineIdentity';
 import { MenuItem, Order, OrderItem, PaymentMethod, PreOrderItem, TableKitchenStatus, TABLE_ZONES, TableId, TableZone, tableZoneLabel } from '../../types';
 import { MenuCategoryGroup, translateCategory } from '../MenuZoneGroup/MenuCategoryGroup';
-import { OrderSection } from '../OrderZone/OrderSection';
+import { confirmDestructiveAction, OrderSection } from '../OrderZone/OrderSection';
 import { TableZoneGroup } from '../TableZoneGroup/TableZoneGroup';
 
 type MenuLayout = 'desktop' | 'mobile';
@@ -200,7 +201,7 @@ function getCombinedConfirmedLines(confirmedItems: ConfirmedItemRow[]): Array<{ 
 
   for (const confirmedItem of confirmedItems) {
     const unitPriceCents = confirmedItem.item.unitPriceCents ?? 0;
-    const key = `${confirmedItem.item.name.trim().toLowerCase()}|${unitPriceCents}`;
+    const key = getOrderLineIdentity({ ...confirmedItem.item, unitPriceCents });
     const existing = lineByKey.get(key);
     const totalPriceCents = unitPriceCents * confirmedItem.item.qty;
 
@@ -318,9 +319,9 @@ function MobileCartaPreorderSidebar({ orderProps }: { orderProps: PosScreenProps
         {orderProps.formatPrice(orderProps.preorderTotal)}
       </Text>
       <TouchableOpacity
-        style={[styles.mobileCartaSidebarSendButton, !hasItems && styles.mobileDisabledButton]}
-        onPress={orderProps.onConfirmOrder}
-        disabled={!hasItems}
+        style={[styles.mobileCartaSidebarSendButton, (!hasItems || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]}
+        onPress={() => void orderProps.onConfirmOrder()}
+        disabled={!hasItems || orderProps.isMutating || orderProps.paymentPending}
       >
         <Text style={styles.mobileCartaSidebarSendText}>Enviar</Text>
       </TouchableOpacity>
@@ -349,8 +350,9 @@ function MobileConfirmedItem({
       </View>
       <Text style={styles.mobileConfirmedQtyText}>{`x${item.qty}`}</Text>
       <TouchableOpacity
-        style={styles.mobileOrderSecondaryButton}
+        style={[styles.mobileOrderSecondaryButton, (orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]}
         onPress={() => orderProps.onMoveConfirmedItemToPreOrder(orderId, item)}
+        disabled={orderProps.isMutating || orderProps.paymentPending}
       >
         <Text style={styles.mobileOrderButtonText}>Editar</Text>
       </TouchableOpacity>
@@ -373,6 +375,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
   const customerTicketIssuedAt = new Date();
   const hasPreorder = orderProps.preorderItems.length > 0;
   const hasConfirmed = confirmedItems.length > 0;
+  const checkoutDisabled = !hasConfirmed || orderProps.isMutating || orderProps.paymentPending;
   const selectedAaItemCount = Object.values(aaQtyByKey).reduce((sum, qty) => sum + qty, 0);
   const selectedAaTotalCents = confirmedItems.reduce((sum, confirmedItem) => {
     const selectedQty = aaQtyByKey[confirmedItem.key] ?? 0;
@@ -480,24 +483,42 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
     return items;
   }
 
-  function handlePayAa(method: PaymentMethod): void {
+  async function handlePayAa(method: PaymentMethod): Promise<void> {
     const items = buildAaSelectedItems('registrar el pago AA');
     if (!items) {
       return;
     }
 
-    orderProps.onPaySelectedItems(method, items);
-    setAaQtyByKey({});
+    if (await orderProps.onPaySelectedItems(method, items)) {
+      setAaQtyByKey({});
+    }
   }
 
-  function handleRemoveSelectedAaItems(): void {
+  async function handleRemoveSelectedAaItems(): Promise<void> {
     const items = buildAaSelectedItems('eliminar productos');
     if (!items) {
       return;
     }
 
-    orderProps.onRemoveSelectedItems(items);
-    setAaQtyByKey({});
+    if (await orderProps.onRemoveSelectedItems(items)) {
+      setAaQtyByKey({});
+    }
+  }
+
+  function handleClearPreOrder(): void {
+    confirmDestructiveAction(
+      'Limpiar prepedido',
+      'Se eliminarán todos los productos pendientes de esta mesa.',
+      () => void orderProps.onClearPreOrder()
+    );
+  }
+
+  function confirmRemoveSelectedAaItems(): void {
+    confirmDestructiveAction(
+      'Quitar productos seleccionados',
+      `Se retirarán ${selectedAaItemCount} unidad(es) de pedidos confirmados.`,
+      () => void handleRemoveSelectedAaItems()
+    );
   }
 
   return (
@@ -530,16 +551,16 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
         <View style={styles.mobileStickyActions}>
           <TouchableOpacity
-            style={[styles.mobileOrderPrimaryButton, styles.flex1, !hasPreorder && styles.mobileDisabledButton]}
-            onPress={orderProps.onConfirmOrder}
-            disabled={!hasPreorder}
+            style={[styles.mobileOrderPrimaryButton, styles.flex1, (!hasPreorder || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]}
+            onPress={() => void orderProps.onConfirmOrder()}
+            disabled={!hasPreorder || orderProps.isMutating || orderProps.paymentPending}
           >
             <Text style={styles.mobileOrderPrimaryButtonText}>Enviar a cocina</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.flex1, !hasPreorder && styles.mobileDisabledButton]}
-            onPress={orderProps.onClearPreOrder}
-            disabled={!hasPreorder}
+            style={[styles.mobileOrderSecondaryButton, styles.flex1, (!hasPreorder || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]}
+            onPress={handleClearPreOrder}
+            disabled={!hasPreorder || orderProps.isMutating || orderProps.paymentPending}
           >
             <Text style={styles.mobileOrderButtonText}>Limpiar</Text>
           </TouchableOpacity>
@@ -567,28 +588,33 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
 
       <View style={styles.mobileCheckoutPanel}>
         <View style={styles.mobileCheckoutTotalField}>
-          <Text style={styles.mobileCheckoutTotalLabel}>Total</Text>
-          <Text style={styles.mobileOrderTotal}>{orderProps.formatPrice(orderProps.currentTableTotal)}</Text>
+          <Text style={styles.mobileCheckoutTotalLabel}>Total confirmado</Text>
+          <Text style={styles.mobileOrderTotal}>{orderProps.formatPrice(orderProps.confirmedTotal)}</Text>
+          {orderProps.preorderTotal > 0 ? (
+            <Text style={styles.mobileOrderItemPrice}>{`Pendiente sin incluir: ${orderProps.formatPrice(orderProps.preorderTotal)}`}</Text>
+          ) : null}
+          {orderProps.paymentPending ? <Text style={styles.mobileOrderItemPrice}>Registrando pago…</Text> : null}
+          {!orderProps.paymentPending && orderProps.isMutating ? <Text style={styles.mobileOrderItemPrice}>Guardando cambios…</Text> : null}
         </View>
         <View style={styles.mobileTicketActionsRow}>
           <TouchableOpacity
-            style={[styles.mobileOrderPrimaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderPrimaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
             onPress={() => orderProps.onPrintTicket()}
-            disabled={!hasConfirmed}
+            disabled={checkoutDisabled}
           >
             <Text style={styles.mobileOrderPrimaryButtonText}>Imprimir</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
             onPress={() => setIsCustomerTicketVisible(true)}
-            disabled={!hasConfirmed}
+            disabled={checkoutDisabled}
           >
             <Text style={styles.mobileOrderButtonText}>Ver ticket</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
             onPress={() => setIsAaModalVisible(true)}
-            disabled={!hasConfirmed}
+            disabled={checkoutDisabled}
           >
             <Text style={styles.mobileOrderButtonText}>AA</Text>
           </TouchableOpacity>
@@ -596,31 +622,31 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             <Text style={styles.mobileOrderButtonText}>Caja</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
-            onPress={() => orderProps.onPayTicket('cash')}
-            disabled={!hasConfirmed}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
+            onPress={() => void orderProps.onPayTicket('cash')}
+            disabled={checkoutDisabled}
           >
             <Text style={styles.mobileOrderButtonText}>Efectivo</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
-            onPress={() => orderProps.onPayTicket('card')}
-            disabled={!hasConfirmed}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
+            onPress={() => void orderProps.onPayTicket('card')}
+            disabled={checkoutDisabled}
           >
             <Text style={styles.mobileOrderButtonText}>Tarjeta</Text>
           </TouchableOpacity>
           <TextInput
-            style={[styles.smallNumberInput, styles.mobileSplitInput, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.smallNumberInput, styles.mobileSplitInput, checkoutDisabled && styles.mobileDisabledButton]}
             keyboardType="number-pad"
             value={splitPeopleText}
             onChangeText={setSplitPeopleText}
             placeholder="2"
-            editable={hasConfirmed}
+            editable={!checkoutDisabled}
           />
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, !hasConfirmed && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
             onPress={handlePrintDividedTicket}
-            disabled={!hasConfirmed}
+            disabled={checkoutDisabled}
           >
             <Text style={styles.mobileOrderButtonText}>Dividir</Text>
           </TouchableOpacity>
@@ -650,7 +676,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                 <Text style={styles.mobileCustomerTicketSmall}>{invoiceConfig.city}</Text>
                 <Text style={styles.mobileCustomerTicketSmall}>{`Tel. ${invoiceConfig.phone}`}</Text>
                 <View style={styles.mobileCustomerTicketDivider} />
-                <Text style={styles.mobileCustomerTicketTitle}>Factura simplificada</Text>
+                <Text style={styles.mobileCustomerTicketTitle}>Cuenta provisional · No fiscal</Text>
                 <View style={styles.mobileCustomerTicketMeta}>
                   <Text style={styles.mobileCustomerTicketSmall}>{`Mesa ${tableZoneLabel(orderProps.selectedTable.zone)}-${orderProps.selectedTable.number}`}</Text>
                   <Text style={styles.mobileCustomerTicketSmall}>
@@ -698,7 +724,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
                   <Text style={styles.mobileCheckoutTotalLabel}>Total IVA incluido</Text>
                   <Text style={styles.mobileCustomerTicketTotalAmount}>{orderProps.formatPrice(ticketTotalCents)}</Text>
                 </View>
-                <Text style={styles.mobileCustomerTicketFooter}>IVA incluido. Vista previa para cliente.</Text>
+                <Text style={styles.mobileCustomerTicketFooter}>Documento provisional. No es factura ni justificante de pago.</Text>
               </View>
             </ScrollView>
           </View>
@@ -767,18 +793,18 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.mobileOrderSecondaryButton, selectedAaItemCount === 0 ? styles.aaDisabledButton : null]}
-                onPress={handleRemoveSelectedAaItems}
-                disabled={selectedAaItemCount === 0}
+                onPress={confirmRemoveSelectedAaItems}
+                disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending}
               >
                 <Text style={styles.mobileOrderButtonText}>Quitar seleccionados</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.mobileOrderPrimaryButton} onPress={handlePrintAaTicket}>
+              <TouchableOpacity style={[styles.mobileOrderPrimaryButton, (selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]} onPress={handlePrintAaTicket} disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending}>
                 <Text style={styles.mobileOrderPrimaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => handlePayAa('cash')}>
-                <Text style={styles.mobileOrderButtonText}>Pagar efectivo</Text>
+              <TouchableOpacity style={[styles.mobileOrderSecondaryButton, (selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]} onPress={() => void handlePayAa('cash')} disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending}>
+                <Text style={styles.mobileOrderButtonText}>{orderProps.paymentPending ? 'Pagando…' : 'Pagar efectivo'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.mobileOrderSecondaryButton} onPress={() => handlePayAa('card')}>
+              <TouchableOpacity style={[styles.mobileOrderSecondaryButton, (selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]} onPress={() => void handlePayAa('card')} disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending}>
                 <Text style={styles.mobileOrderButtonText}>Pagar tarjeta</Text>
               </TouchableOpacity>
             </View>

@@ -45,6 +45,16 @@ if ! command -v npm >/dev/null 2>&1; then
   fail "npm is required. Install npm, then run this installer again."
 fi
 
+if ! node -e "const major = Number(process.argv[1].split('.')[0]); process.exit(major >= 10 ? 0 : 1)" "$(npm --version)"; then
+  fail "npm 10 or newer is required. Current version: $(npm --version)"
+fi
+
+RUNNING_MESSAGE="$(node scripts/is-running.mjs 2>&1)"
+RUNNING_STATUS=$?
+if [ "$RUNNING_STATUS" -eq 0 ] || [ "$RUNNING_STATUS" -eq 2 ]; then
+  fail "Stop BarRestaurantTicketing before installing or upgrading it. $RUNNING_MESSAGE"
+fi
+
 if command -v xdg-user-dir >/dev/null 2>&1; then
   DESKTOP_DIR="$(xdg-user-dir DESKTOP)"
 else
@@ -64,10 +74,10 @@ Version=1.0
 Type=Application
 Name=Start BarRestaurantTicketing
 Comment=Start the local BarRestaurantTicketing POS application
-Exec=$APP_DIR/Start_BarRestaurantTicketing.sh
-Path=$APP_DIR
+Exec="$APP_DIR/Start_BarRestaurantTicketing.sh"
+Path="$APP_DIR"
 Terminal=true
-Categories=Office;Utility;
+Categories=Office;
 DESKTOP
 
 cat > "$DESKTOP_DIR/Stop BarRestaurantTicketing.desktop" <<DESKTOP
@@ -76,10 +86,10 @@ Version=1.0
 Type=Application
 Name=Stop BarRestaurantTicketing
 Comment=Stop the local BarRestaurantTicketing POS application
-Exec=$APP_DIR/Stop_BarRestaurantTicketing.sh
-Path=$APP_DIR
+Exec="$APP_DIR/Stop_BarRestaurantTicketing.sh"
+Path="$APP_DIR"
 Terminal=true
-Categories=Office;Utility;
+Categories=Office;
 DESKTOP
 
 chmod +x \
@@ -93,21 +103,12 @@ if command -v gio >/dev/null 2>&1; then
   gio set "$DESKTOP_DIR/Stop BarRestaurantTicketing.desktop" metadata::trusted true >/dev/null 2>&1 || true
 fi
 
-echo "Installing exact application libraries from package-lock.json..."
-npm ci || fail "Library installation failed. Check the messages above."
-
-echo "Preparing Prisma client..."
-npm run -w backend prisma:generate || fail "Prisma setup failed. Check the messages above."
+node scripts/ensure-dependencies.mjs || fail "Library installation failed. Check the messages above."
 
 node scripts/ensure-runtime-env.mjs || fail "Runtime settings setup failed."
-
-if [ ! -f "$APP_DIR/packages/backend/prisma/dev.db" ]; then
-  echo "Creating local database..."
-  npm run -w backend prisma:migrate:dev || fail "Database setup failed. Check the messages above."
-  npm run -w backend seed || fail "Database seed failed. Check the messages above."
-else
-  echo "Local database already exists."
-fi
+npm run build:production || fail "Production build failed. The database was not migrated."
+node scripts/validate-production-env.mjs || fail "Production settings are incomplete or unsafe. Update the private .env file before migration."
+node scripts/prepare-database.mjs || fail "Database setup failed. The previous database was preserved or restored."
 
 echo
 echo "$APP_NAME is ready."

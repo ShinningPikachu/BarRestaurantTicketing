@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
-import prisma from '../../db';
+import prisma from '../../db.js';
 
 export interface PaidTicketLine {
   orderId: string;
@@ -59,42 +59,18 @@ export class WorkflowRepository {
 
   async markTableTicketPrinted(tableId: number, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
-    await db.$executeRaw`UPDATE "Table" SET "ticketPrintedAt" = ${new Date()} WHERE "id" = ${tableId}`;
-    return db.table.findUniqueOrThrow({ where: { id: tableId } });
+    return db.table.update({
+      where: { id: tableId },
+      data: { ticketPrintedAt: new Date() },
+    });
   }
 
   async clearTableTicketPrinted(tableId: number, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
-    await db.$executeRaw`UPDATE "Table" SET "ticketPrintedAt" = NULL WHERE "id" = ${tableId}`;
-    return db.table.findUniqueOrThrow({ where: { id: tableId } });
-  }
-
-  async getPrintedTicketTableIds(tableIds: number[], tx?: Prisma.TransactionClient): Promise<Set<number>> {
-    if (tableIds.length === 0) {
-      return new Set();
-    }
-
-    const db = tx ?? this.client;
-    const rows = await db.$queryRaw<Array<{ id: number }>>`
-      SELECT "id"
-      FROM "Table"
-      WHERE "ticketPrintedAt" IS NOT NULL
-        AND "id" IN (${Prisma.join(tableIds)})
-    `;
-
-    return new Set(rows.map((row) => row.id));
-  }
-
-  async hasTablePrintedTicket(tableId: number, tx?: Prisma.TransactionClient): Promise<boolean> {
-    const db = tx ?? this.client;
-    const rows = await db.$queryRaw<Array<{ ticketPrintedAt: Date | string | null }>>`
-      SELECT "ticketPrintedAt"
-      FROM "Table"
-      WHERE "id" = ${tableId}
-      LIMIT 1
-    `;
-
-    return Boolean(rows[0]?.ticketPrintedAt);
+    return db.table.update({
+      where: { id: tableId },
+      data: { ticketPrintedAt: null },
+    });
   }
 
   async getTableNumbersInZone(zone: string, tx?: Prisma.TransactionClient): Promise<number[]> {
@@ -118,21 +94,27 @@ export class WorkflowRepository {
     });
   }
 
+  async ensureFirstTableInZone(zone: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.table.upsert({
+      where: { number_zone: { number: 1, zone } },
+      create: { zone, number: 1 },
+      update: {},
+    });
+  }
+
   async countTablesInZone(zone: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
     return db.table.count({ where: { zone } });
   }
 
-  async countTableDependencies(tableId: number, tx?: Prisma.TransactionClient) {
+  async countTableFinancialDependencies(tableId: number, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
-
-    const [orders, preOrderSessions, kitchenTickets] = await Promise.all([
-      db.order.count({ where: { tableId } }),
-      db.preOrderSession.count({ where: { tableId } }),
-      db.kitchenTicket.count({ where: { tableId } }),
+    const [payments, paidOrders] = await Promise.all([
+      db.payment.count({ where: { order: { tableId } } }),
+      db.order.count({ where: { tableId, status: 'paid' } }),
     ]);
-
-    return { orders, preOrderSessions, kitchenTickets };
+    return { payments, paidOrders };
   }
 
   async deleteTable(tableId: number, tx?: Prisma.TransactionClient) {
@@ -143,22 +125,13 @@ export class WorkflowRepository {
   async deleteTableWorkflowData(tableId: number, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
 
-    const [orders, preOrderSessions, kitchenTickets] = await Promise.all([
+    const [orders, preOrderSessions] = await Promise.all([
       db.order.findMany({ where: { tableId }, select: { id: true } }),
       db.preOrderSession.findMany({ where: { tableId }, select: { id: true } }),
-      db.kitchenTicket.findMany({ where: { tableId }, select: { id: true } }),
     ]);
 
     const orderIds = orders.map((order) => order.id);
     const preOrderSessionIds = preOrderSessions.map((session) => session.id);
-    const kitchenTicketIds = kitchenTickets.map((ticket) => ticket.id);
-
-    if (kitchenTicketIds.length > 0) {
-      await db.kitchenTicketItem.deleteMany({
-        where: { ticketId: { in: kitchenTicketIds } },
-      });
-      await db.kitchenTicket.deleteMany({ where: { id: { in: kitchenTicketIds } } });
-    }
 
     if (orderIds.length > 0) {
       await db.payment.deleteMany({ where: { orderId: { in: orderIds } } });
@@ -252,12 +225,10 @@ export class WorkflowRepository {
     return db.preOrderItem.deleteMany({ where: { sessionId } });
   }
 
-  async markSessionAsSent(sessionId: string, tx?: Prisma.TransactionClient) {
+  async deleteDraftSession(sessionId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
-    return db.preOrderSession.update({
-      where: { id: sessionId },
-      data: { status: 'sent' }
-    });
+    await db.preOrderItem.deleteMany({ where: { sessionId } });
+    return db.preOrderSession.delete({ where: { id: sessionId } });
   }
 
   async getOrdersForTable(tableId: number, tx?: Prisma.TransactionClient) {
@@ -272,14 +243,49 @@ export class WorkflowRepository {
     });
   }
 
-  async countPaidTickets(tx?: Prisma.TransactionClient) {
+  async allocateTicketSequence(series: string, tx?: Prisma.TransactionClient): Promise<number> {
     const db = tx ?? this.client;
-    return db.paidTicket.count();
+    const sequence = await db.ticketSequence.upsert({
+      where: { series },
+      create: { series, value: 1 },
+      update: { value: { increment: 1 } },
+      select: { value: true },
+    });
+    return sequence.value;
+  }
+
+  async getPaidTicketByIdempotencyKey(idempotencyKey: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.paidTicket.findUnique({
+      where: { idempotencyKey },
+      include: { items: true },
+    });
+  }
+
+  async getMutationReceipt(idempotencyKey: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.client;
+    return db.mutationReceipt.findUnique({ where: { idempotencyKey } });
+  }
+
+  async createMutationReceipt(
+    payload: {
+      idempotencyKey: string;
+      fingerprint: string;
+      operation: string;
+      tableNumber: number;
+      tableZone: string;
+    },
+    tx?: Prisma.TransactionClient
+  ) {
+    const db = tx ?? this.client;
+    return db.mutationReceipt.create({ data: payload });
   }
 
   async createPaidTicket(
     payload: {
       ticketNumber: string;
+      idempotencyKey: string;
+      idempotencyFingerprint: string;
       mode: string;
       method: string;
       tableNumber: number;
@@ -325,9 +331,11 @@ export class WorkflowRepository {
       auditMetadata: payload.auditMetadata ?? null,
     };
 
-    const paidTicket = await db.paidTicket.create({
+    return db.paidTicket.create({
       data: {
         ticketNumber: payload.ticketNumber,
+        idempotencyKey: payload.idempotencyKey,
+        idempotencyFingerprint: payload.idempotencyFingerprint,
         mode: payload.mode,
         method: payload.method,
         tableNumber: payload.tableNumber,
@@ -337,6 +345,7 @@ export class WorkflowRepository {
         vatCents: payload.vatCents,
         vatRatePercent: payload.vatRatePercent,
         splitPeople: payload.splitPeople ?? null,
+        ...snapshot,
         items: {
           create: payload.items.map((item) => ({
             orderId: item.orderId,
@@ -353,31 +362,6 @@ export class WorkflowRepository {
       },
       include: { items: true },
     });
-
-    await db.$executeRaw`
-      UPDATE "PaidTicket"
-      SET
-        "businessName" = ${snapshot.businessName},
-        "tradeName" = ${snapshot.tradeName},
-        "businessTaxId" = ${snapshot.businessTaxId},
-        "businessAddress" = ${snapshot.businessAddress},
-        "businessCity" = ${snapshot.businessCity},
-        "businessPhone" = ${snapshot.businessPhone},
-        "terminalId" = ${snapshot.terminalId},
-        "cashierName" = ${snapshot.cashierName},
-        "customerName" = ${snapshot.customerName},
-        "customerTaxId" = ${snapshot.customerTaxId},
-        "status" = ${snapshot.status},
-        "relatedTicketNumber" = ${snapshot.relatedTicketNumber},
-        "pdfFileReference" = ${snapshot.pdfFileReference},
-        "auditMetadata" = ${snapshot.auditMetadata}
-      WHERE "id" = ${paidTicket.id}
-    `;
-
-    return {
-      ...paidTicket,
-      ...snapshot,
-    };
   }
 
   async createPayment(orderId: string, amountCents: number, method: string, tx?: Prisma.TransactionClient) {
@@ -405,7 +389,6 @@ export class WorkflowRepository {
 
   async createOrderFromPreOrder(
     tableId: number,
-    sessionId: string,
     items: Array<{ menuItemId: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number }>,
     tx?: Prisma.TransactionClient
   ) {
@@ -430,34 +413,6 @@ export class WorkflowRepository {
         }
       },
       include: { items: true, table: true }
-    });
-  }
-
-  async createKitchenTicket(
-    orderId: string,
-    tableId: number,
-    items: Array<{ menuItemId: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number }>,
-    tx?: Prisma.TransactionClient
-  ) {
-    const db = tx ?? this.client;
-
-    return db.kitchenTicket.create({
-      data: {
-        orderId,
-        tableId,
-        status: 'queued',
-        items: {
-          create: items.map((item) => ({
-            menuItemId: item.menuItemId,
-            name: item.name,
-            primaryName: item.primaryName ?? null,
-            secondaryName: item.secondaryName ?? null,
-            qty: item.qty,
-            unitPriceCents: item.unitPriceCents,
-            totalPriceCents: item.qty * item.unitPriceCents
-          }))
-        }
-      }
     });
   }
 
@@ -500,6 +455,11 @@ export class WorkflowRepository {
     });
   }
 
+  async countPaymentsForOrder(orderId: string, tx?: Prisma.TransactionClient): Promise<number> {
+    const db = tx ?? this.client;
+    return db.payment.count({ where: { orderId } });
+  }
+
   async deleteOrderItem(orderItemId: number, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
     return db.orderItem.delete({ where: { id: orderItemId } });
@@ -522,19 +482,6 @@ export class WorkflowRepository {
   async deleteOrder(orderId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.client;
 
-    const tickets = await db.kitchenTicket.findMany({
-      where: { orderId },
-      select: { id: true },
-    });
-
-    const ticketIds = tickets.map((ticket) => ticket.id);
-    if (ticketIds.length > 0) {
-      await db.kitchenTicketItem.deleteMany({
-        where: { ticketId: { in: ticketIds } },
-      });
-    }
-
-    await db.kitchenTicket.deleteMany({ where: { orderId } });
     await db.payment.deleteMany({ where: { orderId } });
     await db.orderItem.deleteMany({ where: { orderId } });
 
@@ -565,9 +512,6 @@ export class WorkflowRepository {
     });
   }
 
-  async getAllOrders() {
-    return this.client.order.findMany({ include: { items: true, table: true } });
-  }
 }
 
 export const workflowRepository = new WorkflowRepository();

@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Start BarRestaurantTicketing
-Comment=Start the local BarRestaurantTicketing POS application
-Exec=/home/jinhenglin/Documents/BarRestaurantTicketing/Start_BarRestaurantTicketing.sh
-Path=/home/jinhenglin/Documents/BarRestaurantTicketing
-Terminal=true
-Categories=Office;Utility;

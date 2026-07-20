@@ -1,6 +1,6 @@
 import { Router, NextFunction, Request, Response } from 'express';
-import prisma from '../db';
-import { successResponse } from '../types/api';
+import prisma from '../db.js';
+import { successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();

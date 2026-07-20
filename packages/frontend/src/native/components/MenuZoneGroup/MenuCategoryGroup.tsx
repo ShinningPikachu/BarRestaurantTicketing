@@ -38,11 +38,6 @@ export function MenuCategoryGroup({
   layout = 'desktop'
 }: MenuCategoryGroupProps): React.JSX.Element {
   const [itemsWidth, setItemsWidth] = useState(0);
-
-  if (items.length === 0) {
-    return <></>;
-  }
-
   const isMobile = layout === 'mobile';
   const desktopItemWidth = useMemo(() => {
     if (isMobile || itemsWidth <= 0) {
@@ -56,6 +51,10 @@ export function MenuCategoryGroup({
 
     return Math.floor((itemsWidth - DESKTOP_ITEM_GAP * (columnCount - 1)) / columnCount);
   }, [isMobile, itemsWidth]);
+
+  if (items.length === 0) {
+    return <Text style={styles.emptyText}>No se encontraron productos.</Text>;
+  }
 
   function handleItemsLayout(event: LayoutChangeEvent): void {
     setItemsWidth(event.nativeEvent.layout.width);

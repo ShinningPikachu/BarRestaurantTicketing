@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, Platform, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SelectedTable } from '../../app/app.types';
 import { styles } from '../../app/App.styles';
 import { getItemDisplayName } from '../../helpers/itemDisplayName';
@@ -11,7 +11,10 @@ interface OrderSectionProps {
   tableOrders: Order[];
   menuByCategory: Map<string, MenuItem[]>;
   preorderTotal: number;
+  confirmedTotal: number;
   currentTableTotal: number;
+  isMutating: boolean;
+  paymentPending: boolean;
   priceDraftByItemId: Record<number, string>;
   getMenuTitleById: (menuByCategory: Map<string, MenuItem[]>, menuId: number) => string;
   formatPrice: (cents: number) => string;
@@ -20,12 +23,12 @@ interface OrderSectionProps {
   onUpdatePriceDraft: (itemId: number, value: string) => void;
   onCommitPriceDraft: (itemId: number) => void;
   onAdjustItemPrice: (itemId: number, deltaCents: number) => void;
-  onConfirmOrder: () => void;
-  onClearPreOrder: () => void;
+  onConfirmOrder: () => Promise<boolean>;
+  onClearPreOrder: () => Promise<boolean>;
   onPrintTicket: (options?: { confirmedOrders?: Order[]; splitPeople?: number; ticketNote?: string }) => void;
-  onPayTicket: (method: PaymentMethod, splitPeople?: number) => void;
-  onPaySelectedItems: (method: PaymentMethod, items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
-  onRemoveSelectedItems: (items: Array<{ orderId: string; itemId: number; qty: number }>) => void;
+  onPayTicket: (method: PaymentMethod, splitPeople?: number) => Promise<boolean>;
+  onPaySelectedItems: (method: PaymentMethod, items: Array<{ orderId: string; itemId: number; qty: number }>) => Promise<boolean>;
+  onRemoveSelectedItems: (items: Array<{ orderId: string; itemId: number; qty: number }>) => Promise<boolean>;
   onMoveConfirmedItemToPreOrder: (orderId: string, item: OrderItem) => void;
   onOpenCashDrawer: () => void;
 }
@@ -44,13 +47,31 @@ const PRICE_ADJUSTMENTS = [
   { label: '-0.50', deltaCents: -50 }
 ];
 
+export function confirmDestructiveAction(title: string, message: string, onConfirm: () => void): void {
+  if (Platform.OS === 'web') {
+    const webConfirm = (globalThis as typeof globalThis & { confirm?: (prompt: string) => boolean }).confirm;
+    if (webConfirm?.(message)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: 'Confirmar', style: 'destructive', onPress: onConfirm },
+  ]);
+}
+
 export function OrderSection({
   selectedTable,
   preorderItems,
   tableOrders,
   menuByCategory,
   preorderTotal,
+  confirmedTotal,
   currentTableTotal,
+  isMutating,
+  paymentPending,
   priceDraftByItemId,
   getMenuTitleById,
   formatPrice,
@@ -95,6 +116,8 @@ export function OrderSection({
     }, 0),
     [aaQtyByKey, confirmedItems]
   );
+  const hasConfirmedItems = confirmedItems.length > 0;
+  const checkoutDisabled = !hasConfirmedItems || isMutating || paymentPending;
 
   function setAaQty(key: string, nextQty: number, maxQty: number): void {
     setAaQtyByKey((current) => {
@@ -203,24 +226,26 @@ export function OrderSection({
     return items;
   }
 
-  function handlePayAa(method: PaymentMethod): void {
+  async function handlePayAa(method: PaymentMethod): Promise<void> {
     const items = buildAaSelectedItems('registrar el pago AA');
     if (!items) {
       return;
     }
 
-    onPaySelectedItems(method, items);
-    setAaQtyByKey({});
+    if (await onPaySelectedItems(method, items)) {
+      setAaQtyByKey({});
+    }
   }
 
-  function handleRemoveSelectedAaItems(): void {
+  async function handleRemoveSelectedAaItems(): Promise<void> {
     const items = buildAaSelectedItems('eliminar productos');
     if (!items) {
       return;
     }
 
-    onRemoveSelectedItems(items);
-    setAaQtyByKey({});
+    if (await onRemoveSelectedItems(items)) {
+      setAaQtyByKey({});
+    }
   }
 
   function handleRemoveConfirmedItem(item: ConfirmedItemRow): void {
@@ -229,11 +254,33 @@ export function OrderSection({
       return;
     }
 
-    onRemoveSelectedItems([{
-      orderId: item.orderId,
-      itemId: item.item.id,
-      qty: item.item.qty,
-    }]);
+    confirmDestructiveAction(
+      'Eliminar producto confirmado',
+      `Se retirarán ${item.item.qty} unidad(es) de "${item.item.name}".`,
+      () => {
+        void onRemoveSelectedItems([{
+          orderId: item.orderId,
+          itemId: item.item.id!,
+          qty: item.item.qty,
+        }]);
+      }
+    );
+  }
+
+  function handleClearPreOrder(): void {
+    confirmDestructiveAction(
+      'Limpiar prepedido',
+      'Se eliminarán todos los productos pendientes de esta mesa.',
+      () => void onClearPreOrder()
+    );
+  }
+
+  function confirmRemoveSelectedAaItems(): void {
+    confirmDestructiveAction(
+      'Quitar productos seleccionados',
+      `Se retirarán ${selectedAaItemCount} unidad(es) de pedidos confirmados.`,
+      () => void handleRemoveSelectedAaItems()
+    );
   }
 
   return (
@@ -309,10 +356,10 @@ export function OrderSection({
           <View style={styles.orderColumnFooter}>
             <Text style={styles.totalText}>{`Por enviar: ${formatPrice(preorderTotal)}`}</Text>
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.primaryButton} onPress={onConfirmOrder}>
-                <Text style={styles.primaryButtonText}>Enviar a cocina</Text>
+              <TouchableOpacity style={[styles.primaryButton, (preorderItems.length === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => void onConfirmOrder()} disabled={preorderItems.length === 0 || isMutating || paymentPending}>
+                <Text style={styles.primaryButtonText}>{isMutating ? 'Guardando…' : 'Enviar a cocina'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={onClearPreOrder}>
+              <TouchableOpacity style={[styles.secondaryButton, (preorderItems.length === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={handleClearPreOrder} disabled={preorderItems.length === 0 || isMutating || paymentPending}>
                 <Text style={styles.secondaryButtonText}>Limpiar</Text>
               </TouchableOpacity>
             </View>
@@ -344,10 +391,10 @@ export function OrderSection({
                   <Text style={styles.confirmedQtyText}>{`x${item.item.qty}`}</Text>
 
                   <View style={styles.actionsRow}>
-                    <TouchableOpacity style={styles.primaryButton} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)}>
+                    <TouchableOpacity style={[styles.primaryButton, (isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)} disabled={isMutating || paymentPending}>
                       <Text style={styles.primaryButtonText}>Editar</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={() => handleRemoveConfirmedItem(item)}>
+                    <TouchableOpacity style={[styles.secondaryButton, (isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => handleRemoveConfirmedItem(item)} disabled={isMutating || paymentPending}>
                       <Text style={styles.secondaryButtonText}>Eliminar</Text>
                     </TouchableOpacity>
                   </View>
@@ -360,20 +407,29 @@ export function OrderSection({
 
       <View style={styles.checkoutPanel}>
         <View style={styles.checkoutTotalField}>
-          <Text style={styles.checkoutTotalLabel}>Total de productos</Text>
-          <Text style={styles.checkoutTotalAmount}>{formatPrice(currentTableTotal)}</Text>
+          <Text style={styles.checkoutTotalLabel}>Total confirmado</Text>
+          <Text style={styles.checkoutTotalAmount}>{formatPrice(confirmedTotal)}</Text>
+          {preorderTotal > 0 ? (
+            <Text style={styles.helperText}>{`Pendiente sin incluir: ${formatPrice(preorderTotal)} · Cuenta completa: ${formatPrice(currentTableTotal)}`}</Text>
+          ) : null}
+          {paymentPending ? <Text style={styles.helperText}>Registrando pago…</Text> : null}
+          {!paymentPending && isMutating ? <Text style={styles.helperText}>Guardando cambios…</Text> : null}
         </View>
         <View style={styles.checkoutActions}>
-          <TouchableOpacity style={styles.desktopCheckoutPrimaryButton} onPress={() => onPrintTicket()}>
+          <TouchableOpacity
+            style={[styles.desktopCheckoutPrimaryButton, checkoutDisabled && styles.aaDisabledButton]}
+            onPress={() => onPrintTicket()}
+            disabled={checkoutDisabled}
+          >
             <Text style={styles.desktopCheckoutPrimaryButtonText}>Imprimir ticket</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={handleOpenAaModal}>
+          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, checkoutDisabled && styles.aaDisabledButton]} onPress={handleOpenAaModal} disabled={checkoutDisabled}>
             <Text style={styles.desktopCheckoutSecondaryButtonText}>AA</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={() => onPayTicket('cash')}>
-            <Text style={styles.desktopCheckoutSecondaryButtonText}>Pagar efectivo</Text>
+          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, checkoutDisabled && styles.aaDisabledButton]} onPress={() => void onPayTicket('cash')} disabled={checkoutDisabled}>
+            <Text style={styles.desktopCheckoutSecondaryButtonText}>{paymentPending ? 'Pagando…' : 'Pagar efectivo'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={() => onPayTicket('card')}>
+          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, checkoutDisabled && styles.aaDisabledButton]} onPress={() => void onPayTicket('card')} disabled={checkoutDisabled}>
             <Text style={styles.desktopCheckoutSecondaryButtonText}>Pagar tarjeta</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={onOpenCashDrawer}>
@@ -389,7 +445,7 @@ export function OrderSection({
             onChangeText={setSplitPeopleText}
             placeholder="2"
           />
-          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={handlePrintDividedTicket}>
+          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, checkoutDisabled && styles.aaDisabledButton]} onPress={handlePrintDividedTicket} disabled={checkoutDisabled}>
             <Text style={styles.desktopCheckoutSecondaryButtonText}>Imprimir dividido</Text>
           </TouchableOpacity>
         </View>
@@ -459,18 +515,18 @@ export function OrderSection({
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.secondaryButton, selectedAaItemCount === 0 ? styles.aaDisabledButton : null]}
-                onPress={handleRemoveSelectedAaItems}
-                disabled={selectedAaItemCount === 0}
+                onPress={confirmRemoveSelectedAaItems}
+                disabled={selectedAaItemCount === 0 || isMutating || paymentPending}
               >
                 <Text style={styles.secondaryButtonText}>Quitar seleccionados</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButton} onPress={handlePrintAaTicket}>
+              <TouchableOpacity style={[styles.primaryButton, (selectedAaItemCount === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={handlePrintAaTicket} disabled={selectedAaItemCount === 0 || isMutating || paymentPending}>
                 <Text style={styles.primaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => handlePayAa('cash')}>
-                <Text style={styles.secondaryButtonText}>Pagar efectivo</Text>
+              <TouchableOpacity style={[styles.secondaryButton, (selectedAaItemCount === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => void handlePayAa('cash')} disabled={selectedAaItemCount === 0 || isMutating || paymentPending}>
+                <Text style={styles.secondaryButtonText}>{paymentPending ? 'Pagando…' : 'Pagar efectivo'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => handlePayAa('card')}>
+              <TouchableOpacity style={[styles.secondaryButton, (selectedAaItemCount === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => void handlePayAa('card')} disabled={selectedAaItemCount === 0 || isMutating || paymentPending}>
                 <Text style={styles.secondaryButtonText}>Pagar tarjeta</Text>
               </TouchableOpacity>
             </View>

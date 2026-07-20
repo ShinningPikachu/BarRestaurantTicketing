@@ -1,32 +1,24 @@
-import prisma from '../db';
-
-interface MenuImportItem {
-  name: string;
-  primaryName?: string | null;
-  secondaryName?: string | null;
-  priceCents: number;
-  costCents?: number | null;
-  category: string;
-  sku?: string | null;
-  description?: string | null;
-  available?: boolean;
-}
+import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
+import { MenuImportItem } from './menu-import.js';
 
 export class MenuService {
+  constructor(private readonly client: PrismaClient = prisma) {}
+
   async getAllMenuItems() {
-    return prisma.menuItem.findMany({ where: { available: true } });
+    return this.client.menuItem.findMany({ where: { available: true } });
   }
 
   async getAllMenuItemsForManagement() {
-    return prisma.menuItem.findMany({ orderBy: [{ category: 'asc' }, { name: 'asc' }] });
+    return this.client.menuItem.findMany({ orderBy: [{ category: 'asc' }, { name: 'asc' }] });
   }
 
   async getMenuItemById(id: number) {
-    return prisma.menuItem.findUnique({ where: { id } });
+    return this.client.menuItem.findUnique({ where: { id } });
   }
 
   async getMenuItemsByCategory(category: string) {
-    return prisma.menuItem.findMany({
+    return this.client.menuItem.findMany({
       where: { category, available: true }
     });
   }
@@ -43,7 +35,7 @@ export class MenuService {
     imageDataUrl?: string | null;
     available?: boolean;
   }) {
-    return prisma.menuItem.create({
+    return this.client.menuItem.create({
       data: {
         name: payload.name,
         primaryName: payload.primaryName || null,
@@ -71,55 +63,57 @@ export class MenuService {
     imageDataUrl?: string | null;
     available?: boolean;
   }) {
-    return prisma.menuItem.update({
+    return this.client.menuItem.update({
       where: { id },
       data: payload
     });
   }
 
   async deleteMenuItem(id: number) {
-    return prisma.$transaction(async (tx) => {
+    return this.client.$transaction(async (tx) => {
       const linkFilter = { menuItemId: id };
       const unlinkData = { menuItemId: null };
 
       await tx.orderItem.updateMany({ where: linkFilter, data: unlinkData });
       await tx.preOrderItem.updateMany({ where: linkFilter, data: unlinkData });
-      await tx.kitchenTicketItem.updateMany({ where: linkFilter, data: unlinkData });
 
       return tx.menuItem.delete({ where: { id } });
     });
   }
 
   async importMenuItems(items: MenuImportItem[]) {
-    let created = 0;
-    let updated = 0;
+    return this.client.$transaction(async (tx) => {
+      let created = 0;
+      let updated = 0;
 
-    for (const item of items) {
-      const data = {
-        name: item.name,
-        primaryName: item.primaryName || null,
-        secondaryName: item.secondaryName || null,
-        priceCents: item.priceCents,
-        costCents: item.costCents ?? null,
-        category: item.category,
-        sku: item.sku || null,
-        description: item.description || null,
-        available: item.available ?? true,
-      };
-      const existing = item.sku
-        ? await prisma.menuItem.findFirst({ where: { sku: item.sku } })
-        : await prisma.menuItem.findFirst({ where: { name: item.name, category: item.category } });
+      for (const item of items) {
+        const data = {
+          name: item.name,
+          primaryName: item.primaryName || null,
+          secondaryName: item.secondaryName || null,
+          priceCents: item.priceCents,
+          costCents: item.costCents ?? null,
+          category: item.category,
+          sku: item.sku || null,
+          description: item.description || null,
+          imageDataUrl: item.imageDataUrl || null,
+          available: item.available ?? true,
+        };
+        const existing = item.sku
+          ? await tx.menuItem.findFirst({ where: { sku: item.sku } })
+          : await tx.menuItem.findFirst({ where: { name: item.name, category: item.category } });
 
-      if (existing) {
-        await prisma.menuItem.update({ where: { id: existing.id }, data });
-        updated += 1;
-      } else {
-        await prisma.menuItem.create({ data });
-        created += 1;
+        if (existing) {
+          await tx.menuItem.update({ where: { id: existing.id }, data });
+          updated += 1;
+        } else {
+          await tx.menuItem.create({ data });
+          created += 1;
+        }
       }
-    }
 
-    return { created, updated, total: items.length };
+      return { created, updated, total: items.length };
+    }, { timeout: 30_000 });
   }
 }
 

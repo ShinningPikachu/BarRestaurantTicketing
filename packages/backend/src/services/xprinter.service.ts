@@ -51,6 +51,7 @@ export interface XprinterTicketPayload {
   ticketNote?: string | null;
   splitPeople?: number | null;
   openCashDrawer?: boolean | null;
+  fiscal?: boolean;
 }
 
 export class PrinterTransportError extends Error {
@@ -154,11 +155,11 @@ function buildEscPosTicket(payload: XprinterTicketPayload): Buffer {
   push([0x1b, 0x61, 0x01]);
   push([0x1d, 0x21, 0x01]); // Double height
   push([0x1b, 0x45, 0x01]);
-  push('FACTURA SIMPLIFICADA');
+  push(payload.fiscal ? 'FACTURA SIMPLIFICADA' : 'PRECUENTA - NO FISCAL');
   push([0x1d, 0x21, 0x00]);
   push([0x1b, 0x45, 0x00]);
   push([0x1b, 0x61, 0x00]);
-  push(line('TICKET', payload.invoiceNumber));
+  push(line(payload.fiscal ? 'TICKET' : 'REFERENCIA', payload.invoiceNumber));
   push(line('FECHA', payload.issuedAt));
   push(line('MESA', payload.tableLabel));
   if (payload.ticketNote) push(line('Modalidad', payload.ticketNote));
@@ -214,9 +215,9 @@ function buildOpenDrawerCommand(): Buffer {
   ]);
 }
 
-function writeToPrinter(buffer: Buffer, host: string, port: number): Promise<void> {
+function writeToPrinter(buffer: Buffer, host: string, port: number, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection({ host, port, timeout: 5000 }, () => {
+    const socket = net.createConnection({ host, port }, () => {
       socket.write(buffer, (error) => {
         if (error) {
           socket.destroy(error);
@@ -225,109 +226,123 @@ function writeToPrinter(buffer: Buffer, host: string, port: number): Promise<voi
         socket.end();
       });
     });
+    socket.setTimeout(timeoutMs);
 
     socket.once('close', (hadError) => {
       if (!hadError) resolve();
     });
     socket.once('timeout', () => {
-      socket.destroy(new Error('Printer connection timed out'));
+      socket.destroy(new PrinterTransportError('Printer connection timed out', 'PRINTER_TIMEOUT'));
     });
-    socket.once('error', reject);
+    socket.once('error', (error) => {
+      reject(error instanceof PrinterTransportError ? error : new PrinterTransportError(error.message));
+    });
   });
 }
 
-function writeToSystemPrinter(buffer: Buffer, printerName: string): Promise<void> {
+function writeToSystemPrinter(buffer: Buffer, printerName: string, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = ['-d', printerName, '-o', 'raw'];
     const child = spawn('lp', args);
     let stderr = '';
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      callback();
+    };
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(() => reject(new PrinterTransportError('Printer command timed out', 'PRINTER_TIMEOUT')));
+    }, timeoutMs);
 
     child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
+      if (stderr.length < 8_192) stderr += String(chunk).slice(0, 8_192 - stderr.length);
     });
     child.once('error', (error) => {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        reject(new PrinterTransportError('The CUPS lp command is not available on this machine.', 'PRINTER_COMMAND_UNAVAILABLE'));
+        finish(() => reject(new PrinterTransportError('The CUPS lp command is not available on this machine.', 'PRINTER_COMMAND_UNAVAILABLE')));
         return;
       }
-      reject(error);
+      finish(() => reject(new PrinterTransportError(error.message)));
     });
     child.once('close', (code) => {
       if (code === 0) {
-        resolve();
+        finish(resolve);
       } else {
         const lpError = stderr.trim() || `lp exited with code ${code}`;
         if (/printer or class does not exist/i.test(lpError)) {
-          reject(new PrinterTransportError(
+          finish(() => reject(new PrinterTransportError(
             `The configured system printer "${printerName}" does not exist. Install it in CUPS or configure XPRINTER_HOST/XPRINTER_USB_DEVICE instead.`,
             'PRINTER_NOT_FOUND'
-          ));
+          )));
           return;
         }
-        reject(new PrinterTransportError(lpError));
+        finish(() => reject(new PrinterTransportError(lpError)));
       }
     });
+    child.stdin.once('error', (error) => finish(() => reject(new PrinterTransportError(error.message))));
 
     child.stdin.end(buffer);
   });
 }
 
 async function writeToUsbDevice(buffer: Buffer, usbDevice: string): Promise<void> {
-  await writeFile(usbDevice, buffer);
+  try {
+    await writeFile(usbDevice, buffer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'USB printer write failed';
+    throw new PrinterTransportError(message);
+  }
 }
 
 export class XprinterService {
-  async printTicket(
-    payload: XprinterTicketPayload,
-    options?: { host?: string; port?: number; printerName?: string; usbDevice?: string }
-  ): Promise<void> {
-    const openCashDrawer = payload.openCashDrawer ?? config.xprinter.openDrawer;
-    const ticketPayload = { ...payload, openCashDrawer };
-    const printerName = options?.printerName || config.xprinter.printerName;
-    const usbDevice = options?.usbDevice || config.xprinter.usbDevice;
-    const host = options?.host || config.xprinter.host;
-    const port = options?.port || config.xprinter.port;
-    const ticketBuffer = buildEscPosTicket(ticketPayload);
+  private queueTail: Promise<void> = Promise.resolve();
+  private queuedJobs = 0;
 
-    if (printerName) {
-      await writeToSystemPrinter(ticketBuffer, printerName);
-      return;
+  private enqueue(job: () => Promise<void>): Promise<void> {
+    if (this.queuedJobs >= 50) {
+      return Promise.reject(new PrinterTransportError('Printer queue is full', 'PRINTER_BUSY'));
     }
-
-    if (usbDevice) {
-      await writeToUsbDevice(ticketBuffer, usbDevice);
-      return;
-    }
-
-    if (!host) {
-      throw new Error('Configure XPRINTER_PRINTER_NAME, XPRINTER_USB_DEVICE, or XPRINTER_HOST');
-    }
-
-    await writeToPrinter(ticketBuffer, host, port);
+    this.queuedJobs += 1;
+    const result = this.queueTail.then(job, job);
+    this.queueTail = result.catch(() => undefined);
+    return result.finally(() => {
+      this.queuedJobs -= 1;
+    });
   }
 
-  async openCashDrawer(options?: { host?: string; port?: number; printerName?: string; usbDevice?: string }): Promise<void> {
-    const printerName = options?.printerName || config.xprinter.printerName;
-    const usbDevice = options?.usbDevice || config.xprinter.usbDevice;
-    const host = options?.host || config.xprinter.host;
-    const port = options?.port || config.xprinter.port;
-    const drawerBuffer = buildOpenDrawerCommand();
-
+  private async writeConfiguredTarget(buffer: Buffer): Promise<void> {
+    const { printerName, usbDevice, host, port, timeoutMs } = config.xprinter;
     if (printerName) {
-      await writeToSystemPrinter(drawerBuffer, printerName);
+      await writeToSystemPrinter(buffer, printerName, timeoutMs);
       return;
     }
-
     if (usbDevice) {
-      await writeToUsbDevice(drawerBuffer, usbDevice);
+      await writeToUsbDevice(buffer, usbDevice);
       return;
     }
-
-    if (!host) {
-      throw new Error('Configure XPRINTER_PRINTER_NAME, XPRINTER_USB_DEVICE, or XPRINTER_HOST');
+    if (host) {
+      await writeToPrinter(buffer, host, port, timeoutMs);
+      return;
     }
+    throw new PrinterTransportError(
+      'Configure XPRINTER_PRINTER_NAME, XPRINTER_USB_DEVICE, or XPRINTER_HOST',
+      'PRINTER_NOT_CONFIGURED'
+    );
+  }
 
-    await writeToPrinter(drawerBuffer, host, port);
+  async printTicket(payload: XprinterTicketPayload): Promise<void> {
+    const openCashDrawer = payload.openCashDrawer === true;
+    const ticketPayload = { ...payload, openCashDrawer };
+    const ticketBuffer = buildEscPosTicket(ticketPayload);
+    await this.enqueue(() => this.writeConfiguredTarget(ticketBuffer));
+  }
+
+  async openCashDrawer(): Promise<void> {
+    const drawerBuffer = buildOpenDrawerCommand();
+    await this.enqueue(() => this.writeConfiguredTarget(drawerBuffer));
   }
 }
 

@@ -1,10 +1,44 @@
-import { ApiError } from '../../middleware/errorHandler';
-import { config } from '../../config';
-import { PaidTicketLine, workflowRepository } from './workflow.repository';
+import { createHash } from 'node:crypto';
+import { Prisma } from '@prisma/client';
+import { config } from '../../config/index.js';
+import { ApiError } from '../../middleware/errorHandler.js';
+import { PaidTicketLine, workflowRepository } from './workflow.repository.js';
 
 const VALID_TABLE_ZONES = new Set(['outside', 'floor1', 'floor2']);
 const VALID_PAYMENT_METHODS = new Set(['cash', 'card']);
 const DEFAULT_VAT_RATE_PERCENT = 10;
+const TICKET_SERIES = 'PT';
+const MAX_DATABASE_INT = 2_147_483_647;
+
+function checkedDatabaseInteger(value: number, label: string): number {
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_DATABASE_INT) {
+    throw new ApiError(
+      422,
+      `${label} exceeds the supported order value`,
+      'ORDER_VALUE_TOO_LARGE'
+    );
+  }
+  return value;
+}
+
+function checkedLineTotal(qty: number, unitPriceCents: number): number {
+  checkedDatabaseInteger(qty, 'Item quantity');
+  checkedDatabaseInteger(unitPriceCents, 'Item price');
+  return checkedDatabaseInteger(qty * unitPriceCents, 'Item total');
+}
+
+function checkedCentsSum(values: Iterable<number>, label = 'Order total'): number {
+  let total = 0;
+  for (const value of values) {
+    checkedDatabaseInteger(value, label);
+    total = checkedDatabaseInteger(total + value, label);
+  }
+  return total;
+}
+
+function checkedQuantitySum(left: number, right: number): number {
+  return checkedDatabaseInteger(left + right, 'Item quantity');
+}
 
 function normalizeZone(zone: string): string {
   const normalized = zone.trim().toLowerCase();
@@ -32,7 +66,7 @@ function normalizePaymentMethod(method: string): string {
 
 function calculateTax(totalCents: number) {
   const configuredVatRate = config.ticket.vatRatePercent;
-  const vatRatePercent = Number.isFinite(configuredVatRate) && configuredVatRate > 0
+  const vatRatePercent = Number.isFinite(configuredVatRate) && configuredVatRate >= 0
     ? Math.round(configuredVatRate)
     : DEFAULT_VAT_RATE_PERCENT;
   const taxableBaseCents = Math.round(totalCents / (1 + vatRatePercent / 100));
@@ -44,7 +78,25 @@ function calculateTax(totalCents: number) {
 }
 
 function nextPaidTicketNumber(sequence: number): string {
-  return `PT-${String(sequence).padStart(6, '0')}`;
+  return `${TICKET_SERIES}-${String(sequence).padStart(6, '0')}`;
+}
+
+function normalizeIdempotencyKey(value: string): string {
+  const normalized = value.trim();
+  if (normalized.length < 8 || normalized.length > 128) {
+    throw new ApiError(400, 'Invalid idempotency key', 'INVALID_IDEMPOTENCY_KEY');
+  }
+  return normalized;
+}
+
+function createPaymentFingerprint(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function isRetryableTransactionError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') return true;
+  const candidate = error as { code?: string; message?: string };
+  return candidate?.code === 'P1008' || /database is locked/i.test(candidate?.message ?? '');
 }
 
 function groupPaymentTotalsByOrder(lines: PaidTicketLine[]): Map<string, number> {
@@ -105,6 +157,15 @@ function getSmallestAvailableTableNumber(existingNumbers: number[]): number {
 }
 
 type WorkflowState = Awaited<ReturnType<typeof workflowRepository.getTableWorkflow>>;
+type PaidTicketWithItems = NonNullable<Awaited<ReturnType<typeof workflowRepository.getPaidTicketByIdempotencyKey>>>;
+type PublicPaidTicket = Omit<PaidTicketWithItems, 'idempotencyKey' | 'idempotencyFingerprint'>;
+type PaymentTransactionResult = {
+  paidTicket: PaidTicketWithItems;
+  tableNumber: number;
+  tableZone: string;
+};
+type PublicPaymentResult = Omit<PaymentTransactionResult, 'paidTicket'> & { paidTicket: PublicPaidTicket };
+type IdempotentMutationResult = { tableNumber: number; tableZone: string };
 
 function workflowHasProducts(workflow: WorkflowState): boolean {
   const hasPendingItems = workflow.preOrderSession?.items.some((item) => item.qty > 0) ?? false;
@@ -118,19 +179,79 @@ function workflowHasConfirmedProducts(workflow: WorkflowState): boolean {
 }
 
 export class WorkflowService {
-  private async clearPrintedTicketIfTableIsEmpty(
+  private async invalidatePrintedTicket(
     tableId: number,
-    tx?: Parameters<typeof workflowRepository.getTableWorkflow>[1]
+    tx?: Parameters<typeof workflowRepository.clearTableTicketPrinted>[1]
   ) {
-    const workflow = await workflowRepository.getTableWorkflow(tableId, tx);
-    if (!workflowHasProducts(workflow)) {
-      await workflowRepository.clearTableTicketPrinted(tableId, tx);
+    await workflowRepository.clearTableTicketPrinted(tableId, tx);
+  }
+
+  private toIdempotentPaymentResult(paidTicket: PaidTicketWithItems, fingerprint: string): PaymentTransactionResult {
+    if (paidTicket.idempotencyFingerprint !== fingerprint) {
+      throw new ApiError(409, 'Idempotency key was already used for a different payment', 'IDEMPOTENCY_KEY_REUSED');
     }
+    return {
+      paidTicket,
+      tableNumber: paidTicket.tableNumber,
+      tableZone: paidTicket.tableZone,
+    };
+  }
+
+  private toPublicPaymentResult(result: PaymentTransactionResult): PublicPaymentResult {
+    const { idempotencyKey: _idempotencyKey, idempotencyFingerprint: _fingerprint, ...paidTicket } = result.paidTicket;
+    return { ...result, paidTicket };
+  }
+
+  private async runPaymentTransaction(
+    idempotencyKey: string,
+    fingerprint: string,
+    callback: (tx: Prisma.TransactionClient) => Promise<PaymentTransactionResult>
+  ): Promise<PaymentTransactionResult> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await workflowRepository.runInTransaction(callback);
+      } catch (error) {
+        const existing = await workflowRepository.getPaidTicketByIdempotencyKey(idempotencyKey);
+        if (existing) return this.toIdempotentPaymentResult(existing, fingerprint);
+        if (!isRetryableTransactionError(error) || attempt === 2) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+      }
+    }
+    throw new ApiError(503, 'Payment transaction could not be completed', 'PAYMENT_TRANSACTION_FAILED');
+  }
+
+  private mutationReceiptResult(
+    receipt: NonNullable<Awaited<ReturnType<typeof workflowRepository.getMutationReceipt>>>,
+    operation: string,
+    fingerprint: string
+  ): IdempotentMutationResult {
+    if (receipt.operation !== operation || receipt.fingerprint !== fingerprint) {
+      throw new ApiError(409, 'Idempotency key was already used for a different operation', 'IDEMPOTENCY_KEY_REUSED');
+    }
+    return { tableNumber: receipt.tableNumber, tableZone: receipt.tableZone };
+  }
+
+  private async runMutationTransaction(
+    idempotencyKey: string,
+    operation: string,
+    fingerprint: string,
+    callback: (tx: Prisma.TransactionClient) => Promise<IdempotentMutationResult>
+  ): Promise<IdempotentMutationResult> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await workflowRepository.runInTransaction(callback);
+      } catch (error) {
+        const existing = await workflowRepository.getMutationReceipt(idempotencyKey);
+        if (existing) return this.mutationReceiptResult(existing, operation, fingerprint);
+        if (!isRetryableTransactionError(error) || attempt === 2) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+      }
+    }
+    throw new ApiError(503, 'Mutation transaction could not be completed', 'MUTATION_TRANSACTION_FAILED');
   }
 
   async listTables() {
     const tables = await workflowRepository.listTables();
-    const printedTicketTableIds = await workflowRepository.getPrintedTicketTableIds(tables.map((table) => table.id));
 
     return tables
       .filter((table) => VALID_TABLE_ZONES.has((table.zone ?? '').trim().toLowerCase()))
@@ -146,7 +267,7 @@ export class WorkflowService {
             + pendingItems.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0),
           pendingItemCount,
           confirmedItemCount,
-          hasPrintedTicket: printedTicketTableIds.has(table.id) && pendingItemCount + confirmedItemCount > 0,
+          hasPrintedTicket: Boolean(table.ticketPrintedAt) && pendingItemCount + confirmedItemCount > 0,
         };
       });
   }
@@ -162,6 +283,11 @@ export class WorkflowService {
     });
   }
 
+  async ensureTableInZone(zone: string) {
+    const normalizedZone = normalizeZone(zone);
+    return workflowRepository.ensureFirstTableInZone(normalizedZone);
+  }
+
   async deleteTable(tableNumber: number, tableZone: string) {
     const normalizedNumber = normalizeNumber(tableNumber);
     const normalizedZone = normalizeZone(tableZone);
@@ -175,6 +301,11 @@ export class WorkflowService {
       const tablesInZone = await workflowRepository.countTablesInZone(normalizedZone, tx);
       if (tablesInZone <= 1) {
         throw new ApiError(409, 'Cannot remove the last table in a zone', 'LAST_TABLE_IN_ZONE');
+      }
+
+      const financialDependencies = await workflowRepository.countTableFinancialDependencies(table.id, tx);
+      if (financialDependencies.payments > 0 || financialDependencies.paidOrders > 0) {
+        throw new ApiError(409, 'Cannot remove a table with payment history', 'TABLE_HAS_PAYMENT_HISTORY');
       }
 
       await workflowRepository.deleteTableWorkflowData(table.id, tx);
@@ -193,12 +324,10 @@ export class WorkflowService {
     }
 
     const workflow = await workflowRepository.getTableWorkflow(table.id);
-    const hasPrintedTicket = await workflowRepository.hasTablePrintedTicket(table.id);
-
     return {
       table: {
         ...table,
-        hasPrintedTicket: hasPrintedTicket && workflowHasProducts(workflow),
+        hasPrintedTicket: Boolean(table.ticketPrintedAt) && workflowHasProducts(workflow),
       },
       preOrderItems: workflow.preOrderSession?.items ?? [],
       orders: workflow.orders
@@ -216,6 +345,10 @@ export class WorkflowService {
       }
 
       const workflow = await workflowRepository.getTableWorkflow(table.id, tx);
+      const hasPendingProducts = workflow.preOrderSession?.items.some((item) => item.qty > 0) ?? false;
+      if (hasPendingProducts) {
+        throw new ApiError(409, 'Pending items must be sent before marking the ticket as printed', 'PENDING_ITEMS_NOT_PRINTED');
+      }
       if (!workflowHasConfirmedProducts(workflow)) {
         throw new ApiError(409, 'No confirmed items to mark as printed', 'EMPTY_PRINTED_TICKET');
       }
@@ -255,11 +388,14 @@ export class WorkflowService {
       );
 
       if (existing) {
+        const nextQty = checkedQuantitySum(existing.qty, 1);
+        checkedLineTotal(nextQty, existing.unitPriceCents);
         await workflowRepository.updatePreOrderItem(existing.id, {
-          qty: existing.qty + 1,
+          qty: nextQty,
           unitPriceCents: existing.unitPriceCents
         }, tx);
       } else {
+        checkedLineTotal(1, menu.priceCents);
         await workflowRepository.createPreOrderItem(draftSession.id, {
           menuItemId: menu.id,
           name: menu.name,
@@ -269,6 +405,8 @@ export class WorkflowService {
           unitPriceCents: menu.priceCents
         }, tx);
       }
+
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         tableNumber: table.number,
@@ -298,13 +436,14 @@ export class WorkflowService {
       if (nextQty <= 0) {
         await workflowRepository.deletePreOrderItem(item.id, tx);
       } else {
+        checkedLineTotal(nextQty, nextUnitPrice);
         await workflowRepository.updatePreOrderItem(item.id, {
           qty: nextQty,
           unitPriceCents: Math.max(0, nextUnitPrice)
         }, tx);
       }
 
-      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         tableNumber: table.number,
@@ -328,7 +467,7 @@ export class WorkflowService {
         await workflowRepository.clearDraftItems(session.id, tx);
       }
 
-      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         tableNumber: table.number,
@@ -362,10 +501,11 @@ export class WorkflowService {
         qty: item.qty,
         unitPriceCents: item.unitPriceCents
       }));
+      checkedCentsSum(normalizedItems.map((item) => checkedLineTotal(item.qty, item.unitPriceCents)));
 
-      const order = await workflowRepository.createOrderFromPreOrder(table.id, draftSession!.id, normalizedItems, tx);
-      await workflowRepository.createKitchenTicket(order.id, table.id, normalizedItems, tx);
-      await workflowRepository.markSessionAsSent(draftSession!.id, tx);
+      await workflowRepository.createOrderFromPreOrder(table.id, normalizedItems, tx);
+      await workflowRepository.deleteDraftSession(draftSession!.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         tableNumber: table.number,
@@ -379,6 +519,10 @@ export class WorkflowService {
       const orderItem = await workflowRepository.getOrderItemWithOrder(orderId, orderItemId, tx);
       if (!orderItem) {
         throw new ApiError(404, 'Order item not found', 'ORDER_ITEM_NOT_FOUND');
+      }
+      const paymentCount = await workflowRepository.countPaymentsForOrder(orderId, tx);
+      if (orderItem.order.status !== 'confirmed' || paymentCount > 0) {
+        throw new ApiError(409, 'Cannot move an item from an order with payment history', 'ORDER_HAS_PAYMENT_HISTORY');
       }
 
       const table = orderItem.order.table;
@@ -394,11 +538,14 @@ export class WorkflowService {
       );
 
       if (existing) {
+        const nextQty = checkedQuantitySum(existing.qty, orderItem.qty);
+        checkedLineTotal(nextQty, existing.unitPriceCents);
         await workflowRepository.updatePreOrderItem(existing.id, {
-          qty: existing.qty + orderItem.qty,
+          qty: nextQty,
           unitPriceCents: existing.unitPriceCents
         }, tx);
       } else {
+        checkedLineTotal(orderItem.qty, orderItem.unitPriceCents);
         await workflowRepository.createPreOrderItem(draftSession.id, {
           menuItemId: orderItem.menuItemId ?? null,
           name: orderItem.name,
@@ -413,23 +560,25 @@ export class WorkflowService {
 
       const remainingItems = await workflowRepository.getOrderItems(orderId, tx);
       if (remainingItems.length === 0) {
-        await workflowRepository.deleteOrder(orderId, tx);
+        const paymentCount = await workflowRepository.countPaymentsForOrder(orderId, tx);
+        if (paymentCount > 0) {
+          await workflowRepository.updateOrderTotal(orderId, 0, tx);
+          await workflowRepository.updateOrderStatus(orderId, 'paid', tx);
+        } else {
+          await workflowRepository.deleteOrder(orderId, tx);
+        }
       } else {
-        const totalCents = remainingItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+        const totalCents = checkedCentsSum(remainingItems.map((item) => item.totalPriceCents));
         await workflowRepository.updateOrderTotal(orderId, totalCents, tx);
       }
 
-      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         tableNumber: table.number,
         tableZone: table.zone ?? 'outside'
       };
     });
-  }
-
-  async getAllOrders() {
-    return workflowRepository.getAllOrders();
   }
 
   async deleteOrder(orderId: string) {
@@ -439,19 +588,37 @@ export class WorkflowService {
         throw new ApiError(404, 'Order not found', 'ORDER_NOT_FOUND');
       }
 
+      const paymentCount = await workflowRepository.countPaymentsForOrder(orderId, tx);
+      if (order.status === 'paid' || paymentCount > 0) {
+        throw new ApiError(409, 'Cannot delete an order with payment history', 'ORDER_HAS_PAYMENT_HISTORY');
+      }
+
       const tableId = order.tableId;
       await workflowRepository.deleteOrder(orderId, tx);
-      await this.clearPrintedTicketIfTableIsEmpty(tableId, tx);
+      await this.invalidatePrintedTicket(tableId, tx);
       return { ok: true };
     });
   }
 
-  async payTable(tableNumber: number, tableZone: string, method: string, splitPeople?: number) {
+  async payTable(tableNumber: number, tableZone: string, method: string, idempotencyKey: string, splitPeople?: number) {
     const normalizedNumber = normalizeNumber(tableNumber);
     const normalizedZone = normalizeZone(tableZone);
     const normalizedMethod = normalizePaymentMethod(method);
+    const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey);
+    const normalizedSplitPeople = splitPeople && splitPeople > 1 ? splitPeople : null;
+    const fingerprint = createPaymentFingerprint({
+      version: 1,
+      operation: 'pay-table',
+      tableNumber: normalizedNumber,
+      tableZone: normalizedZone,
+      method: normalizedMethod,
+      splitPeople: normalizedSplitPeople,
+    });
 
-    return workflowRepository.runInTransaction(async (tx) => {
+    const result = await this.runPaymentTransaction(normalizedIdempotencyKey, fingerprint, async (tx) => {
+      const existing = await workflowRepository.getPaidTicketByIdempotencyKey(normalizedIdempotencyKey, tx);
+      if (existing) return this.toIdempotentPaymentResult(existing, fingerprint);
+
       const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
@@ -477,19 +644,21 @@ export class WorkflowService {
         throw new ApiError(409, 'No confirmed items to pay', 'EMPTY_PAYMENT');
       }
 
-      const totalCents = lines.reduce((sum, line) => sum + line.totalPriceCents, 0);
-      const sequence = await workflowRepository.countPaidTickets(tx) + 1;
+      const totalCents = checkedCentsSum(lines.map((line) => line.totalPriceCents), 'Ticket total');
+      const sequence = await workflowRepository.allocateTicketSequence(TICKET_SERIES, tx);
       const tax = calculateTax(totalCents);
-      const mode = splitPeople && splitPeople > 1 ? 'split' : 'full';
+      const mode = normalizedSplitPeople ? 'split' : 'full';
       const paidTicket = await workflowRepository.createPaidTicket({
         ticketNumber: nextPaidTicketNumber(sequence),
+        idempotencyKey: normalizedIdempotencyKey,
+        idempotencyFingerprint: fingerprint,
         mode,
         method: normalizedMethod,
         tableNumber: table.number,
         tableZone: table.zone ?? normalizedZone,
         totalCents,
         ...tax,
-        splitPeople: splitPeople && splitPeople > 1 ? splitPeople : null,
+        splitPeople: normalizedSplitPeople,
         ...getTicketAccountingSnapshot({
           mode,
           method: normalizedMethod,
@@ -506,7 +675,7 @@ export class WorkflowService {
         await workflowRepository.updateOrderStatus(orderId, 'paid', tx);
       }
 
-      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         paidTicket,
@@ -514,17 +683,20 @@ export class WorkflowService {
         tableZone: table.zone ?? normalizedZone,
       };
     });
+    return this.toPublicPaymentResult(result);
   }
 
   async paySelectedItems(
     tableNumber: number,
     tableZone: string,
     method: string,
-    selectedItems: Array<{ orderId: string; itemId: number; qty: number }>
+    selectedItems: Array<{ orderId: string; itemId: number; qty: number }>,
+    idempotencyKey: string
   ) {
     const normalizedNumber = normalizeNumber(tableNumber);
     const normalizedZone = normalizeZone(tableZone);
     const normalizedMethod = normalizePaymentMethod(method);
+    const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey);
 
     if (selectedItems.length === 0) {
       throw new ApiError(400, 'No selected items to pay', 'EMPTY_PAYMENT_SELECTION');
@@ -533,11 +705,24 @@ export class WorkflowService {
     const groupedSelectedItems = Array.from(selectedItems.reduce((grouped, item) => {
       const key = `${item.orderId}:${item.itemId}`;
       const current = grouped.get(key);
-      grouped.set(key, current ? { ...current, qty: current.qty + item.qty } : { ...item });
+      grouped.set(key, current ? { ...current, qty: checkedQuantitySum(current.qty, item.qty) } : { ...item });
       return grouped;
-    }, new Map<string, { orderId: string; itemId: number; qty: number }>()).values());
+    }, new Map<string, { orderId: string; itemId: number; qty: number }>()).values())
+      .sort((left, right) => left.orderId.localeCompare(right.orderId) || left.itemId - right.itemId);
 
-    return workflowRepository.runInTransaction(async (tx) => {
+    const fingerprint = createPaymentFingerprint({
+      version: 1,
+      operation: 'pay-items',
+      tableNumber: normalizedNumber,
+      tableZone: normalizedZone,
+      method: normalizedMethod,
+      items: groupedSelectedItems,
+    });
+
+    const result = await this.runPaymentTransaction(normalizedIdempotencyKey, fingerprint, async (tx) => {
+      const existing = await workflowRepository.getPaidTicketByIdempotencyKey(normalizedIdempotencyKey, tx);
+      if (existing) return this.toIdempotentPaymentResult(existing, fingerprint);
+
       const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
@@ -566,16 +751,18 @@ export class WorkflowService {
           secondaryName: orderItem.secondaryName,
           qty: selected.qty,
           unitPriceCents: orderItem.unitPriceCents,
-          totalPriceCents: selected.qty * orderItem.unitPriceCents,
+          totalPriceCents: checkedLineTotal(selected.qty, orderItem.unitPriceCents),
         });
       }
 
-      const totalCents = lines.reduce((sum, line) => sum + line.totalPriceCents, 0);
-      const sequence = await workflowRepository.countPaidTickets(tx) + 1;
+      const totalCents = checkedCentsSum(lines.map((line) => line.totalPriceCents), 'Ticket total');
+      const sequence = await workflowRepository.allocateTicketSequence(TICKET_SERIES, tx);
       const tax = calculateTax(totalCents);
       const mode = 'aa';
       const paidTicket = await workflowRepository.createPaidTicket({
         ticketNumber: nextPaidTicketNumber(sequence),
+        idempotencyKey: normalizedIdempotencyKey,
+        idempotencyFingerprint: fingerprint,
         mode,
         method: normalizedMethod,
         tableNumber: table.number,
@@ -614,12 +801,12 @@ export class WorkflowService {
         if (remainingItems.length === 0) {
           await workflowRepository.updateOrderStatus(line.orderId, 'paid', tx);
         } else {
-          const nextTotal = remainingItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+          const nextTotal = checkedCentsSum(remainingItems.map((item) => item.totalPriceCents));
           await workflowRepository.updateOrderTotal(line.orderId, nextTotal, tx);
         }
       }
 
-      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         paidTicket,
@@ -627,15 +814,18 @@ export class WorkflowService {
         tableZone: table.zone ?? normalizedZone,
       };
     });
+    return this.toPublicPaymentResult(result);
   }
 
   async removeSelectedItems(
     tableNumber: number,
     tableZone: string,
-    selectedItems: Array<{ orderId: string; itemId: number; qty: number }>
+    selectedItems: Array<{ orderId: string; itemId: number; qty: number }>,
+    idempotencyKey: string
   ) {
     const normalizedNumber = normalizeNumber(tableNumber);
     const normalizedZone = normalizeZone(tableZone);
+    const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey);
 
     if (selectedItems.length === 0) {
       throw new ApiError(400, 'No selected items to remove', 'EMPTY_REMOVE_SELECTION');
@@ -644,11 +834,34 @@ export class WorkflowService {
     const groupedSelectedItems = Array.from(selectedItems.reduce((grouped, item) => {
       const key = `${item.orderId}:${item.itemId}`;
       const current = grouped.get(key);
-      grouped.set(key, current ? { ...current, qty: current.qty + item.qty } : { ...item });
+      grouped.set(key, current ? { ...current, qty: checkedQuantitySum(current.qty, item.qty) } : { ...item });
       return grouped;
     }, new Map<string, { orderId: string; itemId: number; qty: number }>()).values());
 
-    return workflowRepository.runInTransaction(async (tx) => {
+    const operation = 'remove-items';
+    const fingerprint = createPaymentFingerprint({
+      version: 1,
+      operation,
+      tableNumber: normalizedNumber,
+      tableZone: normalizedZone,
+      items: [...groupedSelectedItems]
+        .sort((left, right) => left.orderId.localeCompare(right.orderId) || left.itemId - right.itemId),
+    });
+
+    return this.runMutationTransaction(normalizedIdempotencyKey, operation, fingerprint, async (tx) => {
+      const existingReceipt = await workflowRepository.getMutationReceipt(normalizedIdempotencyKey, tx);
+      if (existingReceipt) return this.mutationReceiptResult(existingReceipt, operation, fingerprint);
+
+      // Claim the key inside the same transaction as the destructive write.
+      // A failed validation or mutation rolls the receipt back as well.
+      await workflowRepository.createMutationReceipt({
+        idempotencyKey: normalizedIdempotencyKey,
+        fingerprint,
+        operation,
+        tableNumber: normalizedNumber,
+        tableZone: normalizedZone,
+      }, tx);
+
       const table = await workflowRepository.getTableByNumberAndZone(normalizedNumber, normalizedZone, tx);
       if (!table) {
         throw new ApiError(404, 'Table not found', 'TABLE_NOT_FOUND');
@@ -689,14 +902,20 @@ export class WorkflowService {
 
         const remainingItems = await workflowRepository.getOrderItems(line.orderId, tx);
         if (remainingItems.length === 0) {
-          await workflowRepository.deleteOrder(line.orderId, tx);
+          const paymentCount = await workflowRepository.countPaymentsForOrder(line.orderId, tx);
+          if (paymentCount > 0) {
+            await workflowRepository.updateOrderTotal(line.orderId, 0, tx);
+            await workflowRepository.updateOrderStatus(line.orderId, 'paid', tx);
+          } else {
+            await workflowRepository.deleteOrder(line.orderId, tx);
+          }
         } else {
-          const nextTotal = remainingItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+          const nextTotal = checkedCentsSum(remainingItems.map((item) => item.totalPriceCents));
           await workflowRepository.updateOrderTotal(line.orderId, nextTotal, tx);
         }
       }
 
-      await this.clearPrintedTicketIfTableIsEmpty(table.id, tx);
+      await this.invalidatePrintedTicket(table.id, tx);
 
       return {
         tableNumber: table.number,

@@ -1,90 +1,57 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { workflowService } from '../domain/workflow/workflow.service';
-import { validateBody, validateParams } from '../middleware/validation';
+import { workflowService } from '../domain/workflow/workflow.service.js';
+import { validateBody, validateParams } from '../middleware/validation.js';
 import { signalDataChange } from '../services/sync.service.js';
-import { successResponse } from '../types/api';
+import { successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
-
-// Validation schemas
-const sendToKitchenSchema = z.object({
-  tableNumber: z.number().positive('Table number must be positive'),
-  tableZone: z.string().min(1, 'Table zone is required'),
-});
-
-const itemIdParamSchema = z.object({
-  itemId: z.coerce.number().positive('Item ID must be positive'),
-});
+const MAX_DATABASE_ID = 2_147_483_647;
+const tableNumberSchema = z.number().int().min(1).max(10_000);
+const tableZoneSchema = z.string().trim().min(1).max(32);
+const idempotencyKeySchema = z.string().trim().min(8).max(128);
 
 const paymentMethodSchema = z.enum(['cash', 'card']);
 
 const payTableSchema = z.object({
-  tableNumber: z.number().positive('Table number must be positive'),
-  tableZone: z.string().min(1, 'Table zone is required'),
+  tableNumber: tableNumberSchema,
+  tableZone: tableZoneSchema,
   method: paymentMethodSchema,
-  splitPeople: z.number().int().positive().optional(),
+  splitPeople: z.number().int().min(1).max(1_000).optional(),
+  idempotencyKey: idempotencyKeySchema,
 });
 
 const paySelectedItemsSchema = z.object({
-  tableNumber: z.number().positive('Table number must be positive'),
-  tableZone: z.string().min(1, 'Table zone is required'),
+  tableNumber: tableNumberSchema,
+  tableZone: tableZoneSchema,
   method: paymentMethodSchema,
   items: z.array(z.object({
-    orderId: z.string().min(1),
-    itemId: z.number().int().positive(),
-    qty: z.number().int().positive(),
-  })).min(1),
+    orderId: z.string().trim().min(1).max(128),
+    itemId: z.number().int().min(1).max(MAX_DATABASE_ID),
+    qty: z.number().int().min(1).max(10_000),
+  })).min(1).max(500),
+  idempotencyKey: idempotencyKeySchema,
 });
 
 const removeSelectedItemsSchema = paySelectedItemsSchema.omit({ method: true });
 
 export const moveToPreorderParamSchema = z.object({
-  id: z.string().min(1, 'Order ID is required'),
-  itemId: z.coerce.number().positive('Item ID must be positive'),
+  id: z.string().trim().min(1, 'Order ID is required').max(128),
+  itemId: z.coerce.number().int().min(1).max(MAX_DATABASE_ID),
 });
 
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    logger.info({}, 'Fetching all orders');
-    const orders = await workflowService.getAllOrders();
-    logger.debug({ count: orders.length }, 'Orders fetched');
-    res.json(successResponse(orders));
-  } catch (error) {
-    logger.error({ error }, 'Failed to fetch orders');
-    next(error);
-  }
-});
-
-router.post(
-  '/',
-  validateBody(sendToKitchenSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { tableNumber, tableZone } = req.body;
-      logger.info({ tableNumber, tableZone }, 'Sending order to kitchen');
-
-      await workflowService.sendToKitchen(tableNumber, tableZone);
-      const workflow = await workflowService.getTableWorkflow(tableNumber, tableZone);
-      signalDataChange('orders');
-      res.status(201).json(successResponse(workflow));
-    } catch (error) {
-      logger.error({ error }, 'Failed to send order to kitchen');
-      next(error);
-    }
-  }
-);
+const orderIdParamSchema = z.object({ id: z.string().trim().min(1).max(128) });
 
 router.post(
   '/pay-table',
   validateBody(payTableSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { tableNumber, tableZone, method, splitPeople } = req.body;
+      const { tableNumber, tableZone, method, splitPeople, idempotencyKey } = req.body;
       logger.info({ tableNumber, tableZone, method, splitPeople }, 'Paying table ticket');
 
-      const result = await workflowService.payTable(tableNumber, tableZone, method, splitPeople);
+      const result = await workflowService.payTable(tableNumber, tableZone, method, idempotencyKey, splitPeople);
       const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
       signalDataChange('orders');
       res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
@@ -100,10 +67,10 @@ router.post(
   validateBody(paySelectedItemsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { tableNumber, tableZone, method, items } = req.body;
+      const { tableNumber, tableZone, method, items, idempotencyKey } = req.body;
       logger.info({ tableNumber, tableZone, method, itemCount: items.length }, 'Paying selected ticket items');
 
-      const result = await workflowService.paySelectedItems(tableNumber, tableZone, method, items);
+      const result = await workflowService.paySelectedItems(tableNumber, tableZone, method, items, idempotencyKey);
       const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
       signalDataChange('orders');
       res.json(successResponse({ paidTicket: result.paidTicket, workflow }));
@@ -119,10 +86,10 @@ router.post(
   validateBody(removeSelectedItemsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { tableNumber, tableZone, items } = req.body;
+      const { tableNumber, tableZone, items, idempotencyKey } = req.body;
       logger.info({ tableNumber, tableZone, itemCount: items.length }, 'Removing selected ticket items');
 
-      const result = await workflowService.removeSelectedItems(tableNumber, tableZone, items);
+      const result = await workflowService.removeSelectedItems(tableNumber, tableZone, items, idempotencyKey);
       const workflow = await workflowService.getTableWorkflow(result.tableNumber, result.tableZone);
       signalDataChange('orders');
       res.json(successResponse(workflow));
@@ -133,7 +100,7 @@ router.post(
   }
 );
 
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', validateParams(orderIdParamSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     logger.info({ orderId: id }, 'Deleting order');

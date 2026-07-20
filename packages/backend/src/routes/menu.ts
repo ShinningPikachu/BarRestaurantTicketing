@@ -1,24 +1,27 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { menuService } from '../services/menu.service';
+import { ApiError } from '../middleware/errorHandler.js';
+import { validateBody, validateParams } from '../middleware/validation.js';
+import { imageDataUrlSchema, MenuImportValidationError, parseMenuImportCsv } from '../services/menu-import.js';
+import { menuService } from '../services/menu.service.js';
 import { signalDataChange } from '../services/sync.service.js';
-import { errorResponse, successResponse } from '../types/api';
-import { validateBody, validateParams } from '../middleware/validation';
+import { errorResponse, successResponse } from '../types/api.js';
+import { CsvParseError } from '../utils/csv.js';
 import { logger } from '../utils/logger.js';
-import { parseCsvObjects } from '../utils/csv.js';
 
 const router = Router();
+const MAX_CENTS = 2_000_000_000;
 
 const menuItemBodySchema = z.object({
-  name: z.string().trim().min(1),
-  primaryName: z.string().trim().optional().nullable(),
-  secondaryName: z.string().trim().optional().nullable(),
-  priceCents: z.number().int().min(0),
-  costCents: z.number().int().min(0).optional().nullable(),
-  category: z.string().trim().min(1),
-  sku: z.string().trim().optional().nullable(),
-  description: z.string().trim().optional().nullable(),
-  imageDataUrl: z.string().trim().max(1_500_000).startsWith('data:image/').optional().nullable(),
+  name: z.string().trim().min(1).max(200),
+  primaryName: z.string().trim().max(200).optional().nullable(),
+  secondaryName: z.string().trim().max(200).optional().nullable(),
+  priceCents: z.number().int().min(0).max(MAX_CENTS),
+  costCents: z.number().int().min(0).max(MAX_CENTS).optional().nullable(),
+  category: z.string().trim().min(1).max(100),
+  sku: z.string().trim().max(100).optional().nullable(),
+  description: z.string().trim().max(2_000).optional().nullable(),
+  imageDataUrl: imageDataUrlSchema.optional().nullable(),
   available: z.boolean().optional(),
 });
 
@@ -27,56 +30,12 @@ const updateMenuItemBodySchema = menuItemBodySchema.partial().refine((payload) =
 });
 
 const menuItemParamsSchema = z.object({
-  id: z.coerce.number().int().positive(),
+  id: z.coerce.number().int().min(1).max(2_147_483_647),
 });
 
 const importCsvBodySchema = z.object({
-  csv: z.string().min(1),
+  csv: z.string().min(1).max(2_000_000),
 });
-
-function parseBoolean(value: string | undefined): boolean | undefined {
-  if (value === undefined || value.trim() === '') return undefined;
-  return ['true', '1', 'yes', 'si', 'sí'].includes(value.trim().toLowerCase());
-}
-
-function parseCents(record: Record<string, string>, centsKey: string, euroKey: string): number | null {
-  const centsValue = record[centsKey]?.trim();
-  if (centsValue) {
-    const parsed = Number(centsValue);
-    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
-  }
-
-  const euroValue = record[euroKey]?.replace(',', '.').trim();
-  if (!euroValue) return null;
-  const parsed = Number(euroValue);
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
-}
-
-function parseMenuImportCsv(csv: string) {
-  return parseCsvObjects(csv).map((record, index) => {
-    const name = record.name?.trim();
-    const category = record.category?.trim();
-    const priceCents = parseCents(record, 'priceCents', 'price');
-    const costCents = parseCents(record, 'costCents', 'cost');
-
-    if (!name || !category || priceCents === null) {
-      throw new Error(`Invalid CSV row ${index + 2}: name, category and price are required`);
-    }
-
-    return {
-      name,
-      primaryName: record.primaryName?.trim() || null,
-      secondaryName: record.secondaryName?.trim() || null,
-      category,
-      priceCents,
-      costCents,
-      sku: record.sku?.trim() || null,
-      description: record.description?.trim() || null,
-      imageDataUrl: record.imageDataUrl?.trim() || null,
-      available: parseBoolean(record.available),
-    };
-  });
-}
 
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -112,7 +71,11 @@ router.post(
       res.json(successResponse(result));
     } catch (error) {
       logger.error({ error }, 'Failed to import menu CSV');
-      next(error);
+      if (error instanceof MenuImportValidationError || error instanceof CsvParseError) {
+        next(new ApiError(400, error.message, 'INVALID_MENU_CSV'));
+      } else {
+        next(error);
+      }
     }
   }
 );

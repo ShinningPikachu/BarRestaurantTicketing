@@ -3,7 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "composite": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "types": ["node"]
   },
-  "include": ["App.tsx", "src/native/**/*", "src/native/components/OrderZone/**/*"]
+  "include": ["App.tsx", "src/native/**/*", "src/native/components/OrderZone/**/*", "test/**/*"]
 }

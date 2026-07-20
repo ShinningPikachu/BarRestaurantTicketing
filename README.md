@@ -2,11 +2,12 @@
 
 Restaurant/bar POS for table management, menu ordering, kitchen workflow, paid ticket history, simplified receipts, PDF ticket copies, and Xprinter cash drawer/receipt printing.
 
-This is a monorepo with three workspaces:
+Before moving an existing database to another computer or applying a release to production information, read [CHANGESET_PRODUCTION_REVIEW.md](./CHANGESET_PRODUCTION_REVIEW.md) and follow [PRODUCTION_FIRST_RUN.md](./PRODUCTION_FIRST_RUN.md). The production migration path requires a verified external backup and tests pending migrations against a restored temporary copy before changing the live SQLite file.
+
+This is a monorepo with two application workspaces:
 
 - `packages/backend`: Express API, Prisma, SQLite database, printer bridge.
 - `packages/frontend`: Expo React Native app for desktop web and phone/tablet.
-- `packages/shared`: Shared TypeScript types/constants.
 
 The frontend has separate main screens for computer and mobile:
 
@@ -44,22 +45,16 @@ The desktop installer and start launcher also activate this `.nvmrc` version aut
 
 ## Login
 
-The POS requires a login code on both computer and mobile screens. The backend also protects `/api/*` routes, so people on the same network cannot use the API without logging in.
+The POS requires a login code on both computer and mobile screens. The backend also protects `/api/*` routes, so people on the same network cannot use the API without logging in. The installer and launcher generate a random six-digit access code and a long random API token in the private root `.env` file when either value is missing or blank. The generated access code is printed in the startup terminal.
 
-Default development access code:
-
-```text
-1234
-```
-
-For real use, set your own code in `.env`:
+You can instead set your own values in `.env` before starting:
 
 ```env
 POS_ACCESS_CODE=ChangeThisCode
-POS_AUTH_TOKEN=ChangeThisLongRandomToken
+POS_AUTH_TOKEN=ReplaceWithAtLeast32RandomCharacters
 ```
 
-Use the same `.env` when running `npm run dev`, because the backend reads these values.
+Do not use the example values for service. The launcher enforces private file permissions on Linux and never prints the API token. A newly generated access code is shown once; set `BAR_TICKETING_SHOW_ACCESS_CODE=1` for an explicit later display.
 
 ## Quick Start
 
@@ -69,22 +64,21 @@ Install the exact dependencies committed in `package-lock.json` and generate the
 npm run bootstrap
 ```
 
-Create and seed the local SQLite database:
+Apply all committed migrations to a new/empty local SQLite database:
 
 ```bash
-cd packages/backend
-npm run prisma:migrate:dev
-npm run seed
-cd ../..
+npm run db:migrate:deploy
 ```
 
-Run backend, desktop web POS, and phone Expo server together:
+For an existing database with pending migrations, use the external-backup command in `PRODUCTION_FIRST_RUN.md`; a plain command intentionally stops before changing data. A populated database is never seeded. For a genuinely new standalone database only, explicitly initialize the bundled menu once with `npm run db:initialize:new`.
+
+Run backend, desktop web POS, and phone Expo server together for development only:
 
 ```bash
 npm run dev
 ```
 
-The helper prints URLs similar to:
+The development helper prints URLs similar to:
 
 ```text
 Backend API shared by both screens: http://192.168.1.50:3000/api
@@ -109,26 +103,20 @@ On Linux, the downloaded React Native DevTools Electron application may require 
 
 ## Clickable Local Launcher
 
-For a normal user, run the installer once:
+For a normal user, run the installer once from the repository folder:
 
-```text
-Install_BarRestaurantTicketing.desktop
+```bash
+bash Install_BarRestaurantTicketing.sh
 ```
 
-It prepares the app, installs the exact npm libraries from `package-lock.json`, prepares Prisma/database files, and creates two desktop buttons:
+It installs the exact npm libraries from `package-lock.json`, generates private runtime credentials, builds the compiled operational application, validates production settings, applies committed database migrations without automatic seeding, and creates two path-correct desktop buttons in the current user's Desktop folder. An existing database with pending migrations requires the explicit external-backup procedure in `PRODUCTION_FIRST_RUN.md` before installation can complete:
 
 ```text
 Start BarRestaurantTicketing
 Stop BarRestaurantTicketing
 ```
 
-On Linux desktops, you can start the local POS without typing terminal commands:
-
-```text
-Start_BarRestaurantTicketing.desktop
-```
-
-Double-click it from the repository folder and choose to run it if your file manager asks. It installs missing locked npm libraries when needed, opens a terminal window, starts the backend and frontend, then opens the desktop POS at:
+Double-click the generated `Start BarRestaurantTicketing` button and choose to run it if your file manager asks. It verifies the installed dependency lock, refreshes dependencies only when needed, rebuilds and validates the operational app, checks the database migration state, opens a terminal window, starts the compiled backend and exported frontend, waits for both to pass readiness checks, then opens the configured desktop POS (port `8081` by default). It does not run Expo or TypeScript watchers in operational mode.
 
 ```text
 http://localhost:8081
@@ -138,10 +126,10 @@ Keep the terminal window open while using the app. Press `Ctrl+C` in that window
 
 If the POS is already running, double-clicking the same start icon again only opens or focuses the existing POS screen. It does not start a second copy. If someone accidentally closes only the POS browser window, double-click the start icon again to reopen it.
 
-If the app keeps running or you closed the terminal window, double-click:
+If the app keeps running or you closed the terminal window, double-click the generated stop button:
 
 ```text
-Stop_BarRestaurantTicketing.desktop
+Stop BarRestaurantTicketing
 ```
 
 You can also stop it from the repo root with:
@@ -158,7 +146,7 @@ You can also create one movable executable file:
 npm run package:linux
 ```
 
-This creates:
+This creates the generated, Git-ignored artifact:
 
 ```text
 .dist/BarRestaurantTicketing-linux.run
@@ -170,9 +158,13 @@ Move that one `.run` file to another Linux computer and double-click it, or run:
 ./BarRestaurantTicketing-linux.run
 ```
 
-On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, checks for Node.js 20.19.4 through 22.x and npm, installs the exact libraries from `package-lock.json`, prepares Prisma, and opens the desktop POS at `http://localhost:8081`. Local `.env` credentials are not included in the portable package; configure them on the destination computer.
+The package build uses an explicit release allowlist and fails if its payload contains a runtime `.env`, SQLite database, journal/WAL file, database backup, cache, generated project build, or escaping symlink. Runtime credentials and restaurant data are never intentionally distributed. Verify this safety message appears whenever creating a package.
+
+On first launch it unpacks the app into `~/.local/share/BarRestaurantTicketing`, selects Node 22 through nvm when available, checks Node.js 20.19.4 through 22.x and npm 10+, installs the exact libraries from `package-lock.json`, generates private local credentials, builds and validates the production-mode app, creates/migrates a new destination database, and opens the desktop POS after readiness checks. Before importing or upgrading an existing database, follow `PRODUCTION_FIRST_RUN.md`; pending migrations intentionally stop until a separate verified backup path is supplied.
 
 If the portable app is already running, opening the `.run` file again only opens or focuses the POS screen. It will not start a duplicate backend/frontend server.
+
+To upgrade an installed portable copy, stop it first, make an external backup of its data, and run the newer `.run` file. The updater prepares code and dependencies in a unique staging directory, preserves the destination `.env`, database (including any rollback-journal/WAL state), and database-backup directory, recovers/checkpoints and validates SQLite before copying or migrating it, and only then publishes the prepared directory with a rename. An interrupted publish is restored from the previous-directory rollback copy on the next launch. Obsolete code/dependency directories are replaced instead of merged indefinitely.
 
 To stop a portable app started from the `.run` file, run:
 
@@ -188,15 +180,20 @@ If you want the package to include the already-installed `node_modules` folder f
 npm run package:linux:offline
 ```
 
-That file will be much larger and is best used on a similar Linux system with the same CPU architecture. For different computers or architectures, use `npm run package:linux` so dependencies install cleanly on the destination computer.
+That file will be much larger. Its dependency tree is verified against the package lock and retains required nested `build`/`dist` directories. Because native npm/Prisma binaries are platform-specific, use it only on a similar Linux system with the same CPU architecture. For different systems or architectures, use `npm run package:linux` so dependencies install cleanly on the destination computer.
 
 ## Run Separately
 
 Backend only:
 
 ```bash
+set -a
+. ./.env
+set +a
 npm run -w backend dev
 ```
+
+The backend workspace command does not load the root `.env` by itself; source the trusted local file as shown or export the required variables explicitly. The combined launcher handles this automatically.
 
 Frontend web only:
 
@@ -271,19 +268,21 @@ If you want to force the initial backend URL, set it before building:
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.50:3000/api npm run android:apk
 ```
 
-The generated APK is:
+The generated APK is a release-mode bundle signed with the generated debug key for trusted local sideloading:
 
 ```text
-packages/frontend/android/app/build/outputs/apk/release/app-release.apk
+packages/frontend/android/app/build/outputs/apk/release/app-local.apk
 ```
+
+It is not a production-signed release and must not be uploaded to an app store. A store/managed deployment needs a protected release keystore, controlled versionCode/version updates, and a separate signed release workflow.
 
 Install it on a connected Android phone with USB debugging enabled:
 
 ```bash
-adb install -r packages/frontend/android/app/build/outputs/apk/release/app-release.apk
+adb install -r packages/frontend/android/app/build/outputs/apk/release/app-local.apk
 ```
 
-The phone and computer must stay on the same network, and the computer firewall must allow the backend port, usually `3000`. A computer-created hotspot counts as the same network when the phone is connected to that hotspot.
+The phone and computer must stay on the same trusted network, and the computer firewall must allow the backend port, usually `3000`. A computer-created hotspot counts as the same network when the phone is connected to that hotspot. The local APK currently enables cleartext HTTP so it can reach a LAN-only backend; login tokens and POS traffic are therefore not protected from an untrusted or hostile network. Do not expose the backend port to the public internet. Use TLS or a trusted private network for any broader deployment.
 
 ## Environment
 
@@ -293,10 +292,11 @@ Example `.env`:
 
 ```env
 PORT=3000
-DATABASE_URL=file:./dev.db
+DESKTOP_EXPO_PORT=8081
+PHONE_EXPO_PORT=8082
 
 POS_ACCESS_CODE=ChangeThisCode
-POS_AUTH_TOKEN=ChangeThisLongRandomToken
+POS_AUTH_TOKEN=ReplaceWithAtLeast32RandomCharacters
 
 EXPO_PUBLIC_TICKET_TRADE_NAME=Your Restaurant Name
 EXPO_PUBLIC_TICKET_BUSINESS_NAME=Your Legal Business Name
@@ -304,20 +304,19 @@ EXPO_PUBLIC_TICKET_BUSINESS_NIF=Your Tax ID
 EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS=Your Business Address
 EXPO_PUBLIC_TICKET_BUSINESS_CITY=Your City
 EXPO_PUBLIC_TICKET_BUSINESS_PHONE=Your Phone Number
-EXPO_PUBLIC_TICKET_SERIES=FS
 EXPO_PUBLIC_TICKET_VAT_RATE=10
 
 # Optional printer mode for frontend-triggered customer tickets.
 EXPO_PUBLIC_TICKET_PRINT_MODE=xprinter-lan
-EXPO_PUBLIC_XPRINTER_HOST=192.168.1.80
-EXPO_PUBLIC_XPRINTER_PORT=9100
-EXPO_PUBLIC_XPRINTER_OPEN_DRAWER=false
 
 # Backend printer bridge settings.
 XPRINTER_HOST=192.168.1.80
 XPRINTER_PORT=9100
-XPRINTER_OPEN_DRAWER=false
 ```
+
+The local database path is fixed by the included Prisma schema at `packages/backend/prisma/dev.db`; `DATABASE_URL` is not a supported relocation setting. Keep custom backend, desktop, and phone ports distinct. The combined launcher derives localhost CORS origins from `DESKTOP_EXPO_PORT`; set `CORS_ORIGINS` explicitly only when serving the web POS from additional trusted origins.
+
+The backend listens on LAN interfaces so phones can connect. Authentication is still required, but CORS is not a firewall and the default LAN transport is HTTP. Restrict the backend port to the trusted restaurant LAN/hotspot, use strong generated credentials, do not forward it from the router, and add TLS before using it across an untrusted network.
 
 Printer alternatives:
 
@@ -399,7 +398,7 @@ Use:
 - `Imprimir`: reprint a simplified receipt through the configured printer bridge.
 - `PDF`: create/open a clearer detailed ticket copy. On web, use the browser print dialog and choose `Save as PDF`.
 
-The current session window is controlled by the backend: it starts at 06:00 and ends at 04:00 the next day.
+The current session window is controlled by the backend: it runs continuously from 06:00 until 06:00 the next day, so early-morning sales are never omitted from every session.
 
 ### 7. Manage Products
 
@@ -452,7 +451,7 @@ For USB device:
 XPRINTER_USB_DEVICE=/dev/usb/lp0
 ```
 
-Cash drawer opening uses the same printer bridge and sends an ESC/POS drawer pulse.
+Cash drawer opening is a separate, explicit action through the backend printer bridge. Normal ticket printing and history reprints do not request a drawer pulse.
 
 ## Useful Commands
 
@@ -468,6 +467,12 @@ Run backend tests:
 npm run -w backend test
 ```
 
+Run all script, backend, and frontend tests, backend/frontend typechecks, the web export, and an isolated compiled-backend auth/health smoke test:
+
+```bash
+npm run check
+```
+
 Typecheck frontend:
 
 ```bash
@@ -480,12 +485,38 @@ Build everything:
 npm run build
 ```
 
+Apply production-style committed migrations without seeding:
+
+```bash
+npm run db:migrate:deploy
+```
+
+Explicitly load the bundled initial menu into a genuinely new and otherwise empty database:
+
+```bash
+npm run db:initialize:new
+```
+
 Prisma Studio:
 
 ```bash
 cd packages/backend
 npm run prisma:studio
 ```
+
+## Database Backup, Upgrade, And Recovery
+
+The working SQLite file contains operational and ticket/accounting history. It is runtime state, is ignored by Git, and is never supposed to be included in a Linux package. Do not use Git or a generated `.run` artifact as a data backup. The complete production procedure is in `PRODUCTION_FIRST_RUN.md`.
+
+Before an application or operating-system upgrade:
+
+1. Stop the POS and verify the stop command reports that all processes stopped.
+2. Copy `packages/backend/prisma/dev.db` to protected storage outside the application directory.
+3. Keep multiple dated copies and periodically test restoring one on a separate machine.
+4. Start/install the new version. If migrations are pending, run `npm run db:migrate:deploy -- --backup-output=/absolute/external/path.db`. The preparer recovers/checkpoints and integrity-checks SQLite, creates a guarded local copy plus a verified non-overwriting external copy, tests the migration on a temporary restore, and only then applies `prisma migrate deploy`. Guarded backups are not automatically deleted.
+5. Confirm `/health`, tables, open orders, ticket history, totals, and printing before resuming service.
+
+If migration preparation fails, the launcher restores the guarded copy (or removes an incomplete brand-new database) and does not start the application. Do not repeatedly seed or replace a populated database. To restore manually, stop the POS, preserve the failed database for investigation, copy a known-good backup to `packages/backend/prisma/dev.db`, and start again. If the `sqlite3` command is installed, `sqlite3 packages/backend/prisma/dev.db 'PRAGMA integrity_check;'` should return `ok` before a restored database is put back into service.
 
 ## Troubleshooting
 
@@ -559,13 +590,15 @@ That is expected. Browser apps cannot silently save a PDF without extra PDF gene
 
 ### Database Is Empty
 
-Run migrations and seed:
+For a genuinely new or zero-byte database, run the guarded preparation command:
 
 ```bash
-cd packages/backend
-npm run prisma:migrate:dev
-npm run seed
+npm run db:migrate:deploy
 ```
+
+If this is a brand-new installation with no transferred data and you want the bundled initial menu, run `npm run db:initialize:new` once after schema creation.
+
+If a previously populated database appears empty, stop and restore a known-good backup instead of seeding it.
 
 ### Port Already In Use
 
@@ -596,6 +629,4 @@ packages/
   frontend/
     App.tsx          Main app shell
     src/native/      Controllers, components, styles, services
-  shared/
-    src/             Shared types/constants
 ```

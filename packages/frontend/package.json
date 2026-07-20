@@ -12,6 +12,7 @@
     "ios": "expo run:ios",
     "web": "node ../../scripts/expo-start.mjs default --web",
     "web:desktop": "node ../../scripts/expo-start.mjs desktop --web",
+    "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "expo export --platform web"
   },
@@ -28,11 +29,12 @@
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-web": "^0.21.0",
-    "shared": "*",
     "toqr": "^0.1.1"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@types/react": "~19.2.14",
+    "tsx": "^4.23.1",
     "typescript": "~6.0.3"
   }
 }

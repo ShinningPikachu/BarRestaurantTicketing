@@ -5,7 +5,6 @@ import { DesktopPosScreen } from '../components';
 import { MainScreenProps } from './MainScreen.types';
 import { desktopStyles as styles } from './DesktopMain.styles';
 import { MenuItem, PaidTicket, TicketPeriodPreset, tableZoneLabel, normalizeTableZone } from '../types';
-import { getSimplifiedInvoiceConfig } from '../helpers/kitchenTicketPrinter';
 
 type ProductEditValues = {
   name: string;
@@ -197,16 +196,15 @@ function getModeLabel(mode: string): string {
 }
 
 function getTicketBusinessLine(ticket: PaidTicket): string {
-  const invoiceConfig = getSimplifiedInvoiceConfig();
   const business = [
-    ticket.tradeName || invoiceConfig.tradeName,
-    ticket.businessName || invoiceConfig.businessName,
+    ticket.tradeName,
+    ticket.businessName,
   ].filter(Boolean).join(' · ');
   return business || 'Empresa no registrada en el ticket';
 }
 
 function getTicketBusinessTaxId(ticket: PaidTicket): string {
-  return ticket.businessTaxId || getSimplifiedInvoiceConfig().nif || 'No registrado';
+  return ticket.businessTaxId || 'No registrado';
 }
 
 function getTicketLineSummary(ticket: PaidTicket): string {
