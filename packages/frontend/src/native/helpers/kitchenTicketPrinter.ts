@@ -91,7 +91,10 @@ function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; to
 function shouldUseXprinterBridge(): boolean {
   const printMode = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TICKET_PRINT_MODE?.trim().toLowerCase();
 
-  return printMode === 'xprinter-lan' || printMode === 'xprinter-usb';
+  return printMode === 'xprinter-lan'
+    || printMode === 'xprinter-usb'
+    || printMode === 'xprinter-bluetooth'
+    || printMode === 'xprinter-system';
 }
 function getCombinedOrderLines(orders: Order[]): Array<{ name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }> {
   const lineByKey = new Map<string, { name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }>();

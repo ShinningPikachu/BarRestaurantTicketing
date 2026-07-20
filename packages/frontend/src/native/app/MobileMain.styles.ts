@@ -84,7 +84,7 @@ export const mobileStyles = StyleSheet.create({
     color: colors.textLight
   },
   homeGrid: {
-    flex: 1,
+    flexGrow: 1,
     flexDirection: 'column',
     gap: 8
   },

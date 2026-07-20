@@ -23,6 +23,7 @@ import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCat
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel, TicketHistorySummary, TicketPeriodPreset } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
+import type { PrinterDiagnostics, PrinterStatus } from './src/native/services/api';
 import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
@@ -509,6 +510,9 @@ export default function App(): React.JSX.Element {
   const [productSku, setProductSku] = useState('');
   const [productDescription, setProductDescription] = useState('');
   const [productImageDataUrl, setProductImageDataUrl] = useState<string | null>(null);
+  const [printerStatus, setPrinterStatus] = useState<PrinterStatus | null>(null);
+  const [printerDiagnostics, setPrinterDiagnostics] = useState<PrinterDiagnostics | null>(null);
+  const [printerAction, setPrinterAction] = useState<'refresh' | 'reconnect' | 'test' | 'cancel' | 'diagnostics' | null>(null);
   const {
     loading,
     tables,
@@ -560,6 +564,9 @@ export default function App(): React.JSX.Element {
     setProductSku('');
     setProductDescription('');
     setProductImageDataUrl(null);
+    setPrinterStatus(null);
+    setPrinterDiagnostics(null);
+    setPrinterAction(null);
   }
 
   function closePairingScanner(): void {
@@ -1388,12 +1395,101 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function refreshPrinterStatus(showError = true): Promise<PrinterStatus | null> {
+    if (printerAction) return printerStatus;
+    setPrinterAction('refresh');
+    try {
+      const status = await apiService.fetchPrinterStatus();
+      setPrinterStatus(status);
+      return status;
+    } catch {
+      if (showError) Alert.alert('Impresora', 'No se pudo consultar el estado de la impresora.');
+      return null;
+    } finally {
+      setPrinterAction(null);
+    }
+  }
+
+  async function ensurePrinterAvailable(): Promise<boolean> {
+    try {
+      const status = await apiService.fetchPrinterStatus();
+      setPrinterStatus(status);
+      if (status.state === 'connected' || status.state === 'busy') return true;
+      Alert.alert('Impresora no disponible', status.error ?? 'Comprueba la conexión desde la pantalla Impresora.');
+      return false;
+    } catch {
+      Alert.alert('Impresora no disponible', 'No se pudo verificar la conexión. No se envió ningún trabajo.');
+      return false;
+    }
+  }
+
+  async function reconnectPrinter(): Promise<void> {
+    if (printerAction) return;
+    setPrinterAction('reconnect');
+    try {
+      const status = await apiService.reconnectPrinter();
+      setPrinterStatus(status);
+    } catch {
+      Alert.alert('Impresora', 'No se pudo restablecer la conexión.');
+    } finally {
+      setPrinterAction(null);
+    }
+  }
+
+  async function runPrinterTest(): Promise<void> {
+    if (printerAction || printerStatus?.state !== 'connected') return;
+    setPrinterAction('test');
+    try {
+      const result = await apiService.runSafePrinterTest();
+      setPrinterStatus(await apiService.fetchPrinterStatus());
+      Alert.alert(
+        result.deduplicated ? 'Prueba ya enviada' : 'Prueba enviada',
+        'La prueba contiene únicamente texto fijo y ningún dato de clientes.'
+      );
+    } catch {
+      setPrinterStatus(await apiService.fetchPrinterStatus().catch(() => printerStatus));
+      Alert.alert('Impresora', 'La prueba segura no pudo completarse.');
+    } finally {
+      setPrinterAction(null);
+    }
+  }
+
+  async function cancelPendingPrinterJobs(): Promise<void> {
+    if (printerAction) return;
+    setPrinterAction('cancel');
+    try {
+      const result = await apiService.cancelPendingPrinterJobs();
+      setPrinterStatus(result.status);
+      Alert.alert('Cola actualizada', `${result.cancelled} trabajos pendientes cancelados. El trabajo activo no se interrumpió.`);
+    } catch {
+      Alert.alert('Impresora', 'No se pudieron cancelar los trabajos pendientes.');
+    } finally {
+      setPrinterAction(null);
+    }
+  }
+
+  async function openPrinterDiagnostics(): Promise<void> {
+    if (printerAction) return;
+    setPrinterAction('diagnostics');
+    try {
+      const diagnostics = await apiService.fetchPrinterDiagnostics();
+      setPrinterDiagnostics(diagnostics);
+      setPrinterStatus(diagnostics.status);
+    } catch {
+      Alert.alert('Diagnósticos', 'No se pudieron abrir los diagnósticos de la impresora.');
+    } finally {
+      setPrinterAction(null);
+    }
+  }
+
   async function printSimplifiedPaidTicket(ticket: PaidTicket): Promise<void> {
+    if (!await ensurePrinterAvailable()) return;
     try {
       // The server renders the immutable issuer and line-item snapshot stored
       // with this payment. Never rebuild a fiscal reprint from live config.
-      await apiService.printPaidTicket(ticket.id, false);
-      Alert.alert('Ticket impreso', `Se ha enviado ${ticket.ticketNumber} a la impresora.`);
+      const result = await apiService.printPaidTicket(ticket.id, false);
+      void refreshPrinterStatus(false);
+      Alert.alert(result.deduplicated ? 'Ticket ya enviado' : 'Ticket impreso', `Se ha enviado ${ticket.ticketNumber} a la impresora.`);
     } catch {
       Alert.alert('Error', 'No se pudo imprimir el ticket simplificado.');
     }
@@ -1404,6 +1500,7 @@ export default function App(): React.JSX.Element {
       Alert.alert('Sin tickets', 'No hay tickets seleccionados para imprimir el resumen.');
       return;
     }
+    if (!await ensurePrinterAvailable()) return;
 
     const config = getSimplifiedInvoiceConfig();
     const sortedTickets = [...filteredPaidTickets].sort((first, second) => (
@@ -1458,7 +1555,7 @@ export default function App(): React.JSX.Element {
       .map(({ dayKey: _dayKey, ...dayTotals }) => dayTotals);
 
     try {
-      await apiService.printXprinterFinancialSummary({
+      const result = await apiService.printXprinterFinancialSummary({
         businessName: config.businessName,
         tradeName: config.tradeName,
         nif: config.nif,
@@ -1476,7 +1573,8 @@ export default function App(): React.JSX.Element {
         lastTicketNumber: lastTicket?.ticketNumber ?? null,
         dailyTotals,
       });
-      Alert.alert('Resumen impreso', 'Se ha enviado el resultado financiero a la impresora.');
+      void refreshPrinterStatus(false);
+      Alert.alert(result.deduplicated ? 'Resumen ya enviado' : 'Resumen impreso', 'Se ha enviado el resultado financiero a la impresora.');
     } catch (error) {
       const details = error instanceof ApiRequestError ? `\n\n${error.message}` : '';
       Alert.alert('Error', `No se pudo imprimir el resumen financiero.${details}`);
@@ -1484,8 +1582,10 @@ export default function App(): React.JSX.Element {
   }
 
   async function openCashDrawer(): Promise<void> {
+    if (!await ensurePrinterAvailable()) return;
     try {
       await apiService.openXprinterCashDrawer();
+      void refreshPrinterStatus(false);
       Alert.alert('Caja abierta', 'Se ha enviado la orden de apertura a la caja.');
     } catch (error) {
       const details = error instanceof ApiRequestError ? `\n\n${error.message}` : '';
@@ -1600,6 +1700,25 @@ export default function App(): React.JSX.Element {
       void loadManagedProducts();
     }
   }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'printer' || authStatus !== 'signedIn') return;
+    let active = true;
+    const updateStatus = async () => {
+      try {
+        const status = await apiService.fetchPrinterStatus();
+        if (active) setPrinterStatus(status);
+      } catch {
+        // Keep the last known state. Manual refresh provides user feedback.
+      }
+    };
+    void updateStatus();
+    const interval = setInterval(() => void updateStatus(), 5_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeSection, authStatus]);
 
   useEffect(() => {
     if (authStatus !== 'signedIn' || loading) {
@@ -1873,6 +1992,14 @@ export default function App(): React.JSX.Element {
     printFilteredTicketSummary,
     downloadTicket,
     downloadFilteredTicketPdfs,
+    printerStatus,
+    printerDiagnostics,
+    printerAction,
+    refreshPrinterStatus: () => void refreshPrinterStatus(),
+    reconnectPrinter: () => void reconnectPrinter(),
+    runPrinterTest: () => void runPrinterTest(),
+    cancelPendingPrinterJobs: () => void cancelPendingPrinterJobs(),
+    openPrinterDiagnostics: () => void openPrinterDiagnostics(),
     managedCategories,
     managedMenuItems,
     productName,

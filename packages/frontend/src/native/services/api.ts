@@ -9,6 +9,54 @@ export interface SyncRevision {
   scope: 'menu' | 'orders' | 'tables' | null;
 }
 
+export type PrinterConnectionState = 'connected' | 'disconnected' | 'unavailable' | 'busy' | 'out_of_paper' | 'error' | 'unknown';
+export type PrinterJobKind = 'ticket' | 'financial-summary' | 'test-print' | 'cash-drawer';
+
+export interface PrinterStatus {
+  state: PrinterConnectionState;
+  printerName: string;
+  connectionType: string;
+  address: string | null;
+  dataFormat: 'escpos' | 'text';
+  lastSuccessfulConnectionAt: string | null;
+  lastSuccessfulPrintAt: string | null;
+  lastStateChangeAt: string;
+  error: string | null;
+  queue: {
+    pending: number;
+    external: number | null;
+    active: boolean;
+    activeJobId: string | null;
+    activeJobKind: PrinterJobKind | null;
+  };
+}
+
+export interface PrinterJobResponse {
+  printed: boolean;
+  jobId: string;
+  deduplicated: boolean;
+  acceptedAt: string;
+  completedAt: string;
+}
+
+export interface PrinterDiagnostics {
+  status: PrinterStatus;
+  paperColumns: number;
+  cutMode: string;
+  safeRetryLimit: number;
+  queueLimit: number;
+  note: string;
+  recentJobs: Array<{
+    jobId: string;
+    kind: PrinterJobKind;
+    state: 'completed' | 'failed' | 'cancelled';
+    createdAt: string;
+    completedAt: string;
+    attempts: number;
+    error: string | null;
+  }>;
+}
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -20,6 +68,7 @@ interface ApiResponse<T = unknown> {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const CONNECTION_TEST_TIMEOUT_MS = 7_500;
+const PRINTER_REQUEST_TIMEOUT_MS = 45_000;
 
 let unauthorizedHandler: (() => void | Promise<void>) | null = null;
 
@@ -198,7 +247,7 @@ export class ApiService {
     return result;
   }
 
-  private async request(path: string, init: RequestInit = {}): Promise<Response> {
+  private async request(path: string, init: RequestInit = {}, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<Response> {
     const headers = new Headers(init.headers);
     const authGeneration = this.authGeneration;
     if (this.authToken) {
@@ -208,7 +257,7 @@ export class ApiService {
     const response = await fetchWithTimeout(`${apiBaseUrl}${path}`, {
       ...init,
       headers,
-    });
+    }, timeoutMs);
     // Ignore an unauthorized response belonging to an older login or server.
     if (response.status === 401 && authGeneration === this.authGeneration) {
       void unauthorizedHandler?.();
@@ -461,22 +510,22 @@ export class ApiService {
     totalCents: number;
     ticketNote?: string | null;
     splitPeople?: number | null;
-  }): Promise<{ printed: boolean }> {
+  }): Promise<PrinterJobResponse> {
     const response = await this.request('/printers/xprinter/ticket', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    });
-    return parseOrThrow<{ printed: boolean }>(response, 'Failed to print Xprinter ticket');
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterJobResponse>(response, 'Failed to print Xprinter ticket');
   }
 
-  async printPaidTicket(ticketId: string, openCashDrawer = false): Promise<{ printed: boolean }> {
+  async printPaidTicket(ticketId: string, openCashDrawer = false): Promise<PrinterJobResponse & { ticketId: string }> {
     const response = await this.request(`/printers/xprinter/paid-ticket/${encodeURIComponent(ticketId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ openCashDrawer })
-    });
-    return parseOrThrow<{ printed: boolean }>(response, 'Failed to reprint paid ticket');
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterJobResponse & { ticketId: string }>(response, 'Failed to reprint paid ticket');
   }
 
   async printXprinterFinancialSummary(payload: {
@@ -505,22 +554,55 @@ export class ApiService {
       cashCents: number;
       cardCents: number;
     }>;
-  }): Promise<{ printed: boolean }> {
+  }): Promise<PrinterJobResponse> {
     const response = await this.request('/printers/xprinter/financial-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    });
-    return parseOrThrow<{ printed: boolean }>(response, 'Failed to print Xprinter financial summary');
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterJobResponse>(response, 'Failed to print Xprinter financial summary');
   }
 
-  async openXprinterCashDrawer(): Promise<{ opened: boolean }> {
+  async openXprinterCashDrawer(): Promise<PrinterJobResponse & { opened: boolean }> {
     const response = await this.request('/printers/xprinter/drawer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
-    });
-    return parseOrThrow<{ opened: boolean }>(response, 'Failed to open cash drawer');
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterJobResponse & { opened: boolean }>(response, 'Failed to open cash drawer');
+  }
+
+  async fetchPrinterStatus(): Promise<PrinterStatus> {
+    const response = await this.request('/printers/status');
+    return parseOrThrow<PrinterStatus>(response, 'Failed to read printer status');
+  }
+
+  async reconnectPrinter(): Promise<PrinterStatus> {
+    const response = await this.request('/printers/reconnect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterStatus>(response, 'Failed to reconnect printer');
+  }
+
+  async runSafePrinterTest(): Promise<PrinterJobResponse> {
+    const response = await this.request('/printers/test-print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterJobResponse>(response, 'Failed to run printer test');
+  }
+
+  async cancelPendingPrinterJobs(): Promise<{ cancelled: number; status: PrinterStatus }> {
+    const response = await this.request('/printers/queue/pending', { method: 'DELETE' });
+    return parseOrThrow<{ cancelled: number; status: PrinterStatus }>(response, 'Failed to cancel pending printer jobs');
+  }
+
+  async fetchPrinterDiagnostics(): Promise<PrinterDiagnostics> {
+    const response = await this.request('/printers/diagnostics');
+    return parseOrThrow<PrinterDiagnostics>(response, 'Failed to load printer diagnostics');
   }
 }
 

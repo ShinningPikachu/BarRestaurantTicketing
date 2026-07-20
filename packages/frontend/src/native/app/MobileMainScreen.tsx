@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Platform, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { MobilePosScreen } from '../components';
+import { MobilePosScreen, PrinterStatusPanel } from '../components';
 import { AppSection, MainScreenProps } from './MainScreen.types';
 import { mobileStyles as styles } from './MobileMain.styles';
 import { MenuItem, PaidTicket, TicketPeriodPreset, normalizeTableZone, tableZoneLabel } from '../types';
@@ -41,6 +41,7 @@ const screenTitles: Record<AppSection, string> = {
   pos: 'Venta',
   history: 'Tickets',
   products: 'Productos',
+  printer: 'Impresora',
   'mobile-connect': 'Conectar movil',
 };
 
@@ -49,6 +50,7 @@ const screenSubtitles: Record<AppSection, string> = {
   pos: 'Mesas, pedidos y cobro',
   history: 'Copias, PDF y resumen de caja',
   products: 'Menu, precios e imagenes',
+  printer: 'Estado, cola y diagnósticos',
   'mobile-connect': 'Emparejar telefono',
 };
 
@@ -90,6 +92,7 @@ function MobileBottomTabs({
     { section: 'pos', label: 'TPV' },
     { section: 'history', label: 'Tickets' },
     { section: 'products', label: 'Productos' },
+    { section: 'printer', label: 'Impresora' },
   ];
 
   return (
@@ -113,7 +116,7 @@ function MobileBottomTabs({
 
 function MobileHomeScreen(props: MainScreenProps): React.JSX.Element {
   return (
-    <View style={styles.homeGrid}>
+    <ScrollView contentContainerStyle={styles.homeGrid}>
       <TouchableOpacity style={styles.homeButton} onPress={() => props.setActiveSection('pos')}>
         <Text style={styles.homeButtonTitle}>TPV</Text>
         <Text style={styles.homeButtonText}>Mesas, menu, pedidos y pagos.</Text>
@@ -126,7 +129,11 @@ function MobileHomeScreen(props: MainScreenProps): React.JSX.Element {
         <Text style={styles.homeButtonTitle}>Productos</Text>
         <Text style={styles.homeButtonText}>Añadir productos, tipos, precios e imagenes.</Text>
       </TouchableOpacity>
-    </View>
+      <TouchableOpacity style={styles.homeButton} onPress={() => props.setActiveSection('printer')}>
+        <Text style={styles.homeButtonTitle}>Impresora</Text>
+        <Text style={styles.homeButtonText}>Comprobar conexión, cola y prueba segura.</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
@@ -539,6 +546,18 @@ export function MobileMainScreen(props: MainScreenProps): React.JSX.Element {
         {props.activeSection === 'home' ? <MobileHomeScreen {...props} /> : null}
         {props.activeSection === 'history' ? <MobileHistoryScreen {...props} /> : null}
         {props.activeSection === 'products' ? <MobileProductsScreen {...props} /> : null}
+        {props.activeSection === 'printer' ? (
+          <PrinterStatusPanel
+            status={props.printerStatus}
+            diagnostics={props.printerDiagnostics}
+            action={props.printerAction}
+            onRefresh={props.refreshPrinterStatus}
+            onReconnect={props.reconnectPrinter}
+            onTestPrint={props.runPrinterTest}
+            onCancelPending={props.cancelPendingPrinterJobs}
+            onOpenDiagnostics={props.openPrinterDiagnostics}
+          />
+        ) : null}
         {props.activeSection === 'pos' ? <MobilePosScreen {...props.posScreenProps} /> : null}
       </View>
       <MobileBottomTabs activeSection={props.activeSection} setActiveSection={props.setActiveSection} goHome={props.goHome} />

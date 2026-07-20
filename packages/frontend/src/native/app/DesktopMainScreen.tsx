@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { toQR } from 'toqr';
-import { DesktopPosScreen } from '../components';
+import { DesktopPosScreen, PrinterStatusPanel } from '../components';
 import { MainScreenProps } from './MainScreen.types';
 import { desktopStyles as styles } from './DesktopMain.styles';
 import { MenuItem, PaidTicket, TicketPeriodPreset, tableZoneLabel, normalizeTableZone } from '../types';
@@ -421,6 +421,10 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
             <Text style={styles.homeButtonTitle}>Productos</Text>
             <Text style={styles.homeButtonText}>Añadir productos, tipos y cambiar precios.</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.homeButton} onPress={() => props.setActiveSection('printer')}>
+            <Text style={styles.homeButtonTitle}>Impresora</Text>
+            <Text style={styles.homeButtonText}>Estado, cola, prueba segura y diagnósticos.</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.homeButton} onPress={() => props.setActiveSection('mobile-connect')}>
             <Text style={styles.homeButtonTitle}>Conectar movil</Text>
             <Text style={styles.homeButtonText}>Mostrar el QR para emparejar la app instalada del telefono.</Text>
@@ -541,6 +545,21 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
               <DesktopProductEditRow key={item.id} item={item} props={props} />
             ))}
           </ScrollView>
+        </View>
+      ) : null}
+
+      {props.activeSection === 'printer' ? (
+        <View style={styles.fullPanel}>
+          <PrinterStatusPanel
+            status={props.printerStatus}
+            diagnostics={props.printerDiagnostics}
+            action={props.printerAction}
+            onRefresh={props.refreshPrinterStatus}
+            onReconnect={props.reconnectPrinter}
+            onTestPrint={props.runPrinterTest}
+            onCancelPending={props.cancelPendingPrinterJobs}
+            onOpenDiagnostics={props.openPrinterDiagnostics}
+          />
         </View>
       ) : null}
 

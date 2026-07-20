@@ -1,8 +1,9 @@
 import { ComponentProps } from 'react';
 import { DesktopPosScreen, MobilePosScreen } from '../components';
 import { MenuItem, PaidTicket, SessionSummary, TicketHistorySummary, TicketPeriodPreset } from '../types';
+import type { PrinterDiagnostics, PrinterStatus } from '../services/api';
 
-export type AppSection = 'home' | 'pos' | 'history' | 'products' | 'mobile-connect';
+export type AppSection = 'home' | 'pos' | 'history' | 'products' | 'printer' | 'mobile-connect';
 export type PosScreenProps = ComponentProps<typeof DesktopPosScreen> & ComponentProps<typeof MobilePosScreen>;
 
 export interface MainScreenProps {
@@ -38,6 +39,14 @@ export interface MainScreenProps {
   printFilteredTicketSummary: () => Promise<void>;
   downloadTicket: (ticket: PaidTicket) => Promise<void>;
   downloadFilteredTicketPdfs: () => Promise<void>;
+  printerStatus: PrinterStatus | null;
+  printerDiagnostics: PrinterDiagnostics | null;
+  printerAction: 'refresh' | 'reconnect' | 'test' | 'cancel' | 'diagnostics' | null;
+  refreshPrinterStatus: () => void;
+  reconnectPrinter: () => void;
+  runPrinterTest: () => void;
+  cancelPendingPrinterJobs: () => void;
+  openPrinterDiagnostics: () => void;
   managedCategories: string[];
   managedMenuItems: MenuItem[];
   productName: string;

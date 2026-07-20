@@ -81,6 +81,38 @@ const xprinterFinancialSummarySchema = z.object({
   firstTicketNumber: optionalText(128),
   lastTicketNumber: optionalText(128),
   dailyTotals: z.array(financialSummaryDaySchema).min(1).max(3_660),
+}).superRefine((summary, context) => {
+  const totals = summary.dailyTotals.reduce((result, day) => ({
+    ticketCount: result.ticketCount + day.ticketCount,
+    itemQuantity: result.itemQuantity + day.itemQuantity,
+    taxableBaseCents: result.taxableBaseCents + day.taxableBaseCents,
+    vatCents: result.vatCents + day.vatCents,
+    totalCents: result.totalCents + day.totalCents,
+    cashCents: result.cashCents + day.cashCents,
+    cardCents: result.cardCents + day.cardCents,
+  }), {
+    ticketCount: 0,
+    itemQuantity: 0,
+    taxableBaseCents: 0,
+    vatCents: 0,
+    totalCents: 0,
+    cashCents: 0,
+    cardCents: 0,
+  });
+  const fields = Object.keys(totals) as Array<keyof typeof totals>;
+  if (fields.some((field) => !Number.isSafeInteger(totals[field]) || totals[field] !== summary[field])) {
+    context.addIssue({ code: 'custom', message: 'Financial summary totals do not match daily totals' });
+  }
+  if (
+    summary.taxableBaseCents + summary.vatCents !== summary.totalCents
+    || summary.cashCents + summary.cardCents !== summary.totalCents
+    || summary.dailyTotals.some((day) => (
+      day.taxableBaseCents + day.vatCents !== day.totalCents
+      || day.cashCents + day.cardCents !== day.totalCents
+    ))
+  ) {
+    context.addIssue({ code: 'custom', message: 'Financial summary accounting totals are inconsistent' });
+  }
 });
 
 const emptyBodySchema = z.object({}).optional();
@@ -99,8 +131,8 @@ router.post(
   validateBody(xprinterTicketSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await xprinterService.printTicket(req.body);
-      res.json(successResponse({ printed: true }));
+      const job = await xprinterService.printTicket(req.body);
+      res.json(successResponse({ printed: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
     }
@@ -112,8 +144,8 @@ router.post(
   validateBody(xprinterFinancialSummarySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await xprinterService.printFinancialSummary(req.body);
-      res.json(successResponse({ printed: true }));
+      const job = await xprinterService.printFinancialSummary(req.body);
+      res.json(successResponse({ printed: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
     }
@@ -133,7 +165,7 @@ router.post(
       if (!ticket) throw new ApiError(404, 'Paid ticket not found', 'PAID_TICKET_NOT_FOUND');
       if (ticket.status !== 'paid') throw new ApiError(409, 'Only paid tickets can be printed', 'TICKET_NOT_PAYABLE');
 
-      await xprinterService.printTicket({
+      const job = await xprinterService.printTicket({
         businessName: ticket.businessName,
         tradeName: ticket.tradeName,
         nif: ticket.businessTaxId,
@@ -153,7 +185,7 @@ router.post(
         openCashDrawer: req.body?.openCashDrawer,
         fiscal: true,
       });
-      res.json(successResponse({ printed: true, ticketId: ticket.id }));
+      res.json(successResponse({ printed: true, ticketId: ticket.id, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
     }
@@ -165,12 +197,54 @@ router.post(
   validateBody(emptyBodySchema),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      await xprinterService.openCashDrawer();
-      res.json(successResponse({ opened: true }));
+      const job = await xprinterService.openCashDrawer();
+      res.json(successResponse({ opened: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
     }
   }
 );
+
+router.get('/status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json(successResponse(await xprinterService.getStatus(true)));
+  } catch (error) {
+    next(toPrinterApiError(error));
+  }
+});
+
+router.post('/reconnect', validateBody(emptyBodySchema), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json(successResponse(await xprinterService.reconnect()));
+  } catch (error) {
+    next(toPrinterApiError(error));
+  }
+});
+
+router.post('/test-print', validateBody(emptyBodySchema), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const job = await xprinterService.runSafeTestPrint();
+    res.json(successResponse({ printed: true, ...job }));
+  } catch (error) {
+    next(toPrinterApiError(error));
+  }
+});
+
+router.delete('/queue/pending', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cancelled = xprinterService.cancelPendingJobs();
+    res.json(successResponse({ cancelled, status: await xprinterService.getStatus(false) }));
+  } catch (error) {
+    next(toPrinterApiError(error));
+  }
+});
+
+router.get('/diagnostics', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json(successResponse(await xprinterService.getDiagnostics()));
+  } catch (error) {
+    next(toPrinterApiError(error));
+  }
+});
 
 export default router;

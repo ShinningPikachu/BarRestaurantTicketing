@@ -28,6 +28,21 @@ function boundedInteger(name: string, fallback: number, min: number, max: number
   return value;
 }
 
+function booleanValue(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  throw new Error(`${name} must be true or false`);
+}
+
+function choiceValue<T extends string>(name: string, fallback: T, values: readonly T[]): T {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  if (values.includes(raw as T)) return raw as T;
+  throw new Error(`${name} must be one of: ${values.join(', ')}`);
+}
+
 function requiredCredential(name: 'POS_ACCESS_CODE' | 'POS_AUTH_TOKEN', testValue: string): string {
   const value = process.env[name]?.trim();
   if (value) return value;
@@ -94,6 +109,16 @@ rejectInsecureProductionValue('TICKET_TRADE_NAME', tradeName);
 rejectInsecureProductionValue('TICKET_BUSINESS_NIF', businessTaxId);
 rejectInsecureProductionValue('TICKET_BUSINESS_ADDRESS', businessAddress);
 
+const configuredPrinterTargets = [
+  process.env.XPRINTER_PRINTER_NAME,
+  process.env.XPRINTER_USB_DEVICE,
+  process.env.XPRINTER_BLUETOOTH_DEVICE,
+  process.env.XPRINTER_HOST,
+].filter((value) => Boolean(value?.trim()));
+if (configuredPrinterTargets.length > 1) {
+  throw new Error('Configure exactly one printer target: system name, USB device, Bluetooth device, or network host');
+}
+
 export const config = {
   port: boundedInteger('PORT', 3000, 1, 65_535),
   host: process.env.HOST || '0.0.0.0',
@@ -108,11 +133,14 @@ export const config = {
     host: process.env.XPRINTER_HOST || '',
     port: boundedInteger('XPRINTER_PORT', 9100, 1, 65_535),
     printerName: process.env.XPRINTER_PRINTER_NAME || '',
-    // Preserve the historical raw CUPS behavior unless an administrator
-    // explicitly opts into driver-formatted text output.
-    systemPrinterRaw: process.env.XPRINTER_SYSTEM_PRINTER_RAW !== 'false',
+    systemPrinterRaw: booleanValue('XPRINTER_SYSTEM_PRINTER_RAW', true),
+    systemPrinterRawConfigured: Boolean(process.env.XPRINTER_SYSTEM_PRINTER_RAW?.trim()),
     usbDevice: process.env.XPRINTER_USB_DEVICE || '',
+    bluetoothDevice: process.env.XPRINTER_BLUETOOTH_DEVICE || '',
     timeoutMs: boundedInteger('XPRINTER_TIMEOUT_MS', 10_000, 1_000, 60_000),
+    paperColumns: boundedInteger('XPRINTER_PAPER_COLUMNS', 48, 32, 64),
+    cutMode: choiceValue('XPRINTER_CUT_MODE', 'none', ['none', 'full', 'partial'] as const),
+    safeRetries: boundedInteger('XPRINTER_SAFE_RETRIES', 1, 0, 2),
   },
   auth: {
     accessCode,

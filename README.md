@@ -443,6 +443,7 @@ packages/backend/data/menu-import-template.csv
 Normal customer ticket printing can work in two ways:
 
 - If `EXPO_PUBLIC_TICKET_PRINT_MODE` is `xprinter-lan` or `xprinter-usb`, the frontend sends the print payload to the backend printer bridge.
+- `xprinter-system` and `xprinter-bluetooth` also use the backend bridge with their corresponding server-side adapter.
 - Otherwise, web opens the browser print flow and native opens the platform print flow.
 
 History reprint uses the backend Xprinter endpoint directly. Make sure backend printer variables are configured:
@@ -456,13 +457,26 @@ For system printer:
 
 ```env
 XPRINTER_PRINTER_NAME=PrinterName
+XPRINTER_SYSTEM_PRINTER_RAW=true
 ```
+
+`XPRINTER_SYSTEM_PRINTER_RAW` is required for a named system printer. Use `true` only with a raw ESC/POS CUPS queue. Set it to `false` for a normal driver queue; the backend will then submit sanitized text rather than ESC/POS commands. The printer bridge blocks named queues while this choice is omitted because the wrong mode can make CUPS or the printer interpret commands as unrelated text.
 
 For USB device:
 
 ```env
 XPRINTER_USB_DEVICE=/dev/usb/lp0
 ```
+
+For Bluetooth serial device:
+
+```env
+XPRINTER_BLUETOOTH_DEVICE=/dev/rfcomm0
+```
+
+Configure exactly one backend printer target. `XPRINTER_PAPER_COLUMNS` accepts `32` through `64` (normally `48` for 80 mm paper), `XPRINTER_CUT_MODE` accepts `none`, `full`, or `partial`, and `XPRINTER_SAFE_RETRIES` accepts `0` through `2`. Automatic retries happen only when the adapter proves that no print bytes were accepted.
+
+The Impresora screen shows connection and queue state, supports a fixed-data test print, and exposes sanitized diagnostics. See `PRINTING_MODULE_REVIEW.md` for the complete printing flow and failure semantics.
 
 Cash drawer opening is a separate, explicit action through the backend printer bridge. Normal ticket printing and history reprints do not request a drawer pulse.
 
@@ -594,7 +608,7 @@ Check:
 - Backend is running.
 - Printer IP/port is correct.
 - Printer is on the same network.
-- `XPRINTER_HOST` or `XPRINTER_PRINTER_NAME` or `XPRINTER_USB_DEVICE` is set.
+- Exactly one of `XPRINTER_HOST`, `XPRINTER_PRINTER_NAME`, `XPRINTER_USB_DEVICE`, or `XPRINTER_BLUETOOTH_DEVICE` is set; named system printers also set `XPRINTER_SYSTEM_PRINTER_RAW` explicitly.
 - Firewalls allow connection to printer port `9100` if using LAN.
 
 ### PDF Button Opens Print Dialog On Web

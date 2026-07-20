@@ -128,11 +128,15 @@ LOG_LEVEL=info
 XPRINTER_PRINTER_NAME=POS80_RAW
 XPRINTER_SYSTEM_PRINTER_RAW=true
 XPRINTER_TIMEOUT_MS=10000
+XPRINTER_PAPER_COLUMNS=48
+XPRINTER_CUT_MODE=none
+XPRINTER_SAFE_RETRIES=1
 # Or XPRINTER_USB_DEVICE=/dev/usb/lp0
+# Or XPRINTER_BLUETOOTH_DEVICE=/dev/rfcomm0
 # Or XPRINTER_HOST=192.168.1.50 and XPRINTER_PORT=9100
 ```
 
-Keep `XPRINTER_SYSTEM_PRINTER_RAW=true` for an existing raw CUPS queue. Set it to `false` only for a driver-formatted CUPS queue; cash-drawer commands through a named system printer require raw mode.
+Configure exactly one printer target. `XPRINTER_SYSTEM_PRINTER_RAW` is required when using `XPRINTER_PRINTER_NAME`: use `true` for a raw CUPS queue or `false` for a driver-formatted CUPS queue. Cash-drawer commands through a named system printer require raw mode. Start with `XPRINTER_CUT_MODE=none`, run the fixed safe test print from the Impresora screen, and enable the correct cutter command only after verifying the model.
 
 Do not set `DATABASE_URL`; the operational path is intentionally fixed. Do not put `BAR_TICKETING_ALLOW_INITIAL_SEED`, `BAR_TICKETING_TEST_DATABASE_URL`, smoke-test credentials, or development fixtures in `.env`.
 
