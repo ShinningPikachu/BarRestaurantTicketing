@@ -108,6 +108,9 @@ export const config = {
     host: process.env.XPRINTER_HOST || '',
     port: boundedInteger('XPRINTER_PORT', 9100, 1, 65_535),
     printerName: process.env.XPRINTER_PRINTER_NAME || '',
+    // Preserve the historical raw CUPS behavior unless an administrator
+    // explicitly opts into driver-formatted text output.
+    systemPrinterRaw: process.env.XPRINTER_SYSTEM_PRINTER_RAW !== 'false',
     usbDevice: process.env.XPRINTER_USB_DEVICE || '',
     timeoutMs: boundedInteger('XPRINTER_TIMEOUT_MS', 10_000, 1_000, 60_000),
   },

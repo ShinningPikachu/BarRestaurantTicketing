@@ -56,6 +56,8 @@ INSTALL_DIR="\${BAR_TICKETING_HOME:-$HOME/.local/share/BarRestaurantTicketing}"
 INSTALL_PARENT="$(dirname "$INSTALL_DIR")"
 PREVIOUS_DIR="$INSTALL_PARENT/.BarRestaurantTicketing-previous"
 BUNDLED_NODE_MODULES="${includeNodeModules ? '1' : '0'}"
+BAR_TICKETING_DESKTOP_STATIC="\${BAR_TICKETING_DESKTOP_STATIC:-1}"
+export BAR_TICKETING_DESKTOP_STATIC
 SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 UPDATE_DIR=""
 READY_PID=""

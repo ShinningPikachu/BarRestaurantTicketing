@@ -23,7 +23,6 @@ type ExpoLikeGlobal = typeof globalThis & {
     };
   };
 };
-
 export interface SimplifiedInvoiceConfig {
   businessName: string;
   tradeName: string;
@@ -90,11 +89,10 @@ function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; to
 }
 
 function shouldUseXprinterBridge(): boolean {
-  const env = (globalThis as ExpoLikeGlobal).process?.env;
-  return env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-lan'
-    || env?.EXPO_PUBLIC_TICKET_PRINT_MODE === 'xprinter-usb';
-}
+  const printMode = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TICKET_PRINT_MODE?.trim().toLowerCase();
 
+  return printMode === 'xprinter-lan' || printMode === 'xprinter-usb';
+}
 function getCombinedOrderLines(orders: Order[]): Array<{ name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }> {
   const lineByKey = new Map<string, { name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; totalPriceCents: number }>();
 

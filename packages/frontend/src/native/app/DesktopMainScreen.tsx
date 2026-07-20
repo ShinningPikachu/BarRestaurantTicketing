@@ -217,13 +217,18 @@ function DesktopHistorySummary(props: MainScreenProps): React.JSX.Element {
     <View style={styles.accountingSummaryPanel}>
       <View style={styles.accountingSummaryHeader}>
         <View style={styles.flex1}>
-          <Text style={styles.itemName}>Resultado fiscal</Text>
+          <Text style={styles.itemName}>Resultado financiero</Text>
           <Text style={styles.itemPrice}>{props.ticketDateRangeLabel}</Text>
           {props.ticketDateRangeError ? <Text style={styles.errorText}>{props.ticketDateRangeError}</Text> : null}
         </View>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => void props.downloadFilteredTicketPdfs()}>
-          <Text style={styles.primaryButtonText}>Exportar PDFs</Text>
-        </TouchableOpacity>
+        <View style={styles.historyInlineActions}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.printFilteredTicketSummary()} disabled={summary.ticketCount === 0}>
+            <Text style={styles.secondaryButtonText}>Imprimir resumen</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => void props.downloadFilteredTicketPdfs()}>
+            <Text style={styles.primaryButtonText}>Exportar PDFs</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.accountingSummaryGrid}>
         <View style={styles.accountingStat}>

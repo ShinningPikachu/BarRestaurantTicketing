@@ -54,6 +54,34 @@ export interface XprinterTicketPayload {
   fiscal?: boolean;
 }
 
+export interface XprinterFinancialSummaryPayload {
+  businessName: string;
+  tradeName: string;
+  nif: string;
+  periodLabel: string;
+  issuedAt: string;
+  ticketCount: number;
+  itemQuantity: number;
+  taxableBaseCents: number;
+  vatCents: number;
+  vatRateLabel?: string | null;
+  totalCents: number;
+  cashCents: number;
+  cardCents: number;
+  firstTicketNumber?: string | null;
+  lastTicketNumber?: string | null;
+  dailyTotals: Array<{
+    dayLabel: string;
+    ticketCount: number;
+    itemQuantity: number;
+    taxableBaseCents: number;
+    vatCents: number;
+    totalCents: number;
+    cashCents: number;
+    cardCents: number;
+  }>;
+}
+
 export class PrinterTransportError extends Error {
   constructor(
     message: string,
@@ -208,6 +236,143 @@ function buildEscPosTicket(payload: XprinterTicketPayload): Buffer {
   return Buffer.concat(chunks);
 }
 
+function buildSystemPrinterTicket(payload: XprinterTicketPayload): Buffer {
+  const rows: string[] = [];
+  const push = (value = '') => rows.push(normalizeReceiptText(value));
+
+  push(center(payload.tradeName.toUpperCase()));
+  push(center(payload.businessName));
+  push(center(`NIF: ${payload.nif}`));
+  for (const row of wrap(payload.address, RECEIPT_WIDTH)) push(center(row));
+  if (payload.city) push(center(payload.city));
+  if (payload.phone) push(center(`Movil: ${payload.phone}`));
+  push('='.repeat(RECEIPT_WIDTH));
+  push(center(payload.fiscal ? 'FACTURA SIMPLIFICADA' : 'PRECUENTA - NO FISCAL'));
+  push(line(payload.fiscal ? 'TICKET' : 'REFERENCIA', payload.invoiceNumber));
+  push(line('FECHA', payload.issuedAt));
+  push(line('MESA', payload.tableLabel));
+  if (payload.ticketNote) push(line('Modalidad', payload.ticketNote));
+  push('-'.repeat(RECEIPT_WIDTH));
+  push(itemLine('UD', 'PRODUCTO', 'PRECIO', 'TOTAL'));
+  push('-'.repeat(RECEIPT_WIDTH));
+
+  for (const item of payload.lines) {
+    const displayName = getLineDisplayName(item);
+    const nameRows = wrap(displayName.primary, ITEM_NAME_WIDTH);
+    push(itemLine(`${item.qty}x`, nameRows[0], money(item.unitPriceCents), money(item.totalPriceCents)));
+    for (const extraRow of nameRows.slice(1)) {
+      push(itemLine('', extraRow, '', ''));
+    }
+    if (displayName.secondary) {
+      for (const secondaryRow of wrap(displayName.secondary, ITEM_NAME_WIDTH)) {
+        push(itemLine('', secondaryRow, '', ''));
+      }
+    }
+  }
+
+  push('='.repeat(RECEIPT_WIDTH));
+  push(line(`BASE IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.taxableBaseCents)));
+  push(line(`IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.vatCents)));
+  push('-'.repeat(RECEIPT_WIDTH));
+  push(line('TOTAL', money(payload.totalCents)));
+  if (payload.splitPeople && payload.splitPeople > 1) {
+    push(line('Comensales', String(payload.splitPeople)));
+    push(line('Por persona', money(Math.trunc(payload.totalCents / payload.splitPeople))));
+  }
+  push('='.repeat(RECEIPT_WIDTH));
+  push(center('IVA incluido'));
+  push(center('Gracias por su visita'));
+  push('');
+
+  return Buffer.from(`${rows.join('\n')}\n`, 'utf8');
+}
+
+function financialSummaryRows(payload: XprinterFinancialSummaryPayload): string[] {
+  const rows: string[] = [];
+  const push = (value = '') => rows.push(normalizeReceiptText(value));
+  const vatLabel = payload.vatRateLabel ? `IVA ${payload.vatRateLabel}` : 'IVA';
+
+  push(center(payload.tradeName.toUpperCase()));
+  push(center(payload.businessName));
+  push(center(`NIF: ${payload.nif}`));
+  push('='.repeat(RECEIPT_WIDTH));
+  push(center('RESULTADO FINANCIERO'));
+  push(line('PERIODO', payload.periodLabel));
+  push(line('EMITIDO', payload.issuedAt));
+  push(line('TICKETS', String(payload.ticketCount)));
+  push(line('ARTICULOS', String(payload.itemQuantity)));
+  if (payload.firstTicketNumber || payload.lastTicketNumber) {
+    push(line('DESDE', payload.firstTicketNumber ?? '-'));
+    push(line('HASTA', payload.lastTicketNumber ?? '-'));
+  }
+
+  for (const day of payload.dailyTotals) {
+    push('-'.repeat(RECEIPT_WIDTH));
+    push(center(day.dayLabel));
+    push(line('Tickets', String(day.ticketCount)));
+    push(line('Articulos', String(day.itemQuantity)));
+    push(line('Base', money(day.taxableBaseCents)));
+    push(line(vatLabel, money(day.vatCents)));
+    push(line('Efectivo', money(day.cashCents)));
+    push(line('Tarjeta', money(day.cardCents)));
+    push(line('Total dia', money(day.totalCents)));
+  }
+
+  push('='.repeat(RECEIPT_WIDTH));
+  push(center('TOTAL GENERAL'));
+  push(line('BASE IMPONIBLE', money(payload.taxableBaseCents)));
+  push(line(vatLabel, money(payload.vatCents)));
+  push(line('EFECTIVO', money(payload.cashCents)));
+  push(line('TARJETA', money(payload.cardCents)));
+  push(line('TOTAL', money(payload.totalCents)));
+  push('='.repeat(RECEIPT_WIDTH));
+  push(center('Resumen de tickets seleccionados'));
+  push('');
+
+  return rows;
+}
+
+function buildEscPosFinancialSummary(payload: XprinterFinancialSummaryPayload): Buffer {
+  const chunks: Buffer[] = [];
+  const push = (value: string | number[]) => {
+    chunks.push(Array.isArray(value) ? Buffer.from(value) : Buffer.from(`${value}\n`, 'ascii'));
+  };
+
+  push([0x1b, 0x40]); // Initialize
+  push([0x1b, 0x4d, 0x00]); // Font A
+  push([0x1b, 0x61, 0x01]); // Center
+  push([0x1d, 0x21, 0x01]); // Double height
+  push([0x1b, 0x45, 0x01]); // Bold on
+  push(payload.tradeName.toUpperCase());
+  push([0x1d, 0x21, 0x00]); // Normal size
+  push(payload.businessName);
+  push(`NIF: ${payload.nif}`);
+  push([0x1b, 0x45, 0x00]); // Bold off
+  push([0x1b, 0x61, 0x00]); // Left
+
+  const rows = financialSummaryRows(payload).slice(3);
+  for (const row of rows) {
+    if (row.startsWith('TOTAL')) {
+      push([0x1d, 0x21, 0x11]); // Double width + height
+      push([0x1b, 0x45, 0x01]);
+      push(row);
+      push([0x1d, 0x21, 0x00]);
+      push([0x1b, 0x45, 0x00]);
+      continue;
+    }
+    push(row);
+  }
+
+  push('\n');
+  push([0x1d, 0x56, 0x42, 0x00]); // Cut
+
+  return Buffer.concat(chunks);
+}
+
+function buildSystemPrinterFinancialSummary(payload: XprinterFinancialSummaryPayload): Buffer {
+  return Buffer.from(`${financialSummaryRows(payload).join('\n')}\n`, 'utf8');
+}
+
 function buildOpenDrawerCommand(): Buffer {
   return Buffer.from([
     0x1b, 0x40, // Initialize
@@ -240,9 +405,14 @@ function writeToPrinter(buffer: Buffer, host: string, port: number, timeoutMs: n
   });
 }
 
-function writeToSystemPrinter(buffer: Buffer, printerName: string, timeoutMs: number): Promise<void> {
+function writeToSystemPrinter(
+  buffer: Buffer,
+  printerName: string,
+  timeoutMs: number,
+  options: { raw?: boolean } = {}
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const args = ['-d', printerName, '-o', 'raw'];
+    const args = options.raw ? ['-d', printerName, '-o', 'raw'] : ['-d', printerName];
     const child = spawn('lp', args);
     let stderr = '';
     let settled = false;
@@ -313,10 +483,22 @@ export class XprinterService {
     });
   }
 
-  private async writeConfiguredTarget(buffer: Buffer): Promise<void> {
+  private async writeConfiguredTarget(
+    buffer: Buffer,
+    options: { systemBuffer?: Buffer; requireRawSystemPrinter?: boolean } = {}
+  ): Promise<void> {
     const { printerName, usbDevice, host, port, timeoutMs } = config.xprinter;
     if (printerName) {
-      await writeToSystemPrinter(buffer, printerName, timeoutMs);
+      if (options.requireRawSystemPrinter && !config.xprinter.systemPrinterRaw) {
+        throw new PrinterTransportError(
+          'Cash drawer commands require XPRINTER_SYSTEM_PRINTER_RAW=true when using XPRINTER_PRINTER_NAME.',
+          'PRINTER_RAW_MODE_REQUIRED'
+        );
+      }
+      const systemBuffer = config.xprinter.systemPrinterRaw
+        ? buffer
+        : (options.systemBuffer ?? buffer);
+      await writeToSystemPrinter(systemBuffer, printerName, timeoutMs, { raw: config.xprinter.systemPrinterRaw });
       return;
     }
     if (usbDevice) {
@@ -337,12 +519,19 @@ export class XprinterService {
     const openCashDrawer = payload.openCashDrawer === true;
     const ticketPayload = { ...payload, openCashDrawer };
     const ticketBuffer = buildEscPosTicket(ticketPayload);
-    await this.enqueue(() => this.writeConfiguredTarget(ticketBuffer));
+    const systemBuffer = buildSystemPrinterTicket(ticketPayload);
+    await this.enqueue(() => this.writeConfiguredTarget(ticketBuffer, { systemBuffer }));
+  }
+
+  async printFinancialSummary(payload: XprinterFinancialSummaryPayload): Promise<void> {
+    const summaryBuffer = buildEscPosFinancialSummary(payload);
+    const systemBuffer = buildSystemPrinterFinancialSummary(payload);
+    await this.enqueue(() => this.writeConfiguredTarget(summaryBuffer, { systemBuffer }));
   }
 
   async openCashDrawer(): Promise<void> {
     const drawerBuffer = buildOpenDrawerCommand();
-    await this.enqueue(() => this.writeConfiguredTarget(drawerBuffer));
+    await this.enqueue(() => this.writeConfiguredTarget(drawerBuffer, { requireRawSystemPrinter: true }));
   }
 }
 

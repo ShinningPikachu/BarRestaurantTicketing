@@ -124,6 +124,8 @@ http://localhost:8081
 
 Keep the terminal window open while using the app. Press `Ctrl+C` in that window to stop it.
 
+The desktop start icon does not start the phone Expo QR server. Use `npm run dev` from a terminal when you want the development servers and phone Expo pairing.
+
 If the POS is already running, double-clicking the same start icon again only opens or focuses the existing POS screen. It does not start a second copy. If someone accidentally closes only the POS browser window, double-click the start icon again to reopen it.
 
 If the app keeps running or you closed the terminal window, double-click the generated stop button:
@@ -194,6 +196,17 @@ npm run -w backend dev
 ```
 
 The backend workspace command does not load the root `.env` by itself; source the trusted local file as shown or export the required variables explicitly. The combined launcher handles this automatically.
+
+Backend only without hot reload:
+
+```bash
+set -a
+. ./.env
+set +a
+npm run -w backend serve
+```
+
+Both backend-only commands require the trusted root `.env` to be sourced or the required variables to be exported explicitly. The combined launcher handles this automatically.
 
 Frontend web only:
 

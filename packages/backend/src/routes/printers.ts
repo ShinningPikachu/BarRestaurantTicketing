@@ -8,7 +8,9 @@ import { PrinterTransportError, xprinterService } from '../services/xprinter.ser
 
 const router = Router();
 const MAX_CENTS = 2_000_000_000;
+const MAX_COUNT = 10_000_000;
 const centsSchema = z.number().int().min(0).max(MAX_CENTS);
+const countSchema = z.number().int().min(0).max(MAX_COUNT);
 const optionalText = (max: number) => z.string().trim().max(max).optional().nullable();
 
 const ticketLineSchema = z.object({
@@ -51,6 +53,36 @@ export const xprinterTicketSchema = z.object({
   }
 });
 
+const financialSummaryDaySchema = z.object({
+  dayLabel: z.string().trim().min(1).max(100),
+  ticketCount: countSchema,
+  itemQuantity: countSchema,
+  taxableBaseCents: centsSchema,
+  vatCents: centsSchema,
+  totalCents: centsSchema,
+  cashCents: centsSchema,
+  cardCents: centsSchema,
+});
+
+const xprinterFinancialSummarySchema = z.object({
+  businessName: z.string().trim().min(1).max(200),
+  tradeName: z.string().trim().min(1).max(200),
+  nif: z.string().trim().min(1).max(64),
+  periodLabel: z.string().trim().min(1).max(200),
+  issuedAt: z.string().trim().min(1).max(64),
+  ticketCount: countSchema,
+  itemQuantity: countSchema,
+  taxableBaseCents: centsSchema,
+  vatCents: centsSchema,
+  vatRateLabel: optionalText(32),
+  totalCents: centsSchema,
+  cashCents: centsSchema,
+  cardCents: centsSchema,
+  firstTicketNumber: optionalText(128),
+  lastTicketNumber: optionalText(128),
+  dailyTotals: z.array(financialSummaryDaySchema).min(1).max(3_660),
+});
+
 const emptyBodySchema = z.object({}).optional();
 const paidTicketParamsSchema = z.object({ id: z.string().trim().min(1).max(128) });
 const paidTicketPrintSchema = z.object({ openCashDrawer: z.boolean().optional() }).optional();
@@ -68,6 +100,19 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await xprinterService.printTicket(req.body);
+      res.json(successResponse({ printed: true }));
+    } catch (error) {
+      next(toPrinterApiError(error));
+    }
+  }
+);
+
+router.post(
+  '/xprinter/financial-summary',
+  validateBody(xprinterFinancialSummarySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await xprinterService.printFinancialSummary(req.body);
       res.json(successResponse({ printed: true }));
     } catch (error) {
       next(toPrinterApiError(error));
@@ -118,7 +163,7 @@ router.post(
 router.post(
   '/xprinter/drawer',
   validateBody(emptyBodySchema),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       await xprinterService.openCashDrawer();
       res.json(successResponse({ opened: true }));

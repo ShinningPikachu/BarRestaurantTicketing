@@ -24,6 +24,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "prebuild": "prisma generate",
+    "serve": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "seed": "node --import tsx src/seed.ts",
