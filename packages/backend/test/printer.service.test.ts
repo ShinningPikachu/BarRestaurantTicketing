@@ -96,6 +96,51 @@ test('malformed prepared jobs and text control commands are rejected before tran
   assert.throws(() => validatePreparedPrinterJob(unsafeTextJob), { code: 'PRINTER_JOB_INVALID' });
 });
 
+test('thermal ticket uses a large bar name, bold legal name, fiscal heading, ticket id, structure, and cut', async () => {
+  const adapter = new MockPrinterAdapter();
+  const service = new XprinterService({
+    adapter,
+    paperColumns: 48,
+    cutMode: 'partial',
+  });
+
+  await service.printTicket(validTicket());
+
+  const output = adapter.printed[0];
+  const printable = output.toString('ascii');
+  const rows = printable.split('\n');
+  assert.equal(rows.find((row) => row.includes('TEST RESTAURANT'))?.endsWith('TEST RESTAURANT'), true);
+  assert.equal(output.includes(Buffer.from([
+    0x1b, 0x61, 0x01,
+    0x1b, 0x45, 0x01,
+    0x1d, 0x21, 0x11,
+  ])), true);
+  assert.equal(output.includes(Buffer.concat([
+    Buffer.from([0x1b, 0x61, 0x01, 0x1b, 0x45, 0x01]),
+    Buffer.from('Test Business\n', 'ascii'),
+  ])), true);
+  assert.match(printable, /FACTURA SIMPLIFICADA/);
+  assert.equal(rows.find((row) => row.startsWith('TICKET ID'))?.length, 48);
+  assert.equal(rows.find((row) => row.startsWith('TICKET ID'))?.endsWith('TEST-1'), true);
+  assert.match(printable, /DETALLE/);
+  assert.match(printable, /RESUMEN/);
+  assert.doesNotMatch(printable, /PROVISIONAL|NO FISCAL|REFERENCIA/);
+  assert.equal(
+    rows.find((row) => row.includes('UD  PRODUCTO'))?.endsWith('UD  PRODUCTO                  PRECIO       TOTAL'),
+    true,
+  );
+  assert.equal(rows.find((row) => row.startsWith('1x  ')), '1x  Water                   1.00 EUR    1.00 EUR');
+  assert.equal(
+    rows.find((row) => row.includes('TOTAL                                   1.00 EUR'))
+      ?.endsWith('TOTAL                                   1.00 EUR'),
+    true,
+  );
+  assert.deepEqual(
+    Array.from(output.subarray(-4)),
+    [0x1d, 0x56, 0x42, 0x00],
+  );
+});
+
 test('a retry-safe pre-write failure retries once while duplicate submissions share one job', async () => {
   const adapter = new MockPrinterAdapter();
   adapter.printBehaviors.push(
