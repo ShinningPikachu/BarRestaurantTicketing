@@ -20,6 +20,8 @@ test('package safety rejects runtime databases and private environment files', (
 
 test('offline packages retain dependency build and dist directories', () => {
   assert.ok(packagedPathViolation('packages/frontend/node_modules/typescript/lib/tsc.js'));
+  assert.ok(packagedPathViolation('packages/backend/tsconfig.tsbuildinfo'));
+  assert.ok(packagedPathViolation('packages/shared/package.json'));
   assert.equal(
     packagedPathViolation('node_modules/@expo/cli/build/bin/cli.js', { includeNodeModules: true }),
     undefined,

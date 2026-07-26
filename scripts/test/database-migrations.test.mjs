@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { PrismaClient } from '@prisma/client';
+import { auditMigrationHistoryRows } from '../migration-history.mjs';
 
 const prismaBinary = resolve('node_modules/.bin/prisma');
 const sourcePrismaDir = resolve('packages/backend/prisma');
@@ -115,6 +116,15 @@ test('reviewed migrations preserve legacy workflow and accounting rows', async (
 
     copyMigrationTree(directory, true);
     await deploy(prismaDir);
+    const firstDeployMigrationCount = Number(
+      (await query(databasePath, 'SELECT COUNT(*) AS count FROM "_prisma_migrations"'))[0].count,
+    );
+    await deploy(prismaDir);
+    assert.equal(
+      Number((await query(databasePath, 'SELECT COUNT(*) AS count FROM "_prisma_migrations"'))[0].count),
+      firstDeployMigrationCount,
+      'deploying the same migration tree twice must not record or apply migrations twice',
+    );
 
     const tableRows = await query(databasePath, 'SELECT number, zone, name FROM "Table"');
     assert.deepEqual(tableRows, [{ number: 1, zone: 'outside', name: 'Legacy table' }]);
@@ -146,6 +156,37 @@ test('reviewed migrations preserve legacy workflow and accounting rows', async (
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('migration history audit rejects unknown edits and duplicate application', () => {
+  const migration = {
+    migration_name: '20260101000000_example',
+    checksum: 'expected',
+    finished_at: new Date(),
+    rolled_back_at: null,
+  };
+  const checksums = new Map([[migration.migration_name, 'expected']]);
+
+  assert.deepEqual(
+    [...auditMigrationHistoryRows([migration], checksums, new Map()).applied],
+    [migration.migration_name],
+  );
+  assert.throws(
+    () => auditMigrationHistoryRows([{ ...migration, checksum: 'modified' }], checksums, new Map()),
+    /does not match this release/,
+  );
+  assert.throws(
+    () => auditMigrationHistoryRows([migration, { ...migration }], checksums, new Map()),
+    /applied more than once/,
+  );
+  assert.deepEqual(
+    auditMigrationHistoryRows(
+      [{ ...migration, checksum: 'reviewed-legacy' }],
+      checksums,
+      new Map([[migration.migration_name, new Set(['reviewed-legacy'])]]),
+    ).warnings,
+    [migration.migration_name],
+  );
 });
 
 test('SKU migration stops without clearing duplicate production values', async () => {

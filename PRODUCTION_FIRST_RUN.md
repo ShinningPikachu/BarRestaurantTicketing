@@ -69,6 +69,8 @@ Choose one supported method:
 
 Never transfer `.cache`, `node_modules`, generated `dist` directories, SQLite sidecars from a running database, or an old generated `.run` artifact as if it were a data backup. The portable package deliberately excludes `.env`, databases, journals, backups, caches, and build output.
 
+Browser/Android `AsyncStorage` is separate from SQLite. It contains only the paired API address and per-layout table drag positions, not orders, payments, tickets, or menu data. Re-pair the Android app with the new computer and recreate desktop table positions after a computer/browser-profile transfer; do not copy an entire browser profile as an application-data backup.
+
 After placing the database, set private permissions:
 
 ```bash
@@ -137,6 +139,8 @@ XPRINTER_SAFE_RETRIES=1
 ```
 
 Configure exactly one printer target. `XPRINTER_SYSTEM_PRINTER_RAW` is required when using `XPRINTER_PRINTER_NAME`: use `true` for a raw CUPS queue or `false` for a driver-formatted CUPS queue. Cash-drawer commands through a named system printer require raw mode. Start with `XPRINTER_CUT_MODE=none`, run the fixed safe test print from the Impresora screen, and enable the correct cutter command only after verifying the model.
+
+Printer queue names, `/dev/usb/lp*` and `/dev/rfcomm*` paths, LAN addresses, CUPS installation/permissions, and firewall rules belong to the new computer. Treat copied `XPRINTER_*` values as candidates to verify, not as portable hardware configuration.
 
 Do not set `DATABASE_URL`; the operational path is intentionally fixed. Do not put `BAR_TICKETING_ALLOW_INITIAL_SEED`, `BAR_TICKETING_TEST_DATABASE_URL`, smoke-test credentials, or development fixtures in `.env`.
 

@@ -36,6 +36,8 @@ const PROJECT_GENERATED_DIRECTORIES = new Set([
 
 const PRIVATE_FILE_PATTERN = /(?:^|\/)(?:\.env(?:\.(?!example$).*)?|\.npmrc|\.yarnrc|credentials?(?:\..*)?|secrets?(?:\..*)?|id_rsa(?:\..*)?|[^/]+\.(?:key|p12|pfx))$/i;
 const DATABASE_FILE_PATTERN = /(?:^|\/)[^/]*(?:\.db(?:$|[.-])|\.sqlite(?:3)?(?:$|[.-])|-(?:journal|wal|shm)$)/i;
+const GENERATED_FILE_PATTERN = /(?:^|\/)(?:[^/]+\.tsbuildinfo|\.DS_Store|Thumbs\.db|npm-debug\.log|yarn-debug\.log|yarn-error\.log)$/i;
+const RELEASE_WORKSPACES = new Set(['backend', 'frontend']);
 
 function portablePath(filePath) {
   return filePath.split(sep).join('/');
@@ -59,8 +61,14 @@ export function packagedPathViolation(relativePath, options = {}) {
   if (!RELEASE_ROOT_ENTRIES.has(parts[0]) && parts[0] !== 'node_modules') {
     return `unexpected top-level release entry: ${parts[0]}`;
   }
+  if (parts[0] === 'packages' && parts.length > 1 && !RELEASE_WORKSPACES.has(parts[1])) {
+    return `unexpected package workspace: ${parts[1]}`;
+  }
   if (!insideNodeModules && parts.some((part) => PROJECT_GENERATED_DIRECTORIES.has(part))) {
     return 'generated project directory is not allowed';
+  }
+  if (!insideNodeModules && GENERATED_FILE_PATTERN.test(`/${normalized}`)) {
+    return 'generated project file is not allowed';
   }
   if (!insideNodeModules && DATABASE_FILE_PATTERN.test(`/${normalized}`)) {
     return 'runtime database, journal, WAL, or database backup is not allowed';

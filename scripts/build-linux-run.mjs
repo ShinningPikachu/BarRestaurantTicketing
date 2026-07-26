@@ -289,7 +289,7 @@ try {
     verbatimSymlinks: true,
   });
   assertSafeReleaseTree(appDir, { includeNodeModules });
-  console.log('Verified Linux package contents: no runtime databases, journals, backups, or private environment files.');
+  console.log('Verified Linux package contents: no runtime databases, journals, backups, private environment files, or generated project residue.');
 
   execFileSync('tar', ['-czf', payloadPath, '-C', stagingDir, 'app'], { stdio: 'inherit' });
   writeFileSync(temporaryOutputPath, launcher, { mode: 0o755 });

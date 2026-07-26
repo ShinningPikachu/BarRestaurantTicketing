@@ -26,7 +26,25 @@ const requiredPaths = [
 ];
 
 function lockDigest() {
-  return createHash('sha256').update(readFileSync(lockPath)).digest('hex');
+  let glibcVersion = '';
+  try {
+    glibcVersion = process.report?.getReport()?.header?.glibcVersionRuntime || '';
+  } catch {
+    // Runtime reports are optional; platform/architecture/ABI still prevent
+    // cross-platform dependency markers from being reused.
+  }
+  const runtimeIdentity = JSON.stringify({
+    platform: process.platform,
+    architecture: process.arch,
+    nodeModulesAbi: process.versions.modules,
+    nodeApi: process.versions.napi,
+    glibcVersion,
+  });
+  return createHash('sha256')
+    .update(readFileSync(lockPath))
+    .update('\0')
+    .update(runtimeIdentity)
+    .digest('hex');
 }
 
 function dependencyTreeLooksComplete() {
@@ -69,15 +87,43 @@ function runNpmCi() {
   });
 }
 
+function verifyDependencyTree() {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(npmCommand, ['ls', '--all', '--include=dev'], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      if (stderr.length < 12_000) stderr += chunk.slice(0, 12_000 - stderr.length);
+    });
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolvePromise();
+        return;
+      }
+      reject(new Error(
+        `Installed dependency tree does not match package-lock.json${signal ? ` after ${signal}` : ` (npm exited ${code ?? 'unknown'})`}`
+        + (stderr.trim() ? `:\n${stderr.trim()}` : ''),
+      ));
+    });
+  });
+}
+
 const digest = lockDigest();
 
 if (recordOnly) {
   if (!dependencyTreeLooksComplete()) {
     throw new Error('The bundled dependency tree is incomplete; refusing to record it as installed.');
   }
+  await verifyDependencyTree();
   recordDigest(digest);
   console.log('Verified bundled application libraries.');
 } else if (recordedDigest() === digest && dependencyTreeLooksComplete()) {
+  await verifyDependencyTree();
   console.log('Application libraries match package-lock.json.');
 } else {
   console.log('Installing exact application libraries from package-lock.json...');
@@ -86,6 +132,7 @@ if (recordOnly) {
   if (!dependencyTreeLooksComplete()) {
     throw new Error('npm ci completed, but required application libraries are missing.');
   }
+  await verifyDependencyTree();
   recordDigest(digest);
   console.log('Application libraries are ready.');
 }

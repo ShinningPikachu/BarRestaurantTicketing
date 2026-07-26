@@ -17,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { auditMigrationHistoryRows, migrationChecksums } from './migration-history.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const prismaDir = resolve(repoRoot, 'packages/backend/prisma');
@@ -131,18 +132,17 @@ async function pendingMigrations() {
     if (!Array.isArray(tables) || tables.length === 0) return migrationNames();
 
     const rows = await client.$queryRawUnsafe(
-      'SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations',
+      'SELECT migration_name, checksum, finished_at, rolled_back_at FROM _prisma_migrations',
     );
-    const failed = rows.filter((row) => !row.finished_at && !row.rolled_back_at);
-    if (failed.length > 0) {
-      throw new Error(
-        `Database contains an unfinished migration (${failed.map((row) => row.migration_name).join(', ')}); investigate it before retrying.`,
+    const history = auditMigrationHistoryRows(rows, migrationChecksums(migrationsDir));
+    if (history.warnings.length > 0) {
+      console.warn(
+        `WARNING: This database contains documented legacy migration variants (${history.warnings.join(', ')}). `
+        + 'Its current operational schema is supported, but historical rows removed by those earlier variants cannot be recovered from this file. '
+        + 'Review CHANGESET_PRODUCTION_REVIEW.md and preserve the pre-migration backup.',
       );
     }
-    const applied = new Set(
-      rows.filter((row) => row.finished_at && !row.rolled_back_at).map((row) => row.migration_name),
-    );
-    return migrationNames().filter((name) => !applied.has(name));
+    return migrationNames().filter((name) => !history.applied.has(name));
   } finally {
     await client.$disconnect();
   }
