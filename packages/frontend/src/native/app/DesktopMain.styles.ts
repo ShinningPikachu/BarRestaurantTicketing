@@ -149,6 +149,9 @@ export const desktopStyles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16
   },
+  disabledButton: {
+    opacity: 0.45
+  },
   menuSearchInput: {
     borderColor: colors.inputBorder,
     borderWidth: 1,

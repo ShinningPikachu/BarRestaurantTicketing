@@ -37,6 +37,7 @@ export interface MainScreenProps {
   loadTicketHistory: () => Promise<void>;
   printSimplifiedPaidTicket: (ticket: PaidTicket) => Promise<void>;
   printFilteredTicketSummary: () => Promise<void>;
+  ticketPrintCoolingDown: boolean;
   downloadTicket: (ticket: PaidTicket) => Promise<void>;
   downloadFilteredTicketPdfs: () => Promise<void>;
   printerStatus: PrinterStatus | null;

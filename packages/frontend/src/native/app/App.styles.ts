@@ -1191,6 +1191,11 @@ export const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: colors.surfaceAlt
   },
+  compactOrderProductCard: {
+    gap: 5,
+    marginBottom: 4,
+    padding: 6
+  },
   preorderEditableRow: {
     flexDirection: 'column',
     alignItems: 'stretch'

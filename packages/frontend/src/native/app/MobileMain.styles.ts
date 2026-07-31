@@ -194,6 +194,9 @@ export const mobileStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  disabledButton: {
+    opacity: 0.45
+  },
   compactSecondaryButton: {
     backgroundColor: colors.buttonSecondary,
     borderWidth: 1,

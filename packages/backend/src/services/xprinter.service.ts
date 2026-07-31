@@ -37,7 +37,6 @@ export interface XprinterTicketPayload {
   totalCents: number;
   ticketNote?: string | null;
   splitPeople?: number | null;
-  openCashDrawer?: boolean | null;
   fiscal?: boolean;
 }
 
@@ -159,6 +158,7 @@ export interface XprinterServiceOptions {
 
 const MAX_JOB_BYTES = 1_000_000;
 const DEFAULT_DEDUPE_WINDOW_MS = 10_000;
+const PRINTER_ACTION_COOLDOWN_MS = 3_000;
 
 function sanitizePrintableText(value: string): string {
   return value
@@ -383,12 +383,11 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     return rows;
   };
 
-  const escposFromRows = (rows: string[], options: { drawer?: boolean } = {}) => {
+  const escposFromRows = (rows: string[]) => {
     const chunks: Buffer[] = [];
     const pushBytes = (value: number[]) => chunks.push(Buffer.from(value));
     const pushText = (value: string) => chunks.push(Buffer.from(`${sanitizePrintableText(value)}\n`, 'ascii'));
     pushBytes([0x1b, 0x40]);
-    if (options.drawer) pushBytes([0x1b, 0x70, 0x00, 0x19, 0xfa]);
     pushBytes([0x1b, 0x4d, 0x00]);
     for (const row of rows) pushText(row);
     pushText('');
@@ -400,7 +399,7 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
   return {
     ticket(payload: XprinterTicketPayload) {
       const rows = ticketRows(payload);
-      return { escpos: escposFromRows(rows, { drawer: payload.openCashDrawer === true }), text: textFromRows(rows) };
+      return { escpos: escposFromRows(rows), text: textFromRows(rows) };
     },
     summary(payload: XprinterFinancialSummaryPayload) {
       const rows = summaryRows(payload);
@@ -693,8 +692,7 @@ export class XprinterService {
   }
 
   printTicket(payload: XprinterTicketPayload): Promise<PrinterJobResult> {
-    const safePayload = { ...payload, openCashDrawer: payload.openCashDrawer === true };
-    return this.submit(this.prepared('ticket', this.formatter.ticket(safePayload)));
+    return this.submit(this.prepared('ticket', this.formatter.ticket(payload), PRINTER_ACTION_COOLDOWN_MS));
   }
 
   printFinancialSummary(payload: XprinterFinancialSummaryPayload): Promise<PrinterJobResult> {
@@ -714,7 +712,7 @@ export class XprinterService {
         'error'
       ));
     }
-    return this.submit(this.prepared('cash-drawer', this.formatter.drawer(), 2_000));
+    return this.submit(this.prepared('cash-drawer', this.formatter.drawer(), PRINTER_ACTION_COOLDOWN_MS));
   }
 }
 

@@ -5,22 +5,22 @@ export const styles = StyleSheet.create({
   categoryGroup: {
     width: '100%',
     maxWidth: '100%',
-    marginBottom: 14,
+    marginBottom: 8,
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden'
   },
   mobileCategoryGroup: {
-    padding: 7
+    padding: 5
   },
   categoryHeader: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
     color: colors.primaryDark,
-    marginBottom: 8,
+    marginBottom: 5,
     paddingLeft: 2
   },
   itemsWrap: {
@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'flex-start',
-    gap: 8
+    gap: 6
   },
   menuItemChip: {
     minWidth: 0,
@@ -36,8 +36,8 @@ export const styles = StyleSheet.create({
     flexShrink: 0,
     flexDirection: 'column',
     alignItems: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -45,50 +45,50 @@ export const styles = StyleSheet.create({
   },
   mobileMenuItemChip: {
     minWidth: 0,
-    width: '100%',
-    flexGrow: 1,
-    flexBasis: '100%',
-    paddingHorizontal: 7,
-    paddingVertical: 8
+    paddingHorizontal: 6,
+    paddingVertical: 6
   },
   itemImage: {
     width: '100%',
-    height: 106,
+    height: 64,
     borderRadius: 8,
     backgroundColor: colors.surface,
-    marginBottom: 8
+    marginBottom: 5
   },
   mobileItemImage: {
-    height: 72,
-    marginBottom: 6
+    height: 54,
+    marginBottom: 4
   },
   itemName: {
     maxWidth: '100%',
     color: colors.text,
-    fontSize: 19,
+    fontSize: 15,
     fontWeight: '700',
     marginBottom: 2
   },
   mobileItemName: {
-    fontSize: 14
+    fontSize: 12
   },
   itemSecondaryName: {
     maxWidth: '100%',
-    minHeight: 34,
+    minHeight: 27,
     color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 17,
-    marginBottom: 5
+    fontSize: 11,
+    lineHeight: 14,
+    marginBottom: 3
   },
   mobileItemSecondaryName: {
-    minHeight: 30,
-    fontSize: 12,
-    lineHeight: 15,
-    marginBottom: 4
+    minHeight: 24,
+    fontSize: 10,
+    lineHeight: 12,
+    marginBottom: 3
   },
   itemPrice: {
-    fontSize: 17,
+    fontSize: 14,
     color: colors.textSecondary
+  },
+  mobileItemPrice: {
+    fontSize: 12
   },
   emptyText: {
     color: colors.textTertiary,

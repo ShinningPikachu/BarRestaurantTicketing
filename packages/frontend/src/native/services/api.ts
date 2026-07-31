@@ -519,11 +519,11 @@ export class ApiService {
     return parseOrThrow<PrinterJobResponse>(response, 'Failed to print Xprinter ticket');
   }
 
-  async printPaidTicket(ticketId: string, openCashDrawer = false): Promise<PrinterJobResponse & { ticketId: string }> {
+  async printPaidTicket(ticketId: string): Promise<PrinterJobResponse & { ticketId: string }> {
     const response = await this.request(`/printers/xprinter/paid-ticket/${encodeURIComponent(ticketId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ openCashDrawer })
+      body: JSON.stringify({})
     }, PRINTER_REQUEST_TIMEOUT_MS);
     return parseOrThrow<PrinterJobResponse & { ticketId: string }>(response, 'Failed to reprint paid ticket');
   }

@@ -117,7 +117,6 @@ const xprinterFinancialSummarySchema = z.object({
 
 const emptyBodySchema = z.object({}).optional();
 const paidTicketParamsSchema = z.object({ id: z.string().trim().min(1).max(128) });
-const paidTicketPrintSchema = z.object({ openCashDrawer: z.boolean().optional() }).optional();
 
 function toPrinterApiError(error: unknown): unknown {
   if (error instanceof PrinterTransportError) {
@@ -155,7 +154,7 @@ router.post(
 router.post(
   '/xprinter/paid-ticket/:id',
   validateParams(paidTicketParamsSchema),
-  validateBody(paidTicketPrintSchema),
+  validateBody(emptyBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const ticket = await prisma.paidTicket.findUnique({
@@ -182,7 +181,6 @@ router.post(
         totalCents: ticket.totalCents,
         ticketNote: ticket.mode,
         splitPeople: ticket.splitPeople,
-        openCashDrawer: req.body?.openCashDrawer,
         fiscal: true,
       });
       res.json(successResponse({ printed: true, ticketId: ticket.id, ...job }));

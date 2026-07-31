@@ -313,7 +313,7 @@ function MobileTicketDetail({ ticket, props }: { ticket: PaidTicket; props: Main
         );
       })}
       <View style={styles.historyInlineActions}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.printSimplifiedPaidTicket(ticket)}>
+        <TouchableOpacity style={[styles.secondaryButton, props.ticketPrintCoolingDown && styles.disabledButton]} onPress={() => void props.printSimplifiedPaidTicket(ticket)} disabled={props.ticketPrintCoolingDown}>
           <Text style={styles.secondaryButtonText}>Imprimir</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.downloadTicket(ticket)}>
@@ -353,7 +353,7 @@ function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
               <TouchableOpacity style={styles.secondaryButton} onPress={() => props.selectPaidTicket(ticket)}>
                 <Text style={styles.secondaryButtonText}>Detalle</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.printSimplifiedPaidTicket(ticket)}>
+              <TouchableOpacity style={[styles.secondaryButton, props.ticketPrintCoolingDown && styles.disabledButton]} onPress={() => void props.printSimplifiedPaidTicket(ticket)} disabled={props.ticketPrintCoolingDown}>
                 <Text style={styles.secondaryButtonText}>Imprimir ticket</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.downloadTicket(ticket)}>

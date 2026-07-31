@@ -598,9 +598,9 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
         </View>
         <View style={styles.mobileTicketActionsRow}>
           <TouchableOpacity
-            style={[styles.mobileOrderPrimaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderPrimaryButton, styles.mobileCheckoutActionButton, (checkoutDisabled || orderProps.ticketPrintCoolingDown) && styles.mobileDisabledButton]}
             onPress={() => orderProps.onPrintTicket()}
-            disabled={checkoutDisabled}
+            disabled={checkoutDisabled || orderProps.ticketPrintCoolingDown}
           >
             <Text style={styles.mobileOrderPrimaryButtonText}>Imprimir</Text>
           </TouchableOpacity>
@@ -618,7 +618,11 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
           >
             <Text style={styles.mobileOrderButtonText}>AA</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton]} onPress={orderProps.onOpenCashDrawer}>
+          <TouchableOpacity
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, orderProps.cashDrawerCoolingDown && styles.mobileDisabledButton]}
+            onPress={orderProps.onOpenCashDrawer}
+            disabled={orderProps.cashDrawerCoolingDown}
+          >
             <Text style={styles.mobileOrderButtonText}>Caja</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -644,9 +648,9 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
             editable={!checkoutDisabled}
           />
           <TouchableOpacity
-            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, checkoutDisabled && styles.mobileDisabledButton]}
+            style={[styles.mobileOrderSecondaryButton, styles.mobileCheckoutActionButton, (checkoutDisabled || orderProps.ticketPrintCoolingDown) && styles.mobileDisabledButton]}
             onPress={handlePrintDividedTicket}
-            disabled={checkoutDisabled}
+            disabled={checkoutDisabled || orderProps.ticketPrintCoolingDown}
           >
             <Text style={styles.mobileOrderButtonText}>Dividir</Text>
           </TouchableOpacity>
@@ -798,7 +802,7 @@ function MobileOrderSummary({ orderProps }: { orderProps: PosScreenProps['orderS
               >
                 <Text style={styles.mobileOrderButtonText}>Quitar seleccionados</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.mobileOrderPrimaryButton, (selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]} onPress={handlePrintAaTicket} disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending}>
+              <TouchableOpacity style={[styles.mobileOrderPrimaryButton, (selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending || orderProps.ticketPrintCoolingDown) && styles.mobileDisabledButton]} onPress={handlePrintAaTicket} disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending || orderProps.ticketPrintCoolingDown}>
                 <Text style={styles.mobileOrderPrimaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.mobileOrderSecondaryButton, (selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending) && styles.mobileDisabledButton]} onPress={() => void handlePayAa('cash')} disabled={selectedAaItemCount === 0 || orderProps.isMutating || orderProps.paymentPending}>

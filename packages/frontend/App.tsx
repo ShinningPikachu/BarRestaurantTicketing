@@ -43,6 +43,7 @@ const PRODUCT_IMAGE_MAX_SOURCE_BYTES = 20_000_000;
 const API_BASE_URL_STORAGE_KEY = 'bar-ticketing-api-base-url';
 const DATA_SYNC_SIGNAL_INTERVAL_MS = 5000;
 const DATA_SYNC_MIN_REFRESH_INTERVAL_MS = 5000;
+const PRINTER_ACTION_COOLDOWN_MS = 3_000;
 type AuthStatus = 'checking' | 'signedOut' | 'signedIn';
 
 interface TicketDateRangeState {
@@ -453,6 +454,35 @@ function buildPaidTicketBatchHtml(tickets: PaidTicket[], title: string): string 
   return buildPaidTicketDocumentHtml(tickets.map(buildPaidTicketArticle).join('\n'), title);
 }
 
+function useActionCooldown(durationMs: number): { active: boolean; tryStart: () => boolean } {
+  const [active, setActive] = useState(false);
+  const activeRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+  }, []);
+
+  function tryStart(): boolean {
+    if (activeRef.current) {
+      return false;
+    }
+
+    activeRef.current = true;
+    setActive(true);
+    timeoutRef.current = setTimeout(() => {
+      activeRef.current = false;
+      timeoutRef.current = null;
+      setActive(false);
+    }, durationMs);
+    return true;
+  }
+
+  return { active, tryStart };
+}
+
 export default function App(): React.JSX.Element {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [accessCode, setAccessCode] = useState('');
@@ -513,6 +543,8 @@ export default function App(): React.JSX.Element {
   const [printerStatus, setPrinterStatus] = useState<PrinterStatus | null>(null);
   const [printerDiagnostics, setPrinterDiagnostics] = useState<PrinterDiagnostics | null>(null);
   const [printerAction, setPrinterAction] = useState<'refresh' | 'reconnect' | 'test' | 'cancel' | 'diagnostics' | null>(null);
+  const ticketPrintCooldown = useActionCooldown(PRINTER_ACTION_COOLDOWN_MS);
+  const cashDrawerCooldown = useActionCooldown(PRINTER_ACTION_COOLDOWN_MS);
   const {
     loading,
     tables,
@@ -1483,11 +1515,12 @@ export default function App(): React.JSX.Element {
   }
 
   async function printSimplifiedPaidTicket(ticket: PaidTicket): Promise<void> {
+    if (!ticketPrintCooldown.tryStart()) return;
     if (!await ensurePrinterAvailable()) return;
     try {
       // The server renders the immutable issuer and line-item snapshot stored
       // with this payment. Never rebuild a fiscal reprint from live config.
-      const result = await apiService.printPaidTicket(ticket.id, false);
+      const result = await apiService.printPaidTicket(ticket.id);
       void refreshPrinterStatus(false);
       Alert.alert(result.deduplicated ? 'Ticket ya enviado' : 'Ticket impreso', `Se ha enviado ${ticket.ticketNumber} a la impresora.`);
     } catch {
@@ -1582,6 +1615,7 @@ export default function App(): React.JSX.Element {
   }
 
   async function openCashDrawer(): Promise<void> {
+    if (!cashDrawerCooldown.tryStart()) return;
     if (!await ensurePrinterAvailable()) return;
     try {
       await apiService.openXprinterCashDrawer();
@@ -1603,6 +1637,8 @@ export default function App(): React.JSX.Element {
     currentTableTotal,
     isMutating,
     paymentPending,
+    ticketPrintCoolingDown: ticketPrintCooldown.active,
+    cashDrawerCoolingDown: cashDrawerCooldown.active,
     priceDraftByItemId,
     getMenuTitleById,
     formatPrice: centsToCurrency,
@@ -1626,6 +1662,7 @@ export default function App(): React.JSX.Element {
       return actions.clearPreOrder();
     },
     onPrintTicket: (options?: Parameters<typeof actions.printTicket>[0]) => {
+      if (!ticketPrintCooldown.tryStart()) return;
       void actions.printTicket(options);
     },
     onPayTicket: (method: Parameters<typeof actions.payTable>[0], splitPeople?: number) => {
@@ -1990,6 +2027,7 @@ export default function App(): React.JSX.Element {
     loadTicketHistory,
     printSimplifiedPaidTicket,
     printFilteredTicketSummary,
+    ticketPrintCoolingDown: ticketPrintCooldown.active,
     downloadTicket,
     downloadFilteredTicketPdfs,
     printerStatus,

@@ -115,6 +115,48 @@ test('a retry-safe pre-write failure retries once while duplicate submissions sh
   assert.equal(duplicateResult.deduplicated, true);
 });
 
+test('ticket and cash drawer commands have an exact three-second deduplication window', async () => {
+  let nowMs = Date.parse('2026-01-01T12:00:00.000Z');
+  const adapter = new MockPrinterAdapter();
+  const service = new XprinterService({ adapter, now: () => new Date(nowMs) });
+
+  const firstTicket = await service.printTicket(validTicket());
+  nowMs += 2_999;
+  const duplicateTicket = await service.printTicket(validTicket());
+
+  assert.equal(firstTicket.deduplicated, false);
+  assert.equal(duplicateTicket.deduplicated, true);
+  assert.equal(adapter.printed.length, 1);
+
+  nowMs += 1;
+  const nextTicket = await service.printTicket(validTicket());
+  assert.equal(nextTicket.deduplicated, false);
+  assert.equal(adapter.printed.length, 2);
+
+  const firstDrawer = await service.openCashDrawer();
+  nowMs += 2_999;
+  const duplicateDrawer = await service.openCashDrawer();
+
+  assert.equal(firstDrawer.deduplicated, false);
+  assert.equal(duplicateDrawer.deduplicated, true);
+  assert.equal(adapter.printed.length, 3);
+
+  nowMs += 1;
+  const nextDrawer = await service.openCashDrawer();
+  assert.equal(nextDrawer.deduplicated, false);
+  assert.equal(adapter.printed.length, 4);
+});
+
+test('ticket output cannot contain the cash drawer pulse command', async () => {
+  const adapter = new MockPrinterAdapter();
+  const service = new XprinterService({ adapter });
+
+  await service.printTicket(validTicket());
+
+  assert.equal(adapter.printed.length, 1);
+  assert.equal(adapter.printed[0].includes(Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa])), false);
+});
+
 test('the queue recovers after a failed job and processes the next distinct receipt once', async () => {
   const adapter = new MockPrinterAdapter();
   adapter.printBehaviors.push(

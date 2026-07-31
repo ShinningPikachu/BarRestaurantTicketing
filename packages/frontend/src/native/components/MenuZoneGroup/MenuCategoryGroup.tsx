@@ -4,8 +4,9 @@ import { getItemDisplayName } from '../../helpers/itemDisplayName';
 import { MenuItem } from '../../types';
 import { styles } from './MenuCategoryGroup.styles';
 
-const DESKTOP_ITEM_MIN_WIDTH = 138;
-const DESKTOP_ITEM_GAP = 8;
+const DESKTOP_ITEM_MIN_WIDTH = 106;
+const MOBILE_ITEM_MIN_WIDTH = 112;
+const ITEM_GAP = 6;
 
 interface MenuCategoryGroupProps {
   category: string;
@@ -39,17 +40,18 @@ export function MenuCategoryGroup({
 }: MenuCategoryGroupProps): React.JSX.Element {
   const [itemsWidth, setItemsWidth] = useState(0);
   const isMobile = layout === 'mobile';
-  const desktopItemWidth = useMemo(() => {
-    if (isMobile || itemsWidth <= 0) {
+  const itemWidth = useMemo(() => {
+    if (itemsWidth <= 0) {
       return undefined;
     }
 
+    const minimumWidth = isMobile ? MOBILE_ITEM_MIN_WIDTH : DESKTOP_ITEM_MIN_WIDTH;
     const columnCount = Math.max(
       1,
-      Math.floor((itemsWidth + DESKTOP_ITEM_GAP) / (DESKTOP_ITEM_MIN_WIDTH + DESKTOP_ITEM_GAP))
+      Math.floor((itemsWidth + ITEM_GAP) / (minimumWidth + ITEM_GAP))
     );
 
-    return Math.floor((itemsWidth - DESKTOP_ITEM_GAP * (columnCount - 1)) / columnCount);
+    return Math.floor((itemsWidth - ITEM_GAP * (columnCount - 1)) / columnCount);
   }, [isMobile, itemsWidth]);
 
   if (items.length === 0) {
@@ -69,7 +71,7 @@ return (
           return (
             <TouchableOpacity
               key={item.id}
-              style={[styles.menuItemChip, desktopItemWidth ? { width: desktopItemWidth } : null, isMobile && styles.mobileMenuItemChip]}
+              style={[styles.menuItemChip, isMobile && styles.mobileMenuItemChip, itemWidth ? { width: itemWidth } : null]}
               onPress={() => onSelectItem(item.id)}
               activeOpacity={0.7}
             >
@@ -88,7 +90,7 @@ return (
                   {displayName.secondary}
                 </Text>
               ) : null}
-              <Text style={styles.itemPrice}>{formatPrice(item.priceCents)}</Text>
+              <Text style={[styles.itemPrice, isMobile && styles.mobileItemPrice]}>{formatPrice(item.priceCents)}</Text>
             </TouchableOpacity>
           );
         })}

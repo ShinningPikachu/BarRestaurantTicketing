@@ -15,6 +15,8 @@ interface OrderSectionProps {
   currentTableTotal: number;
   isMutating: boolean;
   paymentPending: boolean;
+  ticketPrintCoolingDown: boolean;
+  cashDrawerCoolingDown: boolean;
   priceDraftByItemId: Record<number, string>;
   getMenuTitleById: (menuByCategory: Map<string, MenuItem[]>, menuId: number) => string;
   formatPrice: (cents: number) => string;
@@ -72,6 +74,8 @@ export function OrderSection({
   currentTableTotal,
   isMutating,
   paymentPending,
+  ticketPrintCoolingDown,
+  cashDrawerCoolingDown,
   priceDraftByItemId,
   getMenuTitleById,
   formatPrice,
@@ -290,7 +294,7 @@ export function OrderSection({
       <View style={styles.orderProductsColumns}>
         <View style={styles.orderProductsColumn}>
           <View style={styles.orderColumnHeader}>
-            <Text style={styles.subTitle}>Prepedido</Text>
+            <Text style={[styles.subTitle, styles.compactSubTitle]}>Prepedido</Text>
             <Text style={styles.orderColumnCount}>{String(preorderItems.length)}</Text>
           </View>
 
@@ -307,12 +311,12 @@ export function OrderSection({
                 secondaryName: item.secondaryName,
               });
               return (
-                <View style={[styles.preorderRow, styles.preorderEditableRow]}>
+                <View style={[styles.preorderRow, styles.preorderEditableRow, styles.compactOrderProductCard]}>
                   <View style={styles.preorderMainRow}>
                     <View style={styles.flex1}>
-                      <Text style={styles.itemName}>{title.primary}</Text>
-                      {title.secondary ? <Text style={styles.itemPrice}>{title.secondary}</Text> : null}
-                      <Text style={styles.itemPrice}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
+                      <Text style={[styles.itemName, styles.compactItemName]}>{title.primary}</Text>
+                      {title.secondary ? <Text style={[styles.itemPrice, styles.compactItemPrice]}>{title.secondary}</Text> : null}
+                      <Text style={[styles.itemPrice, styles.compactItemPrice]}>{formatPrice(item.unitPriceCents * item.qty)}</Text>
                     </View>
 
                     <View style={styles.qtyGroup}>
@@ -326,7 +330,7 @@ export function OrderSection({
                     </View>
 
                     <TextInput
-                      style={styles.priceInput}
+                      style={[styles.priceInput, styles.compactPriceInput]}
                       keyboardType="decimal-pad"
                       value={priceDraftByItemId[item.id] ?? (item.unitPriceCents / 100).toFixed(2)}
                       selectTextOnFocus
@@ -368,7 +372,7 @@ export function OrderSection({
 
         <View style={[styles.orderProductsColumn, styles.confirmedOrderProductsColumn]}>
           <View style={styles.orderColumnHeader}>
-            <Text style={styles.subTitle}>Pedidos confirmados</Text>
+            <Text style={[styles.subTitle, styles.compactSubTitle]}>Pedidos confirmados</Text>
             <Text style={styles.orderColumnCount}>{String(confirmedItems.length)}</Text>
           </View>
 
@@ -381,21 +385,21 @@ export function OrderSection({
             renderItem={({ item }) => {
               const displayName = getItemDisplayName(item.item);
               return (
-                <View style={[styles.preorderRow, styles.confirmedPreorderRow]}>
+                <View style={[styles.preorderRow, styles.confirmedPreorderRow, styles.compactOrderProductCard]}>
                   <View style={styles.flex1}>
-                    <Text style={styles.itemName}>{displayName.primary}</Text>
-                    {displayName.secondary ? <Text style={styles.itemPrice}>{displayName.secondary}</Text> : null}
-                    <Text style={styles.itemPrice}>{formatPrice((item.item.unitPriceCents ?? 0) * item.item.qty)}</Text>
+                    <Text style={[styles.itemName, styles.compactItemName]}>{displayName.primary}</Text>
+                    {displayName.secondary ? <Text style={[styles.itemPrice, styles.compactItemPrice]}>{displayName.secondary}</Text> : null}
+                    <Text style={[styles.itemPrice, styles.compactItemPrice]}>{formatPrice((item.item.unitPriceCents ?? 0) * item.item.qty)}</Text>
                   </View>
 
                   <Text style={styles.confirmedQtyText}>{`x${item.item.qty}`}</Text>
 
                   <View style={styles.actionsRow}>
-                    <TouchableOpacity style={[styles.primaryButton, (isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)} disabled={isMutating || paymentPending}>
-                      <Text style={styles.primaryButtonText}>Editar</Text>
+                    <TouchableOpacity style={[styles.primaryButton, styles.compactUiButton, (isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => onMoveConfirmedItemToPreOrder(item.orderId, item.item)} disabled={isMutating || paymentPending}>
+                      <Text style={styles.compactPrimaryButtonText}>Editar</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.secondaryButton, (isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => handleRemoveConfirmedItem(item)} disabled={isMutating || paymentPending}>
-                      <Text style={styles.secondaryButtonText}>Eliminar</Text>
+                    <TouchableOpacity style={[styles.secondaryButton, styles.compactUiButton, (isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => handleRemoveConfirmedItem(item)} disabled={isMutating || paymentPending}>
+                      <Text style={styles.compactButtonText}>Eliminar</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -417,9 +421,9 @@ export function OrderSection({
         </View>
         <View style={styles.checkoutActions}>
           <TouchableOpacity
-            style={[styles.desktopCheckoutPrimaryButton, checkoutDisabled && styles.aaDisabledButton]}
+            style={[styles.desktopCheckoutPrimaryButton, (checkoutDisabled || ticketPrintCoolingDown) && styles.aaDisabledButton]}
             onPress={() => onPrintTicket()}
-            disabled={checkoutDisabled}
+            disabled={checkoutDisabled || ticketPrintCoolingDown}
           >
             <Text style={styles.desktopCheckoutPrimaryButtonText}>Imprimir ticket</Text>
           </TouchableOpacity>
@@ -432,7 +436,7 @@ export function OrderSection({
           <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, checkoutDisabled && styles.aaDisabledButton]} onPress={() => void onPayTicket('card')} disabled={checkoutDisabled}>
             <Text style={styles.desktopCheckoutSecondaryButtonText}>Pagar tarjeta</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.desktopCheckoutSecondaryButton} onPress={onOpenCashDrawer}>
+          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, cashDrawerCoolingDown && styles.aaDisabledButton]} onPress={onOpenCashDrawer} disabled={cashDrawerCoolingDown}>
             <Text style={styles.desktopCheckoutSecondaryButtonText}>Abrir caja</Text>
           </TouchableOpacity>
         </View>
@@ -445,7 +449,7 @@ export function OrderSection({
             onChangeText={setSplitPeopleText}
             placeholder="2"
           />
-          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, checkoutDisabled && styles.aaDisabledButton]} onPress={handlePrintDividedTicket} disabled={checkoutDisabled}>
+          <TouchableOpacity style={[styles.desktopCheckoutSecondaryButton, (checkoutDisabled || ticketPrintCoolingDown) && styles.aaDisabledButton]} onPress={handlePrintDividedTicket} disabled={checkoutDisabled || ticketPrintCoolingDown}>
             <Text style={styles.desktopCheckoutSecondaryButtonText}>Imprimir dividido</Text>
           </TouchableOpacity>
         </View>
@@ -520,7 +524,7 @@ export function OrderSection({
               >
                 <Text style={styles.secondaryButtonText}>Quitar seleccionados</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.primaryButton, (selectedAaItemCount === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={handlePrintAaTicket} disabled={selectedAaItemCount === 0 || isMutating || paymentPending}>
+              <TouchableOpacity style={[styles.primaryButton, (selectedAaItemCount === 0 || isMutating || paymentPending || ticketPrintCoolingDown) && styles.aaDisabledButton]} onPress={handlePrintAaTicket} disabled={selectedAaItemCount === 0 || isMutating || paymentPending || ticketPrintCoolingDown}>
                 <Text style={styles.primaryButtonText}>{`Imprimir AA (${selectedAaItemCount})`}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.secondaryButton, (selectedAaItemCount === 0 || isMutating || paymentPending) && styles.aaDisabledButton]} onPress={() => void handlePayAa('cash')} disabled={selectedAaItemCount === 0 || isMutating || paymentPending}>
