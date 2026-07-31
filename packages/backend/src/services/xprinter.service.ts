@@ -37,6 +37,7 @@ export interface XprinterTicketPayload {
   totalCents: number;
   ticketNote?: string | null;
   splitPeople?: number | null;
+  openCashDrawer?: boolean | null;
   fiscal?: boolean;
 }
 
@@ -170,6 +171,19 @@ function sanitizePrintableText(value: string): string {
     .trim();
 }
 
+/**
+ * Sanitizes an already composed printer row without removing its layout.
+ * Unlike customer-supplied text, formatter rows intentionally contain repeated
+ * spaces for centering, columns, and right-aligned monetary values.
+ */
+function sanitizePrintableRow(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/€/g, 'EUR')
+    .replace(/[^\x20-\x7E]/g, ' ');
+}
+
 function sanitizedErrorMessage(error: unknown): string {
   const code = error instanceof PrinterTransportError ? error.code : 'PRINTER_ERROR';
   const messages: Record<string, string> = {
@@ -301,20 +315,23 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
 
   const ticketRows = (payload: XprinterTicketPayload): string[] => {
     const rows: string[] = [];
-    const push = (value = '') => rows.push(sanitizePrintableText(value));
+    const push = (value = '') => rows.push(sanitizePrintableRow(value));
     push(center(payload.tradeName.toUpperCase()));
     push(center(payload.businessName));
     push(center(`NIF: ${payload.nif}`));
     for (const row of wrap(payload.address)) push(center(row));
     if (payload.city) push(center(payload.city));
     if (payload.phone) push(center(`Movil: ${payload.phone}`));
+    push('');
     push('='.repeat(receiptWidth));
-    push(center(payload.fiscal ? 'FACTURA SIMPLIFICADA' : 'PRECUENTA - NO FISCAL'));
-    push(line(payload.fiscal ? 'TICKET' : 'REFERENCIA', payload.invoiceNumber));
+    push(center('FACTURA SIMPLIFICADA'));
+    push('='.repeat(receiptWidth));
+    push(line('TICKET ID', payload.invoiceNumber));
     push(line('FECHA', payload.issuedAt));
     push(line('MESA', payload.tableLabel));
     if (payload.ticketNote) push(line('MODALIDAD', payload.ticketNote));
     push('-'.repeat(receiptWidth));
+    push(center('DETALLE'));
     push(itemLine('UD', 'PRODUCTO', 'PRECIO', 'TOTAL'));
     push('-'.repeat(receiptWidth));
     for (const item of payload.lines) {
@@ -326,7 +343,8 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
         for (const secondary of wrap(displayName.secondary, nameWidth)) push(itemLine('', secondary, '', ''));
       }
     }
-    push('='.repeat(receiptWidth));
+    push('-'.repeat(receiptWidth));
+    push(center('RESUMEN'));
     push(line(`BASE IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.taxableBaseCents)));
     push(line(`IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.vatCents)));
     push('-'.repeat(receiptWidth));
@@ -344,7 +362,7 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
 
   const summaryRows = (payload: XprinterFinancialSummaryPayload): string[] => {
     const rows: string[] = [];
-    const push = (value = '') => rows.push(sanitizePrintableText(value));
+    const push = (value = '') => rows.push(sanitizePrintableRow(value));
     const vatLabel = payload.vatRateLabel ? `IVA ${payload.vatRateLabel}` : 'IVA';
     push(center(payload.tradeName.toUpperCase()));
     push(center(payload.businessName));
@@ -383,13 +401,47 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     return rows;
   };
 
-  const escposFromRows = (rows: string[]) => {
+  const escposFromRows = (
+    rows: string[],
+    options: { drawer?: boolean; styledTicket?: boolean } = {},
+  ) => {
     const chunks: Buffer[] = [];
     const pushBytes = (value: number[]) => chunks.push(Buffer.from(value));
-    const pushText = (value: string) => chunks.push(Buffer.from(`${sanitizePrintableText(value)}\n`, 'ascii'));
+    const pushText = (value: string) => chunks.push(Buffer.from(`${sanitizePrintableRow(value)}\n`, 'ascii'));
+    const pushCenteredBold = (value: string) => {
+      pushBytes([0x1b, 0x61, 0x01]);
+      pushBytes([0x1b, 0x45, 0x01]);
+      pushText(value.trim());
+      pushBytes([0x1b, 0x45, 0x00]);
+      pushBytes([0x1b, 0x61, 0x00]);
+    };
     pushBytes([0x1b, 0x40]);
+    if (options.drawer) pushBytes([0x1b, 0x70, 0x00, 0x19, 0xfa]);
     pushBytes([0x1b, 0x4d, 0x00]);
-    for (const row of rows) pushText(row);
+    if (options.styledTicket && rows.length > 0) {
+      pushBytes([0x1b, 0x61, 0x01]); // Center
+      pushBytes([0x1b, 0x45, 0x01]); // Bold on
+      pushBytes([0x1d, 0x21, 0x11]); // Double width and height
+      pushText(rows[0].trim());
+      pushBytes([0x1d, 0x21, 0x00]);
+      pushBytes([0x1b, 0x45, 0x00]);
+      pushBytes([0x1b, 0x61, 0x00]); // Left align
+      if (rows.length > 1) pushCenteredBold(rows[1]);
+      for (const row of rows.slice(2)) {
+        const trimmed = row.trim();
+        if (trimmed === 'FACTURA SIMPLIFICADA' || trimmed === 'DETALLE' || trimmed === 'RESUMEN') {
+          pushCenteredBold(trimmed);
+        } else if (row.startsWith('TOTAL ')) {
+          pushBytes([0x1b, 0x45, 0x01]);
+          pushText(row);
+          pushBytes([0x1b, 0x45, 0x00]);
+        } else {
+          pushText(row);
+        }
+      }
+    } else {
+      for (const row of rows) pushText(row);
+    }
     pushText('');
     appendCut(pushBytes);
     return Buffer.concat(chunks);
@@ -399,7 +451,13 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
   return {
     ticket(payload: XprinterTicketPayload) {
       const rows = ticketRows(payload);
-      return { escpos: escposFromRows(rows), text: textFromRows(rows) };
+      return {
+        escpos: escposFromRows(rows, {
+          drawer: payload.openCashDrawer === true,
+          styledTicket: true,
+        }),
+        text: textFromRows(rows),
+      };
     },
     summary(payload: XprinterFinancialSummaryPayload) {
       const rows = summaryRows(payload);
@@ -692,7 +750,18 @@ export class XprinterService {
   }
 
   printTicket(payload: XprinterTicketPayload): Promise<PrinterJobResult> {
-    return this.submit(this.prepared('ticket', this.formatter.ticket(payload), PRINTER_ACTION_COOLDOWN_MS));
+    const safePayload = { ...payload, openCashDrawer: payload.openCashDrawer === true };
+    const prepared = this.prepared(
+      'ticket',
+      this.formatter.ticket(safePayload),
+      PRINTER_ACTION_COOLDOWN_MS,
+    );
+    // A provisional account reference is intentionally not printed, but it
+    // must still distinguish otherwise identical jobs in the queue.
+    prepared.dedupeKey = `${prepared.dedupeKey}:${createHash('sha256')
+      .update(payload.invoiceNumber)
+      .digest('hex')}`;
+    return this.submit(prepared);
   }
 
   printFinancialSummary(payload: XprinterFinancialSummaryPayload): Promise<PrinterJobResult> {

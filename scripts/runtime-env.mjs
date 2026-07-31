@@ -10,6 +10,17 @@ import {
 import { randomBytes, randomInt } from 'node:crypto';
 import { dirname } from 'node:path';
 
+const insecureRuntimeCredentialValues = new Set([
+  '1234',
+  'changethiscode',
+  'changethislongrandomtoken',
+  'replacewithatleast32randomcharacters',
+]);
+
+function isInsecureRuntimeCredential(value) {
+  return insecureRuntimeCredentialValues.has(value.trim().toLowerCase());
+}
+
 export function parseEnvContent(content) {
   const values = new Map();
 
@@ -83,11 +94,17 @@ export function ensureRuntimeEnv(filePath) {
   const configuredAuthToken = values.get('POS_AUTH_TOKEN')?.trim();
   const environmentAuthToken = process.env.POS_AUTH_TOKEN?.trim();
 
-  if (!configuredAccessCode && !environmentAccessCode) {
+  if (
+    (!configuredAccessCode || isInsecureRuntimeCredential(configuredAccessCode))
+    && !environmentAccessCode
+  ) {
     additions.push(`POS_ACCESS_CODE=${String(randomInt(100000, 1000000))}`);
   }
 
-  if (!configuredAuthToken && !environmentAuthToken) {
+  if (
+    (!configuredAuthToken || isInsecureRuntimeCredential(configuredAuthToken))
+    && !environmentAuthToken
+  ) {
     additions.push(`POS_AUTH_TOKEN=${randomBytes(32).toString('hex')}`);
   }
 

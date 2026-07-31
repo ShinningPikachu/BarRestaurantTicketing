@@ -46,6 +46,27 @@ test('ensureRuntimeEnv replaces blank credentials and protects the file', () => 
   });
 });
 
+test('ensureRuntimeEnv replaces example credential placeholders', () => {
+  withCleanAuthEnvironment(() => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'bar-ticketing-env-test-'));
+    const envPath = resolve(directory, '.env');
+    try {
+      writeFileSync(
+        envPath,
+        'POS_ACCESS_CODE=ChangeThisCode\nPOS_AUTH_TOKEN=ReplaceWithAtLeast32RandomCharacters\n',
+      );
+      const result = ensureRuntimeEnv(envPath);
+      const values = parseEnvContent(readFileSync(envPath, 'utf8'));
+      assert.match(values.get('POS_ACCESS_CODE'), /^\d{6}$/);
+      assert.match(values.get('POS_AUTH_TOKEN'), /^[a-f0-9]{64}$/);
+      assert.equal(result.accessCode, values.get('POS_ACCESS_CODE'));
+      assert.equal(result.createdAccessCode, true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 test('ensureRuntimeEnv reports the effective process override', () => {
   withCleanAuthEnvironment(() => {
     const directory = mkdtempSync(resolve(tmpdir(), 'bar-ticketing-env-test-'));

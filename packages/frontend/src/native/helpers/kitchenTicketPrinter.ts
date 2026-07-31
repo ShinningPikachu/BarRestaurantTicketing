@@ -6,23 +6,6 @@ import { apiService } from '../services/api';
 import { getItemDisplayName } from './itemDisplayName';
 import { getOrderLineIdentity } from './orderLineIdentity';
 
-type ExpoLikeGlobal = typeof globalThis & {
-  process?: {
-    env?: {
-      EXPO_PUBLIC_TICKET_BUSINESS_NAME?: string;
-      EXPO_PUBLIC_TICKET_TRADE_NAME?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_NIF?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_CITY?: string;
-      EXPO_PUBLIC_TICKET_BUSINESS_PHONE?: string;
-      EXPO_PUBLIC_TICKET_ISSUER_NAME?: string;
-      EXPO_PUBLIC_TICKET_ISSUER_NIF?: string;
-      EXPO_PUBLIC_TICKET_ISSUER_ADDRESS?: string;
-      EXPO_PUBLIC_TICKET_VAT_RATE?: string;
-      EXPO_PUBLIC_TICKET_PRINT_MODE?: string;
-    };
-  };
-};
 export interface SimplifiedInvoiceConfig {
   businessName: string;
   tradeName: string;
@@ -34,16 +17,24 @@ export interface SimplifiedInvoiceConfig {
 }
 
 export function getSimplifiedInvoiceConfig(): SimplifiedInvoiceConfig {
-  const env = (globalThis as ExpoLikeGlobal).process?.env;
-  const vatRateRaw = Number(env?.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
+  // Expo only substitutes EXPO_PUBLIC_* values when they use static dot
+  // notation. Reading them dynamically from globalThis.process leaves them
+  // undefined in an exported web bundle and incorrectly selects browser print.
+  const vatRateRaw = Number(process.env.EXPO_PUBLIC_TICKET_VAT_RATE ?? '10');
 
   return {
-    businessName: env?.EXPO_PUBLIC_TICKET_BUSINESS_NAME ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NAME ?? 'NEGOCIO SIN CONFIGURAR',
-    tradeName: env?.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'TPV Restaurante',
-    nif: env?.EXPO_PUBLIC_TICKET_BUSINESS_NIF ?? env?.EXPO_PUBLIC_TICKET_ISSUER_NIF ?? 'NIF SIN CONFIGURAR',
-    address: env?.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS ?? env?.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS ?? 'Dirección sin configurar',
-    city: env?.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '',
-    phone: env?.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '',
+    businessName: process.env.EXPO_PUBLIC_TICKET_BUSINESS_NAME
+      ?? process.env.EXPO_PUBLIC_TICKET_ISSUER_NAME
+      ?? 'NEGOCIO SIN CONFIGURAR',
+    tradeName: process.env.EXPO_PUBLIC_TICKET_TRADE_NAME ?? 'TPV Restaurante',
+    nif: process.env.EXPO_PUBLIC_TICKET_BUSINESS_NIF
+      ?? process.env.EXPO_PUBLIC_TICKET_ISSUER_NIF
+      ?? 'NIF SIN CONFIGURAR',
+    address: process.env.EXPO_PUBLIC_TICKET_BUSINESS_ADDRESS
+      ?? process.env.EXPO_PUBLIC_TICKET_ISSUER_ADDRESS
+      ?? 'Dirección sin configurar',
+    city: process.env.EXPO_PUBLIC_TICKET_BUSINESS_CITY ?? '',
+    phone: process.env.EXPO_PUBLIC_TICKET_BUSINESS_PHONE ?? '',
     vatRatePercent: Number.isInteger(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? vatRateRaw : 10,
   };
 }
@@ -89,7 +80,7 @@ function getOrderLineTotalCents(item: { qty: number; unitPriceCents?: number; to
 }
 
 function shouldUseXprinterBridge(): boolean {
-  const printMode = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TICKET_PRINT_MODE?.trim().toLowerCase();
+  const printMode = process.env.EXPO_PUBLIC_TICKET_PRINT_MODE?.trim().toLowerCase();
 
   return printMode === 'xprinter-lan'
     || printMode === 'xprinter-usb'
@@ -144,11 +135,12 @@ function buildSimplifiedInvoiceHtml(params: {
   selectedTable: SelectedTable;
   confirmedOrders: Order[];
   issuedAt: Date;
+  ticketId: string;
   config: SimplifiedInvoiceConfig;
   splitPeople?: number;
   ticketNote?: string;
 }): string {
-  const { selectedTable, confirmedOrders, issuedAt, config, splitPeople, ticketNote } = params;
+  const { selectedTable, confirmedOrders, issuedAt, ticketId, config, splitPeople, ticketNote } = params;
   const combinedLines = getCombinedOrderLines(confirmedOrders);
   const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
   const vatRate = config.vatRatePercent / 100;
@@ -161,7 +153,7 @@ function buildSimplifiedInvoiceHtml(params: {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cuenta provisional · No fiscal</title>
+  <title>Factura simplificada</title>
   <style>
     * { box-sizing: border-box; }
     @page { margin: 8mm; }
@@ -298,9 +290,9 @@ function buildSimplifiedInvoiceHtml(params: {
     <div class="divider"></div>
 
     <section>
-      <p class="title center">Cuenta provisional · No fiscal</p>
+      <p class="title center">Factura simplificada</p>
       <div class="meta">
-        <div><strong>Documento</strong>PROVISIONAL / NO FISCAL</div>
+        <div><strong>Ticket ID</strong>${escapeHtml(ticketId)}</div>
         <div><strong>Fecha</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
         <div><strong>Mesa</strong>${escapeHtml(tableZoneLabel(selectedTable.zone))} ${selectedTable.number}</div>
       </div>
@@ -358,8 +350,6 @@ function buildSimplifiedInvoiceHtml(params: {
     <div class="divider"></div>
 
     <footer class="legal center">
-      <div>DOCUMENTO PROVISIONAL. NO ES FACTURA NI JUSTIFICANTE DE PAGO.</div>
-      <div>Los importes fiscales son únicamente informativos hasta registrar el cobro.</div>
       <div>Gracias por su visita.</div>
     </footer>
   </main>
@@ -414,6 +404,7 @@ export async function printKitchenTicket(params: {
 }): Promise<void> {
   const config = getSimplifiedInvoiceConfig();
   const issuedAt = new Date();
+  const ticketId = params.confirmedOrders[0]?.id ?? `MESA-${params.selectedTable.zone}-${params.selectedTable.number}-${issuedAt.getTime()}`;
   const combinedLines = getCombinedOrderLines(params.confirmedOrders);
   const totalCents = combinedLines.reduce((sum, item) => sum + item.totalPriceCents, 0);
   const vatRate = config.vatRatePercent / 100;
@@ -428,7 +419,7 @@ export async function printKitchenTicket(params: {
       address: config.address,
       city: config.city || null,
       phone: config.phone || null,
-      invoiceNumber: 'PROVISIONAL-NO-FISCAL',
+      invoiceNumber: ticketId,
       issuedAt: formatDateTime(issuedAt),
       tableLabel: `${tableZoneLabel(params.selectedTable.zone)} ${params.selectedTable.number}`,
       lines: combinedLines,
@@ -436,7 +427,7 @@ export async function printKitchenTicket(params: {
       vatCents,
       vatRatePercent: config.vatRatePercent,
       totalCents,
-      ticketNote: ['DOCUMENTO PROVISIONAL - NO FISCAL', params.ticketNote].filter(Boolean).join(' · '),
+      ticketNote: params.ticketNote ?? null,
       splitPeople: params.splitPeople ?? null,
     });
     return;
@@ -446,6 +437,7 @@ export async function printKitchenTicket(params: {
     selectedTable: params.selectedTable,
     confirmedOrders: params.confirmedOrders,
     issuedAt,
+    ticketId,
     config,
     splitPeople: params.splitPeople,
     ticketNote: params.ticketNote,
