@@ -410,6 +410,32 @@ export const mobileStyles = StyleSheet.create({
     gap: 5,
     marginBottom: 6
   },
+  productModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16
+  },
+  productModal: {
+    width: '100%',
+    maxHeight: '90%',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    padding: 10
+  },
+  productModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 6
+  },
+  productModalContent: {
+    paddingBottom: 2
+  },
   productFormHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -507,6 +533,35 @@ export const mobileStyles = StyleSheet.create({
     gap: 5,
     marginBottom: 6
   },
+  productCategoryFilterList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingRight: 5,
+    marginBottom: 5
+  },
+  productCategoryFilter: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 38
+  },
+  productSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginBottom: 5
+  },
+  productSearchInput: {
+    flex: 1,
+    minWidth: 180,
+    flexBasis: 'auto'
+  },
+  productSearchCount: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700'
+  },
   menuTypeButton: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -520,16 +575,62 @@ export const mobileStyles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12
   },
+  menuTypeButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  menuTypeButtonTextSelected: {
+    color: colors.textLight
+  },
   productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
     padding: 5,
     marginBottom: 5
+  },
+  productRowSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    width: '100%'
+  },
+  productRowSummaryContent: {
+    flex: 1,
+    minWidth: 0
+  },
+  productRowSummaryTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5
+  },
+  productRowSummaryPrice: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  productRowMeta: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 1
+  },
+  productRowToggle: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    minHeight: 30,
+    justifyContent: 'center'
+  },
+  productRowEditor: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: 5,
+    paddingTop: 5,
+    gap: 5
   },
   productRowBody: {
     flex: 1,
@@ -578,6 +679,15 @@ export const mobileStyles = StyleSheet.create({
     width: 88,
     paddingHorizontal: 6,
     paddingVertical: 4,
+    fontSize: 12,
+    minHeight: 30
+  },
+  productEditorCategoryInput: {
+    flex: 1,
+    minWidth: 0,
+    flexBasis: 0,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
     fontSize: 12,
     minHeight: 30
   },

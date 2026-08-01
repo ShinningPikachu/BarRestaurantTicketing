@@ -50,6 +50,11 @@ export interface MainScreenProps {
   openPrinterDiagnostics: () => void;
   managedCategories: string[];
   managedMenuItems: MenuItem[];
+  filteredManagedMenuItems: MenuItem[];
+  productSearchText: string;
+  setProductSearchText: (value: string) => void;
+  selectedProductCategory: string | null;
+  setSelectedProductCategory: (value: string | null) => void;
   productName: string;
   setProductName: (value: string) => void;
   productPrimaryName: string;
@@ -70,7 +75,7 @@ export interface MainScreenProps {
   setProductImageDataUrl: (value: string | null) => void;
   importProductsCsv: () => void;
   chooseProductImage: (onSelected: (imageDataUrl: string) => void) => Promise<void>;
-  saveNewProduct: () => Promise<void>;
+  saveNewProduct: () => Promise<boolean>;
   updateProductDetails: (item: MenuItem, values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string }) => Promise<boolean>;
   updateProductName: (item: MenuItem, value: string) => Promise<void>;
   updateProductDisplayNames: (item: MenuItem, primaryName: string, secondaryName: string) => Promise<void>;

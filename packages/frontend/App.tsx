@@ -531,6 +531,8 @@ export default function App(): React.JSX.Element {
     customEndDate: ticketCustomEndDate,
   };
   const [managedMenuItems, setManagedMenuItems] = useState<MenuItem[]>([]);
+  const [productSearchText, setProductSearchText] = useState('');
+  const [selectedProductCategory, setSelectedProductCategory] = useState<string | null>(null);
   const [productName, setProductName] = useState('');
   const [productPrimaryName, setProductPrimaryName] = useState('');
   const [productSecondaryName, setProductSecondaryName] = useState('');
@@ -584,6 +586,8 @@ export default function App(): React.JSX.Element {
     setSelectedPaidTicket(null);
     setSessionSummary(null);
     setManagedMenuItems([]);
+    setProductSearchText('');
+    setSelectedProductCategory(null);
     setSelectedMenuCategory(null);
     setMenuSearchText('');
     setTicketSearchText('');
@@ -809,6 +813,21 @@ export default function App(): React.JSX.Element {
     () => Array.from(new Set(managedMenuItems.map((item) => item.category))).sort((a, b) => a.localeCompare(b)),
     [managedMenuItems]
   );
+  const filteredManagedMenuItems = useMemo(() => {
+    const query = normalizeSearchText(productSearchText);
+    return managedMenuItems.filter((item) => {
+      const matchesText = !query || normalizeSearchText([
+        item.name,
+        item.primaryName,
+        item.secondaryName,
+        item.category,
+        item.sku,
+        item.description,
+      ].join(' ')).includes(query);
+      const matchesCategory = !selectedProductCategory || item.category === selectedProductCategory;
+      return matchesText && matchesCategory;
+    });
+  }, [managedMenuItems, productSearchText, selectedProductCategory]);
   const forcedTpvScreen = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TPV_SCREEN;
   const useMobilePosLayout = forcedTpvScreen === 'mobile'
     ? true
@@ -1047,7 +1066,7 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  async function saveNewProduct(): Promise<void> {
+  async function saveNewProduct(): Promise<boolean> {
     const priceCents = parsePriceToCents(productPrice);
     const costCents = productCost.trim() ? parsePriceToCents(productCost) : null;
     const name = productName.trim();
@@ -1055,11 +1074,11 @@ export default function App(): React.JSX.Element {
 
     if (!name || !category || priceCents === null) {
       Alert.alert('Producto no válido', 'Introduce nombre, tipo y precio válido.');
-      return;
+      return false;
     }
     if (costCents === null && productCost.trim()) {
       Alert.alert('Coste no válido', 'Introduce un coste válido o deja el campo vacío.');
-      return;
+      return false;
     }
 
     try {
@@ -1086,8 +1105,10 @@ export default function App(): React.JSX.Element {
       setProductImageDataUrl(null);
       await loadManagedProducts();
       await actions.reloadMenu();
+      return true;
     } catch {
       Alert.alert('Error', 'No se pudo crear el producto.');
+      return false;
     }
   }
 
@@ -2040,6 +2061,11 @@ export default function App(): React.JSX.Element {
     openPrinterDiagnostics: () => void openPrinterDiagnostics(),
     managedCategories,
     managedMenuItems,
+    filteredManagedMenuItems,
+    productSearchText,
+    setProductSearchText,
+    selectedProductCategory,
+    setSelectedProductCategory,
     productName,
     setProductName,
     productPrimaryName,

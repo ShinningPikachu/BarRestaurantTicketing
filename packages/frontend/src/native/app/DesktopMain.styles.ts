@@ -398,6 +398,33 @@ export const desktopStyles = StyleSheet.create({
     gap: 8,
     marginBottom: 10
   },
+  productModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24
+  },
+  productModal: {
+    width: '100%',
+    maxWidth: 760,
+    maxHeight: '88%',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    padding: 16
+  },
+  productModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8
+  },
+  productModalContent: {
+    paddingBottom: 4
+  },
   productNameCreateRow: {
     width: '100%',
     flexDirection: 'row',
@@ -459,6 +486,23 @@ export const desktopStyles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 6
   },
+  productEditorFields: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  productEditorCategoryInput: {
+    flex: 1,
+    minWidth: 180
+  },
+  productEditorActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8
+  },
   productSaveStatus: {
     color: colors.textSecondary,
     fontSize: 13,
@@ -508,6 +552,34 @@ export const desktopStyles = StyleSheet.create({
     gap: 8,
     marginBottom: 10
   },
+  productCategoryFilterList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 8,
+    marginBottom: 10
+  },
+  productCategoryFilter: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 44
+  },
+  productSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10
+  },
+  productSearchInput: {
+    flex: 1,
+    minWidth: 260
+  },
+  productSearchCount: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700'
+  },
   menuTypeButton: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -521,28 +593,74 @@ export const desktopStyles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12
   },
+  menuTypeButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  menuTypeButtonTextSelected: {
+    color: colors.textLight
+  },
   productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
     backgroundColor: colors.surfaceAlt,
-    padding: 10,
+    padding: 8,
     marginBottom: 8
   },
+  productRowSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%'
+  },
+  productRowSummaryContent: {
+    flex: 1,
+    minWidth: 0
+  },
+  productRowSummaryTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  productRowSummaryPrice: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700'
+  },
+  productRowMeta: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2
+  },
+  productRowToggle: {
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    minHeight: 36,
+    justifyContent: 'center'
+  },
+  productRowEditor: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: 8,
+    paddingTop: 8,
+    gap: 8
+  },
   productRowImage: {
-    width: 56,
-    height: 56,
+    width: 42,
+    height: 42,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface
   },
   productRowImagePlaceholder: {
-    width: 56,
-    height: 56,
+    width: 42,
+    height: 42,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
