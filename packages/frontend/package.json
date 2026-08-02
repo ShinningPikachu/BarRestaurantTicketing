@@ -14,7 +14,7 @@
     "web:desktop": "node ../../scripts/expo-start.mjs desktop --web",
     "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "expo export --platform web"
+    "build": "expo export --platform web --clear"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.12",

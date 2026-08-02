@@ -410,6 +410,12 @@ export class ApiService {
     return parseOrThrow<MenuItem[]>(response, 'Failed to fetch menu for management');
   }
 
+  async fetchPairingApiBaseUrl(): Promise<string> {
+    const response = await this.request('/pairing');
+    const result = await parseOrThrow<{ apiBaseUrl: string }>(response, 'Failed to fetch pairing address');
+    return result.apiBaseUrl;
+  }
+
   async createMenuItem(payload: {
     name: string;
     primaryName?: string | null;

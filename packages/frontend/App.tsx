@@ -22,7 +22,7 @@ import { useTicketingController } from './src/native/controllers';
 import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCategoryGroup';
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel, TicketHistorySummary, TicketPeriodPreset } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
-import { ApiRequestError, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
+import { ApiRequestError, getApiBaseUrl, normalizeApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
 import type { PrinterDiagnostics, PrinterStatus } from './src/native/services/api';
 import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
@@ -51,14 +51,6 @@ interface TicketDateRangeState {
   endAt: string | null;
   label: string;
   error: string | null;
-}
-
-interface ExpoLikeGlobal {
-  process?: {
-    env?: {
-      EXPO_PUBLIC_TPV_SCREEN?: string;
-    };
-  };
 }
 
 function resizeImageFile(file: File): Promise<string> {
@@ -508,6 +500,8 @@ export default function App(): React.JSX.Element {
   const operationalRefreshGenerationRef = useRef(0);
   const { state, actions } = useTicketingController(authStatus === 'signedIn');
   const { width } = useWindowDimensions();
+  const forcedTpvScreen = process.env.EXPO_PUBLIC_TPV_SCREEN;
+  const isDesktopHost = forcedTpvScreen === 'desktop';
   const [activeSection, setActiveSection] = useState<AppSection>('home');
   const [sectionHistory, setSectionHistory] = useState<AppSection[]>([]);
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
@@ -533,6 +527,9 @@ export default function App(): React.JSX.Element {
   const [managedMenuItems, setManagedMenuItems] = useState<MenuItem[]>([]);
   const [productSearchText, setProductSearchText] = useState('');
   const [selectedProductCategory, setSelectedProductCategory] = useState<string | null>(null);
+  const [computerPairingUrl, setComputerPairingUrl] = useState<string | null>(null);
+  const [computerPairingError, setComputerPairingError] = useState<string | null>(null);
+  const pairingRequestGenerationRef = useRef(0);
   const [productName, setProductName] = useState('');
   const [productPrimaryName, setProductPrimaryName] = useState('');
   const [productSecondaryName, setProductSecondaryName] = useState('');
@@ -703,8 +700,7 @@ export default function App(): React.JSX.Element {
 
     async function restoreLogin(): Promise<void> {
       try {
-        const forcedTpvScreen = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TPV_SCREEN;
-        if (forcedTpvScreen === 'desktop') {
+        if (isDesktopHost) {
           await AsyncStorage.removeItem(API_BASE_URL_STORAGE_KEY);
         } else {
           const savedApiBaseUrl = await AsyncStorage.getItem(API_BASE_URL_STORAGE_KEY);
@@ -729,6 +725,41 @@ export default function App(): React.JSX.Element {
 
     return () => setApiUnauthorizedHandler(null);
   }, []);
+
+  async function refreshComputerPairingUrl(): Promise<void> {
+    if (!isDesktopHost || authStatus !== 'signedIn') {
+      return;
+    }
+
+    const requestGeneration = pairingRequestGenerationRef.current + 1;
+    pairingRequestGenerationRef.current = requestGeneration;
+    setComputerPairingUrl(null);
+    setComputerPairingError(null);
+
+    try {
+      const url = normalizeApiBaseUrl(await apiService.fetchPairingApiBaseUrl());
+      if (requestGeneration === pairingRequestGenerationRef.current) {
+        setComputerPairingUrl(url);
+      }
+    } catch {
+      if (requestGeneration === pairingRequestGenerationRef.current) {
+        setComputerPairingError(
+          'No se pudo detectar la dirección de red del ordenador. Comprueba la conexión Wi-Fi y vuelve a intentarlo.'
+        );
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!isDesktopHost || authStatus !== 'signedIn' || activeSection !== 'mobile-connect') {
+      return;
+    }
+
+    void refreshComputerPairingUrl();
+    return () => {
+      pairingRequestGenerationRef.current += 1;
+    };
+  }, [activeSection, authStatus, isDesktopHost]);
   const menuCategories = useMemo(() => Array.from(menuByCategory.keys()), [menuByCategory]);
   const visibleMenuCategory = selectedMenuCategory && menuByCategory.has(selectedMenuCategory)
     ? selectedMenuCategory
@@ -828,7 +859,6 @@ export default function App(): React.JSX.Element {
       return matchesText && matchesCategory;
     });
   }, [managedMenuItems, productSearchText, selectedProductCategory]);
-  const forcedTpvScreen = (globalThis as ExpoLikeGlobal).process?.env?.EXPO_PUBLIC_TPV_SCREEN;
   const useMobilePosLayout = forcedTpvScreen === 'mobile'
     ? true
     : forcedTpvScreen === 'desktop'
@@ -1975,7 +2005,7 @@ export default function App(): React.JSX.Element {
             <View style={styles.loginPanel}>
               <Text style={styles.loginTitle}>TPV Restaurante</Text>
               <Text style={styles.helperText}>Introduce el código de acceso para continuar.</Text>
-              <Text style={styles.helperText}>{`Servidor: ${configuredApiBaseUrl}`}</Text>
+              {!isDesktopHost ? <Text style={styles.helperText}>{`Servidor: ${configuredApiBaseUrl}`}</Text> : null}
               <TextInput
                 style={styles.loginInput}
                 value={accessCode}
@@ -1989,13 +2019,15 @@ export default function App(): React.JSX.Element {
               <TouchableOpacity style={styles.primaryButton} onPress={() => void handleLogin()} disabled={loginLoading}>
                 <Text style={styles.primaryButtonText}>{loginLoading ? 'Entrando...' : 'Entrar'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.connectionSetupButton} onPress={openConnectionSetup}>
-                <Text style={styles.secondaryButtonText}>Conectar con otro ordenador</Text>
-              </TouchableOpacity>
+              {!isDesktopHost ? (
+                <TouchableOpacity style={styles.connectionSetupButton} onPress={openConnectionSetup}>
+                  <Text style={styles.secondaryButtonText}>Conectar con otro ordenador</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </SafeAreaView>
-        {connectionModal}
+        {!isDesktopHost ? connectionModal : null}
       </>
     );
   }
@@ -2006,13 +2038,15 @@ export default function App(): React.JSX.Element {
         <SafeAreaView style={styles.container}>
           <View style={styles.centered}>
             <Text style={styles.title}>Cargando...</Text>
-            <Text style={styles.loadingConnectionHelp}>Si has cambiado de red, conecta el teléfono de nuevo.</Text>
-            <TouchableOpacity style={styles.connectionSetupButton} onPress={openConnectionSetup}>
-              <Text style={styles.secondaryButtonText}>Conectar con otro ordenador</Text>
-            </TouchableOpacity>
+            <Text style={styles.loadingConnectionHelp}>{isDesktopHost ? 'Conectando con el servidor local…' : 'Si has cambiado de red, conecta el teléfono de nuevo.'}</Text>
+            {!isDesktopHost ? (
+              <TouchableOpacity style={styles.connectionSetupButton} onPress={openConnectionSetup}>
+                <Text style={styles.secondaryButtonText}>Conectar con otro ordenador</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </SafeAreaView>
-        {connectionModal}
+        {!isDesktopHost ? connectionModal : null}
       </>
     );
   }
@@ -2026,7 +2060,9 @@ export default function App(): React.JSX.Element {
     onLogout: () => void handleLogout(),
     onRefreshData: () => void refreshOperationalData({ showFeedback: true }),
     isRefreshingData,
-    computerPairingUrl: getApiBaseUrl(),
+    computerPairingUrl,
+    computerPairingError,
+    onRefreshPairingUrl: () => void refreshComputerPairingUrl(),
     posScreenProps,
     sessionSummary,
     ticketHistorySummary,
@@ -2105,7 +2141,7 @@ export default function App(): React.JSX.Element {
       {useMobilePosLayout
         ? <MobileMainScreen {...mainScreenProps} />
         : <DesktopMainScreen {...mainScreenProps} />}
-      {connectionModal}
+      {!isDesktopHost ? connectionModal : null}
     </>
   );
 }

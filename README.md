@@ -273,7 +273,7 @@ If the phone will connect through a computer-created hotspot, build with the hot
 BAR_TICKETING_HOST_IP=10.42.0.1 npm run android:apk
 ```
 
-The installed Android app can later be paired with a different computer address without rebuilding it. After installing an APK that includes this pairing feature once, start the computer TPV normally, tap `Conectar` in the Android app, and scan the pairing QR shown in the computer startup terminal. Pairing stores only the local server address; the POS login code is still required.
+The installed Android app can later be paired with a different computer address without rebuilding it. After installing an APK that includes this pairing feature once, start and sign in to the computer TPV, open `Conectar movil`, then tap `Conectar` in the Android app and scan the QR shown on the computer. Pairing stores only the local server address; the POS login code is still required. The computer may internally use `localhost` or `127.0.0.1`, but the QR automatically uses the LAN address reachable from the phone.
 
 If you want to force the initial backend URL, set it before building:
 
@@ -582,7 +582,7 @@ For the installed Android app:
 1. Start BarRestaurantTicketing on the computer.
 2. Keep phone and computer on the same Wi-Fi network, or connect the phone to the computer hotspot.
 3. In the phone app, tap `Conectar`.
-4. Scan the `Installed Android app` QR code printed in the computer startup terminal.
+4. On the computer TPV, open `Conectar movil` and scan the displayed QR code.
 5. Log in with the POS access code.
 
 You can also type the pairing address manually in the phone app, for example:

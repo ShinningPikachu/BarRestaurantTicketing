@@ -61,6 +61,36 @@ test('login is rate-limited and HTTP failures remain structured JSON', async () 
   }
 });
 
+test('pairing returns the mobile LAN URL instead of the desktop loopback URL', async () => {
+  const previousHostIp = process.env.BAR_TICKETING_HOST_IP;
+  process.env.BAR_TICKETING_HOST_IP = '192.168.1.80';
+  const server = createApp().listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/pairing`, {
+      headers: { authorization: `Bearer ${config.auth.sessionToken}` },
+    });
+    assert.equal(response.status, 200);
+    const payload = await response.json() as {
+      success: boolean;
+      data: { apiBaseUrl: string };
+    };
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.apiBaseUrl, 'http://192.168.1.80:3000/api');
+  } finally {
+    if (previousHostIp === undefined) {
+      delete process.env.BAR_TICKETING_HOST_IP;
+    } else {
+      process.env.BAR_TICKETING_HOST_IP = previousHostIp;
+    }
+    server.close();
+    await once(server, 'close');
+  }
+});
+
 test('provisional printer payload strips client-controlled transport and fiscal fields', () => {
   const parsed = xprinterTicketSchema.parse({
     businessName: 'Legal Name',

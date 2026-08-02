@@ -537,12 +537,30 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
             <View style={styles.pairingTextBlock}>
               <Text style={styles.sectionTitle}>Conectar movil</Text>
               <Text style={styles.helperText}>En el telefono, abre la app instalada, toca Conectar y escanea este codigo.</Text>
-              <Text style={styles.pairingAddress}>{props.computerPairingUrl}</Text>
-              <Text style={styles.helperText}>Telefono y ordenador deben estar en la misma red Wi-Fi, o el telefono puede conectarse al punto Wi-Fi creado por este ordenador.</Text>
-              <Text style={styles.helperText}>Sin router: activa el hotspot del ordenador, conecta el telefono a esa red y vuelve a abrir esta pantalla para usar la direccion correcta.</Text>
-              <Text style={styles.helperText}>Si no escanea, escribe esta direccion manualmente en el telefono.</Text>
+              {props.computerPairingUrl ? (
+                <>
+                  <Text style={styles.helperText}>Dirección de red para el móvil:</Text>
+                  <Text style={styles.pairingAddress}>{props.computerPairingUrl}</Text>
+                  <Text style={styles.helperText}>Es normal que sea distinta de 127.0.0.1: esa dirección solo funciona dentro del ordenador.</Text>
+                  <Text style={styles.helperText}>Telefono y ordenador deben estar en la misma red Wi-Fi, o el telefono puede conectarse al punto Wi-Fi creado por este ordenador.</Text>
+                  <Text style={styles.helperText}>Sin router: activa el hotspot del ordenador, conecta el telefono a esa red y vuelve a abrir esta pantalla para usar la direccion correcta.</Text>
+                  <Text style={styles.helperText}>Si no escanea, escribe esta direccion manualmente en el telefono.</Text>
+                </>
+              ) : props.computerPairingError ? (
+                <>
+                  <Text style={styles.helperText}>{props.computerPairingError}</Text>
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={props.onRefreshPairingUrl}
+                  >
+                    <Text style={styles.secondaryButtonText}>Volver a detectar la dirección</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={styles.helperText}>Preparando una dirección de red para el teléfono…</Text>
+              )}
             </View>
-            <PairingQrCode value={props.computerPairingUrl} />
+            {props.computerPairingUrl ? <PairingQrCode value={props.computerPairingUrl} /> : null}
           </View>
         </View>
       ) : null}

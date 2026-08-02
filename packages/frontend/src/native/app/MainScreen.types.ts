@@ -15,7 +15,9 @@ export interface MainScreenProps {
   onLogout: () => void;
   onRefreshData: () => void;
   isRefreshingData: boolean;
-  computerPairingUrl: string;
+  computerPairingUrl: string | null;
+  computerPairingError: string | null;
+  onRefreshPairingUrl: () => void;
   posScreenProps: PosScreenProps;
   sessionSummary: SessionSummary | null;
   ticketHistorySummary: TicketHistorySummary;
