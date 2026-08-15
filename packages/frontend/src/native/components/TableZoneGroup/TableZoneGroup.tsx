@@ -34,6 +34,7 @@ const MOBILE_BOARD_VISIBLE_HEIGHT = 190;
 const BOARD_PADDING = 12;
 const DESKTOP_TABLE_GAP = 7;
 const MOBILE_TABLE_GAP = 7;
+const MOBILE_TABLES_PER_ROW = 4;
 const TABLE_POSITIONS_STORAGE_KEY_PREFIX = 'bar-ticketing-table-positions-v1';
 
 function clamp(value: number, min: number, max: number): number {
@@ -239,16 +240,26 @@ export function TableZoneGroup({ layout = 'desktop', zone, numbers, tableTotals,
   const [tablePositions, setTablePositions] = useState<Record<string, TablePosition>>({});
   const [hasLoadedPositions, setHasLoadedPositions] = useState(false);
   const isMobile = layout === 'mobile';
-  const tableWidth = isMobile ? MOBILE_TABLE_WIDTH : DESKTOP_TABLE_WIDTH;
-  const tableHeight = isMobile ? MOBILE_TABLE_HEIGHT : DESKTOP_TABLE_HEIGHT;
-  const boardVisibleHeight = isMobile ? MOBILE_BOARD_VISIBLE_HEIGHT : DESKTOP_BOARD_VISIBLE_HEIGHT;
   const tableGap = isMobile ? MOBILE_TABLE_GAP : DESKTOP_TABLE_GAP;
   const measuredBoardWidth = boardWidth > 0 ? boardWidth : 300;
+  const tableWidth = isMobile
+    ? Math.min(
+      MOBILE_TABLE_WIDTH,
+      Math.max(
+        1,
+        Math.floor((measuredBoardWidth - BOARD_PADDING * 2 - tableGap * (MOBILE_TABLES_PER_ROW - 1)) / MOBILE_TABLES_PER_ROW)
+      )
+    )
+    : DESKTOP_TABLE_WIDTH;
+  const tableHeight = isMobile ? MOBILE_TABLE_HEIGHT : DESKTOP_TABLE_HEIGHT;
+  const boardVisibleHeight = isMobile ? MOBILE_BOARD_VISIBLE_HEIGHT : DESKTOP_BOARD_VISIBLE_HEIGHT;
 
-  const tablesPerRow = Math.max(
-    1,
-    Math.floor((measuredBoardWidth - BOARD_PADDING * 2 + tableGap) / (tableWidth + tableGap))
-  );
+  const tablesPerRow = isMobile
+    ? MOBILE_TABLES_PER_ROW
+    : Math.max(
+      1,
+      Math.floor((measuredBoardWidth - BOARD_PADDING * 2 + tableGap) / (tableWidth + tableGap))
+    );
   const rowCount = Math.max(1, Math.ceil(numbers.length / tablesPerRow));
   const boardContentHeight = Math.max(
     boardVisibleHeight,
