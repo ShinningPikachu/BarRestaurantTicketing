@@ -247,9 +247,9 @@ export function useTicketingController(enabled = true) {
     }
   }
 
-  async function payTable(method: PaymentMethod, splitPeople?: number): Promise<boolean> {
+  async function payTable(method: PaymentMethod, splitPeople?: number, cardConfirmed = false): Promise<boolean> {
     try {
-      return await workflowController.actions.payTable(selectedTable, method, splitPeople);
+      return await workflowController.actions.payTable(selectedTable, method, splitPeople, cardConfirmed);
     } catch (error) {
       logger.error({ error, method, splitPeople }, 'Failed to pay table');
       Alert.alert('Error', 'No se pudo registrar el pago');
@@ -259,10 +259,11 @@ export function useTicketingController(enabled = true) {
 
   async function paySelectedItems(
     method: PaymentMethod,
-    items: Array<{ orderId: string; itemId: number; qty: number }>
+    items: Array<{ orderId: string; itemId: number; qty: number }>,
+    cardConfirmed = false
   ): Promise<boolean> {
     try {
-      return await workflowController.actions.paySelectedItems(selectedTable, method, items);
+      return await workflowController.actions.paySelectedItems(selectedTable, method, items, cardConfirmed);
     } catch (error) {
       logger.error({ error, method }, 'Failed to pay selected items');
       Alert.alert('Error', 'No se pudo registrar el pago AA');
