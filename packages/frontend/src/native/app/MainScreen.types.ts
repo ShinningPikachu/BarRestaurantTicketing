@@ -1,7 +1,7 @@
 import { ComponentProps } from 'react';
 import { DesktopPosScreen, MobilePosScreen } from '../components';
 import { MenuItem, PaidTicket, SessionSummary, TicketHistorySummary, TicketPeriodPreset } from '../types';
-import type { KitchenDispatch, PrinterDiagnostics, PrinterStatus } from '../services/api';
+import type { KitchenDispatch, PersistedPrintJob, PrinterDiagnostics, PrinterStatus } from '../services/api';
 
 export type AppSection = 'home' | 'pos' | 'history' | 'products' | 'printer' | 'mobile-connect';
 export type PosScreenProps = ComponentProps<typeof DesktopPosScreen> & ComponentProps<typeof MobilePosScreen>;
@@ -46,6 +46,9 @@ export interface MainScreenProps {
   printerStatus: PrinterStatus | null;
   printerDiagnostics: PrinterDiagnostics | null;
   kitchenDispatches: KitchenDispatch[];
+  kitchenUnresolvedCount: number;
+  kitchenQueueTruncated: boolean;
+  persistedPrintJobs: PersistedPrintJob[];
   kitchenAction: string | null;
   refreshKitchenDispatches: () => void;
   printPendingKitchenDispatch: (dispatch: KitchenDispatch) => void;
