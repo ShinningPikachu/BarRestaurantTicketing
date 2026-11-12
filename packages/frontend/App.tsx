@@ -23,7 +23,7 @@ import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCat
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel, TicketHistorySummary, TicketPeriodPreset } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl, normalizeApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
-import type { KitchenDispatch, PrinterDiagnostics, PrinterStatus } from './src/native/services/api';
+import type { KitchenDispatch, PersistedPrintJob, PrinterDiagnostics, PrinterStatus } from './src/native/services/api';
 import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
@@ -558,6 +558,9 @@ export default function App(): React.JSX.Element {
   const [productImageDataUrl, setProductImageDataUrl] = useState<string | null>(null);
   const [printerStatus, setPrinterStatus] = useState<PrinterStatus | null>(null);
   const [kitchenDispatches, setKitchenDispatches] = useState<KitchenDispatch[]>([]);
+  const [kitchenUnresolvedCount, setKitchenUnresolvedCount] = useState(0);
+  const [kitchenQueueTruncated, setKitchenQueueTruncated] = useState(false);
+  const [persistedPrintJobs, setPersistedPrintJobs] = useState<PersistedPrintJob[]>([]);
   const [kitchenAction, setKitchenAction] = useState<string | null>(null);
   const [printerDiagnostics, setPrinterDiagnostics] = useState<PrinterDiagnostics | null>(null);
   const [printerAction, setPrinterAction] = useState<'refresh' | 'reconnect' | 'test' | 'cancel' | 'diagnostics' | null>(null);
@@ -619,6 +622,9 @@ export default function App(): React.JSX.Element {
     setProductImageDataUrl(null);
     setPrinterStatus(null);
     setKitchenDispatches([]);
+    setKitchenUnresolvedCount(0);
+    setKitchenQueueTruncated(false);
+    setPersistedPrintJobs([]);
     setKitchenAction(null);
     setPrinterDiagnostics(null);
     setPrinterAction(null);
@@ -1600,7 +1606,10 @@ export default function App(): React.JSX.Element {
 
   async function refreshKitchenDispatches(): Promise<void> {
     try {
-      setKitchenDispatches(await apiService.fetchKitchenDispatches());
+      const queue = await apiService.fetchKitchenDispatches();
+      setKitchenDispatches(queue.jobs);
+      setKitchenUnresolvedCount(queue.unresolvedCount);
+      setKitchenQueueTruncated(queue.truncated);
     } catch {
       Alert.alert('Cola de cocina', 'No se pudieron consultar las comandas pendientes.');
     }
@@ -1620,7 +1629,12 @@ export default function App(): React.JSX.Element {
       const details = error instanceof ApiRequestError ? error.message : 'Consulta el estado antes de reintentar.';
       Alert.alert('Impresión pendiente', details);
     } finally {
-      try { setKitchenDispatches(await apiService.fetchKitchenDispatches()); } catch { /* refresh manually */ }
+      try {
+        const queue = await apiService.fetchKitchenDispatches();
+        setKitchenDispatches(queue.jobs);
+        setKitchenUnresolvedCount(queue.unresolvedCount);
+        setKitchenQueueTruncated(queue.truncated);
+      } catch { /* refresh manually */ }
       setKitchenAction(null);
     }
   }
@@ -1635,7 +1649,10 @@ export default function App(): React.JSX.Element {
     setKitchenAction(dispatch.id);
     try {
       await apiService.acknowledgeKitchenDispatch(dispatch.id, manualHandoff);
-      setKitchenDispatches(await apiService.fetchKitchenDispatches());
+      const queue = await apiService.fetchKitchenDispatches();
+      setKitchenDispatches(queue.jobs);
+      setKitchenUnresolvedCount(queue.unresolvedCount);
+      setKitchenQueueTruncated(queue.truncated);
       Alert.alert('Recepción confirmada', 'La comanda ha quedado registrada como recibida en cocina.');
     } catch (error) {
       const details = error instanceof ApiRequestError ? error.message : 'Actualiza la cola e inténtalo de nuevo.';
@@ -1873,13 +1890,17 @@ export default function App(): React.JSX.Element {
     let active = true;
     const updateStatus = async () => {
       try {
-        const [status, dispatches] = await Promise.all([
+        const [status, dispatches, printJobs] = await Promise.all([
           apiService.fetchPrinterStatus(),
           apiService.fetchKitchenDispatches(),
+          apiService.fetchPersistedPrintJobs(),
         ]);
         if (active) {
           setPrinterStatus(status);
-          setKitchenDispatches(dispatches);
+          setKitchenDispatches(dispatches.jobs);
+          setKitchenUnresolvedCount(dispatches.unresolvedCount);
+          setKitchenQueueTruncated(dispatches.truncated);
+          setPersistedPrintJobs(printJobs);
         }
       } catch {
         // Keep the last known state. Manual refresh provides user feedback.
@@ -2176,6 +2197,9 @@ export default function App(): React.JSX.Element {
     printerStatus,
     printerDiagnostics,
     kitchenDispatches,
+    kitchenUnresolvedCount,
+    kitchenQueueTruncated,
+    persistedPrintJobs,
     kitchenAction,
     refreshKitchenDispatches: () => void refreshKitchenDispatches(),
     printPendingKitchenDispatch: (dispatch: KitchenDispatch) => void printPendingKitchenDispatch(dispatch),
