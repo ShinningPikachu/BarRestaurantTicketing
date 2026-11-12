@@ -26,6 +26,7 @@ const validTicket = (invoiceNumber = 'TEST-1'): XprinterTicketPayload => ({
   vatCents: 9,
   vatRatePercent: 10,
   totalCents: 100,
+  fiscal: true,
 });
 
 class MockPrinterAdapter implements PrinterAdapter {
@@ -259,4 +260,15 @@ test('disconnect during an active write is not retried and safe test output cont
   assert.match(testText, /PRUEBA DE IMPRESORA/);
   assert.match(testText, /SIN DATOS DE CLIENTES/);
   assert.doesNotMatch(testText, /CUSTOMER-SECRET|Test Business|socket closed|PRINTER_DISCONNECTED/);
+});
+
+
+test('provisional receipts never appear as paid simplified invoices', async () => {
+  const adapter = new MockPrinterAdapter();
+  const service = new XprinterService({ adapter });
+  await service.printTicket({ ...validTicket('PRE-2'), fiscal: false });
+  const body = adapter.printed[0].toString('ascii');
+  assert.match(body, /PRECUENTA - NO FISCAL/);
+  assert.match(body, /SIN VALIDEZ FISCAL/);
+  assert.doesNotMatch(body, /FACTURA SIMPLIFICADA/);
 });
