@@ -657,3 +657,7 @@ packages/
     App.tsx          Main app shell
     src/native/      Controllers, components, styles, services
 ```
+
+## Provisional receipts
+
+Before a payment is recorded, the table print action issues a **PRECUENTA / SIN VALIDEZ FISCAL** with an order reference. It is not an issued invoice. To print a simplified invoice after payment, open *Historial de tickets* and reprint the saved `PaidTicket`, which has a durable ticket number and an accounting snapshot. Tax and invoicing rules depend on jurisdiction, and must be reviewed for the restaurant's legal context before using the system for statutory invoicing.
