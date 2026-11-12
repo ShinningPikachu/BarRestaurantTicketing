@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../db.js';
+import { buildRecordedFinancialSummary } from '../services/financial-summary.service.js';
 import { validateBody, validateParams } from '../middleware/validation.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { successResponse } from '../types/api.js';
@@ -53,66 +54,9 @@ export const xprinterTicketSchema = z.object({
   }
 });
 
-const financialSummaryDaySchema = z.object({
-  dayLabel: z.string().trim().min(1).max(100),
-  ticketCount: countSchema,
-  itemQuantity: countSchema,
-  taxableBaseCents: centsSchema,
-  vatCents: centsSchema,
-  totalCents: centsSchema,
-  cashCents: centsSchema,
-  cardCents: centsSchema,
-});
-
-const xprinterFinancialSummarySchema = z.object({
-  businessName: z.string().trim().min(1).max(200),
-  tradeName: z.string().trim().min(1).max(200),
-  nif: z.string().trim().min(1).max(64),
-  periodLabel: z.string().trim().min(1).max(200),
-  issuedAt: z.string().trim().min(1).max(64),
-  ticketCount: countSchema,
-  itemQuantity: countSchema,
-  taxableBaseCents: centsSchema,
-  vatCents: centsSchema,
-  vatRateLabel: optionalText(32),
-  totalCents: centsSchema,
-  cashCents: centsSchema,
-  cardCents: centsSchema,
-  firstTicketNumber: optionalText(128),
-  lastTicketNumber: optionalText(128),
-  dailyTotals: z.array(financialSummaryDaySchema).min(1).max(3_660),
-}).superRefine((summary, context) => {
-  const totals = summary.dailyTotals.reduce((result, day) => ({
-    ticketCount: result.ticketCount + day.ticketCount,
-    itemQuantity: result.itemQuantity + day.itemQuantity,
-    taxableBaseCents: result.taxableBaseCents + day.taxableBaseCents,
-    vatCents: result.vatCents + day.vatCents,
-    totalCents: result.totalCents + day.totalCents,
-    cashCents: result.cashCents + day.cashCents,
-    cardCents: result.cardCents + day.cardCents,
-  }), {
-    ticketCount: 0,
-    itemQuantity: 0,
-    taxableBaseCents: 0,
-    vatCents: 0,
-    totalCents: 0,
-    cashCents: 0,
-    cardCents: 0,
-  });
-  const fields = Object.keys(totals) as Array<keyof typeof totals>;
-  if (fields.some((field) => !Number.isSafeInteger(totals[field]) || totals[field] !== summary[field])) {
-    context.addIssue({ code: 'custom', message: 'Financial summary totals do not match daily totals' });
-  }
-  if (
-    summary.taxableBaseCents + summary.vatCents !== summary.totalCents
-    || summary.cashCents + summary.cardCents !== summary.totalCents
-    || summary.dailyTotals.some((day) => (
-      day.taxableBaseCents + day.vatCents !== day.totalCents
-      || day.cashCents + day.cardCents !== day.totalCents
-    ))
-  ) {
-    context.addIssue({ code: 'custom', message: 'Financial summary accounting totals are inconsistent' });
-  }
+// The backend loads the selected tickets and computes all financial fields.
+const financialSummarySelectionSchema = z.object({
+  ticketIds: z.array(z.string().trim().min(1).max(128)).min(1).max(5_000),
 });
 
 const emptyBodySchema = z.object({}).optional();
@@ -140,10 +84,19 @@ router.post(
 
 router.post(
   '/xprinter/financial-summary',
-  validateBody(xprinterFinancialSummarySchema),
+  validateBody(financialSummarySelectionSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const job = await xprinterService.printFinancialSummary(req.body);
+      const ticketIds = [...new Set(req.body.ticketIds as string[])];
+      const tickets = await prisma.paidTicket.findMany({
+        where: { id: { in: ticketIds }, status: 'paid' },
+        include: { items: true },
+        orderBy: [{ createdAt: 'asc' }, { ticketNumber: 'asc' }],
+      });
+      if (tickets.length !== ticketIds.length) {
+        throw new ApiError(409, 'Some selected tickets are missing or not paid', 'INVALID_SUMMARY_SELECTION');
+      }
+      const job = await xprinterService.printFinancialSummary(buildRecordedFinancialSummary(tickets));
       res.json(successResponse({ printed: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
