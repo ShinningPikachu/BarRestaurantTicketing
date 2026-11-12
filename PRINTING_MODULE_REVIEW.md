@@ -64,3 +64,7 @@ Raw exceptions, stack traces, command output, log messages, and diagnostics are 
 ## Current workstation finding
 
 The local configuration selects the `POS80_RAW` system queue but does not yet declare `XPRINTER_SYSTEM_PRINTER_RAW`. A read-only CUPS check also reports that the scheduler is not running and that `POS80_RAW` is not currently a valid destination. The new service blocks jobs in this condition. Before printing on this computer, start/install CUPS and create the intended queue, or select the correct USB, Bluetooth, or network adapter; then explicitly choose raw or driver mode and use only the fixed safe test print.
+
+## Persisted printer attempts
+
+The backend now writes one `PrintJob` row per accepted request and records adapter acceptance, explicit failure, or an uncertain outcome. Interrupted pending attempts become `unknown` when the backend restarts. `GET /api/printers/history` returns the last 50 attempts. Operators must investigate `unknown` entries before manually reprinting. Never interpret CUPS/TCP acceptance as physical receipt delivery. No receipt content or authentication secrets are stored in this audit table.
