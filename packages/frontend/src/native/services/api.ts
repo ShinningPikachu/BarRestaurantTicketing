@@ -509,6 +509,23 @@ export class ApiService {
     return parseOrThrow<{ created: number; updated: number; total: number }>(response, 'Failed to import menu CSV');
   }
 
+  async fetchPaidTicketPage(params: {
+    startAt: string;
+    endAt: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ tickets: PaidTicket[]; nextCursor: string | null }> {
+    const query = new URLSearchParams();
+    query.set('startAt', params.startAt);
+    query.set('endAt', params.endAt);
+    query.set('limit', String(params.limit ?? 100));
+    if (params.cursor) query.set('cursor', params.cursor);
+    const response = await this.request(`/tickets/page?${query.toString()}`);
+    return parseOrThrow<{ tickets: PaidTicket[]; nextCursor: string | null }>(
+      response, 'Failed to load ticket history page'
+    );
+  }
+
   async fetchPaidTickets(params: { startAt?: string; endAt?: string } = {}): Promise<PaidTicket[]> {
     const query = new URLSearchParams();
     if (params.startAt) {

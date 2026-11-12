@@ -37,6 +37,9 @@ export interface MainScreenProps {
   clearSelectedPaidTicket: () => void;
   refreshSessionSummary: (showFeedback?: boolean) => Promise<void>;
   loadTicketHistory: () => Promise<void>;
+  loadMoreTicketHistory: () => Promise<void>;
+  ticketHasMore: boolean;
+  ticketPageLoading: boolean;
   printSimplifiedPaidTicket: (ticket: PaidTicket) => Promise<void>;
   refundPaidTicket: (ticket: PaidTicket) => void;
   printFilteredTicketSummary: () => Promise<void>;

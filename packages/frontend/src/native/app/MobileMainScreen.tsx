@@ -371,7 +371,16 @@ function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
             </View>
           </View>
         ))}
-        {props.filteredPaidTickets.length === 0 ? <Text style={styles.emptyText}>No hay tickets.</Text> : null}
+        {props.filteredPaidTickets.length === 0 ? <Text style={styles.emptyText}>No hay tickets entre los registros cargados.</Text> : null}
+        {props.ticketHasMore ? (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            disabled={props.ticketPageLoading}
+            onPress={() => void props.loadMoreTicketHistory()}
+          >
+            <Text style={styles.secondaryButtonText}>{props.ticketPageLoading ? 'Cargando...' : 'Cargar 100 tickets más'}</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );

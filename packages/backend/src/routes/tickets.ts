@@ -86,6 +86,50 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+const ticketPageQuery = z.object({
+  startAt: z.string().datetime({ offset: true }),
+  endAt: z.string().datetime({ offset: true }),
+  cursor: z.string().trim().min(1).max(128).optional(),
+  limit: z.coerce.number().int().min(1).max(250).default(100),
+});
+
+router.get('/page', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = ticketPageQuery.parse(req.query);
+    const start = new Date(query.startAt);
+    const end = new Date(query.endAt);
+    if (start >= end) {
+      res.status(400).json(errorResponse('INVALID_TICKET_DATE_RANGE', 'Start date must be before end date'));
+      return;
+    }
+    if (query.cursor) {
+      const cursorTicket = await prisma.paidTicket.findUnique({
+        where: { id: query.cursor },
+        select: { id: true, createdAt: true },
+      });
+      if (!cursorTicket || cursorTicket.createdAt < start || cursorTicket.createdAt >= end) {
+        res.status(400).json(errorResponse('INVALID_TICKET_CURSOR', 'Cursor does not belong to this date range'));
+        return;
+      }
+    }
+    const tickets = await prisma.paidTicket.findMany({
+      where: { createdAt: { gte: start, lt: end } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take: query.limit + 1,
+      include: { items: true },
+    });
+    const hasMore = tickets.length > query.limit;
+    const page = tickets.slice(0, query.limit);
+    res.json(successResponse({
+      tickets: page.map(toPublicTicket),
+      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/summary/session', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const { start, end } = getSessionWindow();

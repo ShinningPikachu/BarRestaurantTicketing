@@ -335,7 +335,7 @@ function DesktopHistorySummary(props: MainScreenProps): React.JSX.Element {
       </View>
       <View style={styles.accountingSummaryGrid}>
         <View style={styles.accountingStat}>
-          <Text style={styles.accountingStatLabel}>Tickets</Text>
+          <Text style={styles.accountingStatLabel}>Tickets cargados</Text>
           <Text style={styles.accountingStatValue}>{summary.ticketCount}</Text>
         </View>
         <View style={styles.accountingStat}>
@@ -403,7 +403,7 @@ function DesktopTicketPeriodControls(props: MainScreenProps): React.JSX.Element 
           style={[styles.menuSearchInput, styles.historySearchInput]}
           value={props.ticketSearchText}
           onChangeText={props.setTicketSearchText}
-          placeholder="Buscar por numero, NIF, cliente, mesa, pago o producto"
+          placeholder="Buscar entre los tickets cargados"
           placeholderTextColor="#6B7280"
         />
         <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.loadTicketHistory()}>
@@ -615,7 +615,16 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
                 </TouchableOpacity>
               </View>
             ))}
-            {props.filteredPaidTickets.length === 0 ? <Text style={styles.emptyText}>No hay tickets.</Text> : null}
+            {props.filteredPaidTickets.length === 0 ? <Text style={styles.emptyText}>No hay tickets entre los registros cargados.</Text> : null}
+            {props.ticketHasMore ? (
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                disabled={props.ticketPageLoading}
+                onPress={() => void props.loadMoreTicketHistory()}
+              >
+                <Text style={styles.secondaryButtonText}>{props.ticketPageLoading ? 'Cargando...' : 'Cargar 100 tickets más'}</Text>
+              </TouchableOpacity>
+            ) : null}
           </ScrollView>
         </View>
       ) : null}
