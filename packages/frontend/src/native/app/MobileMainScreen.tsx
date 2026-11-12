@@ -154,7 +154,8 @@ function getPaymentLabel(method: string): string {
 }
 
 function getStatusLabel(status: string | null | undefined): string {
-  if (status === 'refunded') return 'Devuelto';
+  if (status === 'refunded') return 'Rectificado';
+  if (status === 'correction') return 'Rectificativa';
   if (status === 'cancelled') return 'Cancelado';
   return 'Cobrado';
 }
@@ -306,7 +307,7 @@ function MobileTicketDetail({ ticket, props }: { ticket: PaidTicket; props: Main
         <Text style={styles.totalText}>{props.centsToCurrency(ticket.totalCents)}</Text>
       </View>
       {ticket.items.map((item) => {
-        const lineBase = Math.round(item.totalPriceCents / (1 + ticket.vatRatePercent / 100));
+        const lineBase = Math.round(item.totalPriceCents / (1 + (item.vatRatePercent ?? ticket.vatRatePercent) / 100));
         const lineVat = item.totalPriceCents - lineBase;
         return (
           <View key={item.id} style={styles.ticketLineRow}>
@@ -362,6 +363,11 @@ function MobileHistoryScreen(props: MainScreenProps): React.JSX.Element {
               <TouchableOpacity style={styles.secondaryButton} onPress={() => void props.downloadTicket(ticket)}>
                 <Text style={styles.secondaryButtonText}>PDF completo</Text>
               </TouchableOpacity>
+              {ticket.status === 'paid' ? (
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => props.refundPaidTicket(ticket)}>
+                  <Text style={styles.secondaryButtonText}>Devolver</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         ))}
