@@ -2,6 +2,14 @@ import { createApp } from './app.js';
 import { config } from './config/index.js';
 import prisma from './db.js';
 import { logger } from './utils/logger.js';
+import { markInterruptedPrintJobsUnknown } from './services/print-job.service.js';
+
+// A crash can occur after bytes were sent and before the outcome was persisted.
+// Preserve those attempts for operator review without automatically reprinting.
+const interruptedPrintJobs = await markInterruptedPrintJobsUnknown();
+if (interruptedPrintJobs > 0) {
+  logger.warn({ interruptedPrintJobs }, 'Printer attempts require manual review after restart');
+}
 
 const app = createApp();
 const server = app.listen(config.port, config.host, () => {
