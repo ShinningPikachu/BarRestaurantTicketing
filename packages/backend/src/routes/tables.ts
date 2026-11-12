@@ -2,6 +2,7 @@ import { Request, Response, Router, NextFunction } from 'express';
 import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service.js';
 import { validateParams, validateBody } from '../middleware/validation.js';
+import { requireManager } from '../middleware/auth.js';
 import { signalDataChange } from '../services/sync.service.js';
 import { successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
