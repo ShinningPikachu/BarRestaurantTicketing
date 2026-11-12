@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { ApiError } from '../middleware/errorHandler.js';
 import { validateBody, validateParams } from '../middleware/validation.js';
+import { requireManager } from '../middleware/auth.js';
 import { imageDataUrlSchema, MenuImportValidationError, parseMenuImportCsv } from '../services/menu-import.js';
 import { menuService } from '../services/menu.service.js';
 import { signalDataChange } from '../services/sync.service.js';
@@ -49,7 +50,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/manage/all', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/manage/all', requireManager, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     logger.info({}, 'Fetching all menu items for management');
     const items = await menuService.getAllMenuItemsForManagement();
@@ -62,6 +63,7 @@ router.get('/manage/all', async (_req: Request, res: Response, next: NextFunctio
 
 router.post(
   '/import/csv',
+  requireManager,
   validateBody(importCsvBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -82,6 +84,7 @@ router.post(
 
 router.post(
   '/',
+  requireManager,
   validateBody(menuItemBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -97,6 +100,7 @@ router.post(
 
 router.patch(
   '/:id',
+  requireManager,
   validateParams(menuItemParamsSchema),
   validateBody(updateMenuItemBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -113,6 +117,7 @@ router.patch(
 
 router.delete(
   '/:id',
+  requireManager,
   validateParams(menuItemParamsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
