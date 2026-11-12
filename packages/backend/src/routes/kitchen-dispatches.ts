@@ -20,11 +20,28 @@ function asResponse(job: { linesJson: string }) {
 
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const jobs = await prisma.kitchenDispatch.findMany({
-      take: 100,
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(successResponse(jobs.map(asResponse)));
+    // Unresolved handoffs must remain visible even after hundreds of routine
+    // acknowledged deliveries; newest-first alone can bury a lost order.
+    const [unresolved, recentAcknowledged, unresolvedCount] = await Promise.all([
+      prisma.kitchenDispatch.findMany({
+        where: { status: { not: 'acknowledged' } },
+        take: 500,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+      prisma.kitchenDispatch.findMany({
+        where: { status: 'acknowledged' },
+        take: 20,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+      prisma.kitchenDispatch.count({ where: { status: { not: 'acknowledged' } } }),
+    ]);
+    // UI handles a bounded list. Signal excess unresolved items instead of
+    // incorrectly suggesting every order is accounted for.
+    res.json(successResponse({
+      jobs: [...unresolved, ...recentAcknowledged].map(asResponse),
+      unresolvedCount,
+      truncated: unresolvedCount > unresolved.length,
+    }));
   } catch (error) {
     next(error);
   }
