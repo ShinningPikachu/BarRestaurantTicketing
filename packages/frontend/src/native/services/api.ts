@@ -12,6 +12,23 @@ export interface SyncRevision {
 export type PrinterConnectionState = 'connected' | 'disconnected' | 'unavailable' | 'busy' | 'out_of_paper' | 'error' | 'unknown';
 export type PrinterJobKind = 'ticket' | 'kitchen-ticket' | 'financial-summary' | 'test-print' | 'cash-drawer';
 
+export interface KitchenDispatchQueue {
+  jobs: KitchenDispatch[];
+  unresolvedCount: number;
+  truncated: boolean;
+}
+
+export interface PersistedPrintJob {
+  id: string;
+  kind: string;
+  referenceId: string | null;
+  status: 'pending' | 'accepted' | 'failed' | 'unknown';
+  printerJobId: string | null;
+  errorCode: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 export interface KitchenDispatch {
   id: string;
   orderId: string;
@@ -611,9 +628,9 @@ export class ApiService {
     return parseOrThrow<{ cancelled: number; status: PrinterStatus }>(response, 'Failed to cancel pending printer jobs');
   }
 
-  async fetchKitchenDispatches(): Promise<KitchenDispatch[]> {
+  async fetchKitchenDispatches(): Promise<KitchenDispatchQueue> {
     const response = await this.request('/kitchen-dispatches');
-    return parseOrThrow<KitchenDispatch[]>(response, 'Failed to load kitchen handoffs');
+    return parseOrThrow<KitchenDispatchQueue>(response, 'Failed to load kitchen handoffs');
   }
 
   async printKitchenDispatch(id: string, confirmedNoOutput = false): Promise<PrinterJobResponse> {
@@ -632,6 +649,11 @@ export class ApiService {
       body: JSON.stringify({ manualHandoff }),
     });
     return parseOrThrow<KitchenDispatch>(response, 'Failed to acknowledge kitchen handoff');
+  }
+
+  async fetchPersistedPrintJobs(): Promise<PersistedPrintJob[]> {
+    const response = await this.request('/printers/history');
+    return parseOrThrow<PersistedPrintJob[]>(response, 'Failed to load persisted print history');
   }
 
   async fetchPrinterDiagnostics(): Promise<PrinterDiagnostics> {
