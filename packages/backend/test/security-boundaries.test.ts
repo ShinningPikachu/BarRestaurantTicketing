@@ -145,3 +145,44 @@ test('cashier credentials cannot modify prices or open the cash drawer', async (
     await once(server, 'close');
   }
 });
+
+test('card payments require explicit external authorization acknowledgement', async () => {
+  const server = createApp().listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const response = await fetch(`${base}/api/orders/pay-table`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${config.auth.sessionToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        tableNumber: 1, tableZone: 'outside', method: 'card',
+        idempotencyKey: 'external-card-00001',
+      }),
+    });
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).error.code, 'CARD_PAYMENT_NOT_CONFIRMED');
+
+    const itemResponse = await fetch(`${base}/api/orders/pay-items`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${config.auth.sessionToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        tableNumber: 1, tableZone: 'outside', method: 'card',
+        idempotencyKey: 'external-card-00002',
+        items: [{ orderId: 'order-one', itemId: 1, qty: 1 }],
+      }),
+    });
+    assert.equal(itemResponse.status, 409);
+    assert.equal((await itemResponse.json()).error.code, 'CARD_PAYMENT_NOT_CONFIRMED');
+  } finally {
+    server.close();
+    await once(server, 'close');
+  }
+});
