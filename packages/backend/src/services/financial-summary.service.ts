@@ -39,6 +39,10 @@ export function buildRecordedFinancialSummary(tickets: RecordedTicket[]): Xprint
     days.set(dayLabel, day);
   }
   const rates = new Set(ordered.map((ticket) => ticket.vatRatePercent));
+  const hasMixedTicket = ordered.some((ticket) => {
+    if (!ticket.taxBreakdownJson) return false;
+    try { return JSON.parse(ticket.taxBreakdownJson).length > 1; } catch { return true; }
+  });
   return {
     businessName: config.ticket.businessName,
     tradeName: config.ticket.tradeName,
@@ -46,7 +50,7 @@ export function buildRecordedFinancialSummary(tickets: RecordedTicket[]): Xprint
     periodLabel: `${businessDate(ordered[0].createdAt)} to ${businessDate(ordered[ordered.length - 1].createdAt)}`,
     issuedAt: new Date().toISOString(),
     ...totals,
-    vatRateLabel: rates.size === 1 ? `${ordered[0].vatRatePercent}%` : 'mixto',
+    vatRateLabel: rates.size === 1 && !hasMixedTicket ? `${ordered[0].vatRatePercent}%` : 'mixto',
     firstTicketNumber: ordered[0].ticketNumber,
     lastTicketNumber: ordered[ordered.length - 1].ticketNumber,
     dailyTotals: Array.from(days.values()).sort((a, b) => a.dayLabel.localeCompare(b.dayLabel)),
