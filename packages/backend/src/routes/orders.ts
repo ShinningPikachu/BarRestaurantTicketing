@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service.js';
 import { validateBody, validateParams } from '../middleware/validation.js';
+import { requireManager } from '../middleware/auth.js';
 import { signalDataChange } from '../services/sync.service.js';
 import { successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
@@ -83,6 +84,7 @@ router.post(
 
 router.post(
   '/remove-items',
+  requireManager,
   validateBody(removeSelectedItemsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -100,7 +102,7 @@ router.post(
   }
 );
 
-router.delete('/:id', validateParams(orderIdParamSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requireManager, validateParams(orderIdParamSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     logger.info({ orderId: id }, 'Deleting order');
@@ -115,6 +117,7 @@ router.delete('/:id', validateParams(orderIdParamSchema), async (req: Request, r
 
 router.post(
   '/:id/items/:itemId/move-to-preorder',
+  requireManager,
   validateParams(moveToPreorderParamSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

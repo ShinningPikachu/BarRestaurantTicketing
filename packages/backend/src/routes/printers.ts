@@ -3,6 +3,7 @@ import { z } from 'zod';
 import prisma from '../db.js';
 import { buildRecordedFinancialSummary } from '../services/financial-summary.service.js';
 import { validateBody, validateParams } from '../middleware/validation.js';
+import { requireManager } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { successResponse } from '../types/api.js';
 import { trackPrinterOperation } from '../services/print-job.service.js';
@@ -85,6 +86,7 @@ router.post(
 
 router.post(
   '/xprinter/financial-summary',
+  requireManager,
   validateBody(financialSummarySelectionSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -146,6 +148,7 @@ router.post(
 
 router.post(
   '/xprinter/drawer',
+  requireManager,
   validateBody(emptyBodySchema),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {

@@ -108,6 +108,20 @@ export function ensureRuntimeEnv(filePath) {
     additions.push(`POS_AUTH_TOKEN=${randomBytes(32).toString('hex')}`);
   }
 
+  const configuredManagerCode = values.get('POS_MANAGER_ACCESS_CODE')?.trim();
+  const inheritedManagerCode = process.env.POS_MANAGER_ACCESS_CODE?.trim();
+  const configuredManagerToken = values.get('POS_MANAGER_AUTH_TOKEN')?.trim();
+  const inheritedManagerToken = process.env.POS_MANAGER_AUTH_TOKEN?.trim();
+  if ((!configuredManagerCode || isInsecureRuntimeCredential(configuredManagerCode)) && !inheritedManagerCode) {
+    const cashierCode = configuredAccessCode || environmentAccessCode || additions.find((line) => line.startsWith('POS_ACCESS_CODE='))?.split('=')[1];
+    let code;
+    do { code = String(randomInt(100000, 1000000)); } while (code === cashierCode);
+    additions.push(`POS_MANAGER_ACCESS_CODE=${code}`);
+  }
+  if ((!configuredManagerToken || isInsecureRuntimeCredential(configuredManagerToken)) && !inheritedManagerToken) {
+    additions.push(`POS_MANAGER_AUTH_TOKEN=${randomBytes(32).toString('hex')}`);
+  }
+
   if (additions.length > 0) {
     const prefix = existingContent && !existingContent.endsWith('\n') ? '\n' : '';
     const header = existingContent ? '' : '# Local runtime settings. Keep this file private.\n';
@@ -137,5 +151,7 @@ export function ensureRuntimeEnv(filePath) {
     accessCode: process.env.POS_ACCESS_CODE?.trim() || fileAccessCode,
     created: additions.length > 0,
     createdAccessCode: additions.some((line) => line.startsWith('POS_ACCESS_CODE=')),
+    managerAccessCode: process.env.POS_MANAGER_ACCESS_CODE?.trim() || finalValues.get('POS_MANAGER_ACCESS_CODE')?.trim(),
+    createdManagerAccessCode: additions.some((line) => line.startsWith('POS_MANAGER_ACCESS_CODE=')),
   };
 }

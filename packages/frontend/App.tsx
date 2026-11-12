@@ -1941,7 +1941,7 @@ export default function App(): React.JSX.Element {
           <View style={styles.loginScreen}>
             <View style={styles.loginPanel}>
               <Text style={styles.loginTitle}>TPV Restaurante</Text>
-              <Text style={styles.helperText}>Introduce el código de acceso para continuar.</Text>
+              <Text style={styles.helperText}>Introduce el código de cajero o de responsable. Las operaciones administrativas requieren acceso de responsable.</Text>
               {!isDesktopHost ? <Text style={styles.helperText}>{`Servidor: ${configuredApiBaseUrl}`}</Text> : null}
               <TextInput
                 style={styles.loginInput}

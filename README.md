@@ -682,3 +682,7 @@ systemctl --user enable --now bar-restaurant-ticketing.service
 ```
 
 Use either the systemd service or desktop launcher to control a single POS instance, not both. Inspect service logs using `journalctl --user -u bar-restaurant-ticketing.service`. User timers require a running systemd user manager. A timed backup should be verified by periodically restoring a dated copy to a separate directory.
+
+## Manager and cashier access
+
+The POS generates two separate private access codes and independent bearer credentials for the local installation. The cashier code permits ordinary ordering and payment recording. The manager code is required to edit/import products, override item prices, remove confirmed workflow lines, delete tables/orders, print financial summaries, or manually open the cash drawer. Both credentials are private `.env` values and must never be committed. The manager code is displayed on first generation; use `BAR_TICKETING_SHOW_MANAGER_CODE=1` to deliberately display it again locally. Sign out and enter the manager code to perform administrative actions. This uses a shared manager role and does not attribute operations to individual employees. Deploy individual employee accounts if full audit attribution is required.

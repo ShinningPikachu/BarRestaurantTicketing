@@ -9,14 +9,28 @@ export function secureCompare(left: string, right: string): boolean {
   return timingSafeEqual(leftDigest, rightDigest);
 }
 
-export const requireAuth: RequestHandler = (req, res, next) => {
-  const authHeader = req.header('authorization') ?? '';
-  const [scheme, token] = authHeader.split(' ');
+function bearerToken(req: Parameters<RequestHandler>[0]): string | null {
+  const [scheme, token] = (req.header('authorization') ?? '').split(' ');
+  return scheme?.toLowerCase() === 'bearer' && token ? token : null;
+}
 
-  if (scheme?.toLowerCase() === 'bearer' && token && secureCompare(token, config.auth.sessionToken)) {
+export const requireAuth: RequestHandler = (req, res, next) => {
+  const token = bearerToken(req);
+  if (token && (
+    secureCompare(token, config.auth.sessionToken)
+    || secureCompare(token, config.auth.managerSessionToken)
+  )) {
     next();
     return;
   }
-
   res.status(401).json(errorResponse('UNAUTHORIZED', 'Login required'));
+};
+
+export const requireManager: RequestHandler = (req, res, next) => {
+  const token = bearerToken(req);
+  if (token && secureCompare(token, config.auth.managerSessionToken)) {
+    next();
+    return;
+  }
+  res.status(403).json(errorResponse('MANAGER_REQUIRED', 'This operation requires a manager login'));
 };
