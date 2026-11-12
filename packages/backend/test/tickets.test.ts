@@ -13,3 +13,19 @@ test('session windows include every early-morning sale', () => {
   assert.equal(start.getDate(), 17);
   assert.equal(end.getDate(), 18);
 });
+
+test('spring daylight-saving transition preserves the 06:00 local session boundary', () => {
+  const reference = new Date('2026-03-28T11:00:00Z');
+  const { start, end } = getSessionWindow(reference);
+  assert.equal(start.toISOString(), '2026-03-28T05:00:00.000Z');
+  assert.equal(end.toISOString(), '2026-03-29T04:00:00.000Z');
+  assert.equal((end.getTime() - start.getTime()) / 3_600_000, 23);
+});
+
+test('autumn daylight-saving transition preserves the 06:00 local session boundary', () => {
+  const reference = new Date('2026-10-24T11:00:00Z');
+  const { start, end } = getSessionWindow(reference);
+  assert.equal(start.toISOString(), '2026-10-24T04:00:00.000Z');
+  assert.equal(end.toISOString(), '2026-10-25T05:00:00.000Z');
+  assert.equal((end.getTime() - start.getTime()) / 3_600_000, 25);
+});
