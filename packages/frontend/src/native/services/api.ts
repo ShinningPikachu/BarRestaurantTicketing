@@ -421,6 +421,7 @@ export class ApiService {
     primaryName?: string | null;
     secondaryName?: string | null;
     priceCents: number;
+    vatRatePercent?: number | null;
     costCents?: number | null;
     category: string;
     sku?: string | null;
@@ -443,6 +444,7 @@ export class ApiService {
       primaryName?: string | null;
       secondaryName?: string | null;
       priceCents?: number;
+      vatRatePercent?: number | null;
       costCents?: number | null;
       category?: string;
       sku?: string | null;

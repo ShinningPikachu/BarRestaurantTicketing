@@ -11,6 +11,7 @@ export interface PaidTicketLine {
   qty: number;
   unitPriceCents: number;
   totalPriceCents: number;
+  vatRatePercent?: number | null;
 }
 
 export class WorkflowRepository {
@@ -177,7 +178,7 @@ export class WorkflowRepository {
 
   async createPreOrderItem(
     sessionId: string,
-    payload: { menuItemId?: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number },
+    payload: { menuItemId?: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; vatRatePercent?: number | null },
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
@@ -189,6 +190,7 @@ export class WorkflowRepository {
       secondaryName: payload.secondaryName ?? null,
       qty: payload.qty,
       unitPriceCents: payload.unitPriceCents,
+      vatRatePercent: payload.vatRatePercent ?? null,
       totalPriceCents: payload.unitPriceCents * payload.qty
     };
 
@@ -294,6 +296,7 @@ export class WorkflowRepository {
       taxableBaseCents: number;
       vatCents: number;
       vatRatePercent: number;
+      taxBreakdownJson?: string | null;
       splitPeople?: number | null;
       businessName?: string;
       tradeName?: string;
@@ -344,6 +347,7 @@ export class WorkflowRepository {
         taxableBaseCents: payload.taxableBaseCents,
         vatCents: payload.vatCents,
         vatRatePercent: payload.vatRatePercent,
+        taxBreakdownJson: payload.taxBreakdownJson ?? null,
         splitPeople: payload.splitPeople ?? null,
         ...snapshot,
         items: {
@@ -356,6 +360,7 @@ export class WorkflowRepository {
             secondaryName: item.secondaryName ?? null,
             qty: item.qty,
             unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent ?? null,
             totalPriceCents: item.totalPriceCents,
           })),
         },
@@ -389,7 +394,7 @@ export class WorkflowRepository {
 
   async createOrderFromPreOrder(
     tableId: number,
-    items: Array<{ menuItemId: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number }>,
+    items: Array<{ menuItemId: number | null; name: string; primaryName?: string | null; secondaryName?: string | null; qty: number; unitPriceCents: number; vatRatePercent?: number | null }>,
     tx?: Prisma.TransactionClient
   ) {
     const db = tx ?? this.client;
@@ -408,6 +413,7 @@ export class WorkflowRepository {
             secondaryName: item.secondaryName ?? null,
             qty: item.qty,
             unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent ?? null,
             totalPriceCents: item.qty * item.unitPriceCents
           }))
         }

@@ -28,6 +28,7 @@ export class MenuService {
     primaryName?: string | null;
     secondaryName?: string | null;
     priceCents: number;
+    vatRatePercent?: number | null;
     costCents?: number | null;
     category: string;
     sku?: string | null;
@@ -41,6 +42,7 @@ export class MenuService {
         primaryName: payload.primaryName || null,
         secondaryName: payload.secondaryName || null,
         priceCents: payload.priceCents,
+        vatRatePercent: payload.vatRatePercent ?? null,
         costCents: payload.costCents ?? null,
         category: payload.category,
         sku: payload.sku || null,
@@ -56,6 +58,7 @@ export class MenuService {
     primaryName?: string | null;
     secondaryName?: string | null;
     priceCents?: number;
+    vatRatePercent?: number | null;
     costCents?: number | null;
     category?: string;
     sku?: string | null;
@@ -92,6 +95,7 @@ export class MenuService {
           primaryName: item.primaryName || null,
           secondaryName: item.secondaryName || null,
           priceCents: item.priceCents,
+          vatRatePercent: item.vatRatePercent,
           costCents: item.costCents ?? null,
           category: item.category,
           sku: item.sku || null,

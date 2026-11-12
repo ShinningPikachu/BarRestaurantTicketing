@@ -335,9 +335,20 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
   const cashierName = ticket.cashierName || 'No registrado';
   const customerName = ticket.customerName || 'Cliente no identificado';
   const customerTaxId = ticket.customerTaxId || 'No registrado';
+  const taxBreakdown = (() => {
+    try {
+      const parsed: unknown = ticket.taxBreakdownJson ? JSON.parse(ticket.taxBreakdownJson) : [];
+      return Array.isArray(parsed) ? parsed.filter((band): band is { ratePercent: number; taxableBaseCents: number; vatCents: number } =>
+        band && typeof band.ratePercent === 'number' && typeof band.taxableBaseCents === 'number' && typeof band.vatCents === 'number') : [];
+    } catch { return []; }
+  })();
+  const vatSummary = taxBreakdown.length
+    ? taxBreakdown.map((band) => `<div><span>IVA ${band.ratePercent}%</span><span>${centsToCurrency(band.vatCents)}</span></div>`).join('')
+    : `<div><span>IVA ${ticket.vatRatePercent}%</span><span>${centsToCurrency(ticket.vatCents)}</span></div>`;
   const rows = ticket.items.map((item) => {
     const displayName = getItemDisplayName(item);
-    const lineTaxableBaseCents = Math.round(item.totalPriceCents / (1 + ticket.vatRatePercent / 100));
+    const itemRate = item.vatRatePercent ?? ticket.vatRatePercent;
+    const lineTaxableBaseCents = Math.round(item.totalPriceCents / (1 + itemRate / 100));
     const lineVatCents = item.totalPriceCents - lineTaxableBaseCents;
     return `
       <tr>
@@ -348,7 +359,7 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
         </td>
         <td>${centsToCurrency(item.unitPriceCents)}</td>
         <td>${centsToCurrency(lineTaxableBaseCents)}</td>
-        <td>${ticket.vatRatePercent}%</td>
+        <td>${itemRate}%</td>
         <td>${centsToCurrency(lineVatCents)}</td>
         <td>${centsToCurrency(item.totalPriceCents)}</td>
       </tr>`;
@@ -394,7 +405,7 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
     <div class="totals">
       <div><span>Descuentos</span><span>${centsToCurrency(0)}</span></div>
       <div><span>Base imponible</span><span>${centsToCurrency(ticket.taxableBaseCents)}</span></div>
-      <div><span>IVA ${ticket.vatRatePercent}%</span><span>${centsToCurrency(ticket.vatCents)}</span></div>
+      ${vatSummary}
       <div class="total"><span>Total</span><span>${centsToCurrency(ticket.totalCents)}</span></div>
     </div>
   </section>`;
@@ -536,6 +547,7 @@ export default function App(): React.JSX.Element {
   const [productCategory, setProductCategory] = useState('');
   const [productPrice, setProductPrice] = useState('');
   const [productCost, setProductCost] = useState('');
+  const [productVatRate, setProductVatRate] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productDescription, setProductDescription] = useState('');
   const [productImageDataUrl, setProductImageDataUrl] = useState<string | null>(null);
@@ -594,6 +606,7 @@ export default function App(): React.JSX.Element {
     setProductCategory('');
     setProductPrice('');
     setProductCost('');
+    setProductVatRate('');
     setProductSku('');
     setProductDescription('');
     setProductImageDataUrl(null);
@@ -1101,9 +1114,14 @@ export default function App(): React.JSX.Element {
     const costCents = productCost.trim() ? parsePriceToCents(productCost) : null;
     const name = productName.trim();
     const category = productCategory.trim();
+    const vatRatePercent = productVatRate.trim() ? Number(productVatRate.trim()) : null;
 
     if (!name || !category || priceCents === null) {
       Alert.alert('Producto no válido', 'Introduce nombre, tipo y precio válido.');
+      return false;
+    }
+    if (vatRatePercent !== null && (!Number.isInteger(vatRatePercent) || vatRatePercent < 0 || vatRatePercent > 100)) {
+      Alert.alert('IVA no válido', 'Introduce un porcentaje entero entre 0 y 100.');
       return false;
     }
     if (costCents === null && productCost.trim()) {
@@ -1119,6 +1137,7 @@ export default function App(): React.JSX.Element {
         category,
         priceCents,
         costCents,
+        vatRatePercent,
         sku: productSku.trim() || null,
         description: productDescription.trim() || null,
         imageDataUrl: productImageDataUrl,
@@ -1130,6 +1149,7 @@ export default function App(): React.JSX.Element {
       setProductCategory('');
       setProductPrice('');
       setProductCost('');
+      setProductVatRate('');
       setProductSku('');
       setProductDescription('');
       setProductImageDataUrl(null);
@@ -1276,13 +1296,14 @@ export default function App(): React.JSX.Element {
 
   async function updateProductDetails(
     item: MenuItem,
-    values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string }
+    values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string; vatRate: string }
   ): Promise<boolean> {
     const nextName = values.name.trim();
     const nextCategory = values.category.trim();
     const priceCents = parsePriceToCents(values.price);
     const trimmedCost = values.cost.trim();
     const costCents = trimmedCost ? parsePriceToCents(trimmedCost) : null;
+    const vatRatePercent = values.vatRate.trim() ? Number(values.vatRate.trim()) : null;
 
     if (!nextName) {
       Alert.alert('Nombre no válido', 'Introduce un nombre de producto.');
@@ -1294,6 +1315,10 @@ export default function App(): React.JSX.Element {
     }
     if (priceCents === null) {
       Alert.alert('Precio no válido', 'Introduce un precio válido.');
+      return false;
+    }
+    if (vatRatePercent !== null && (!Number.isInteger(vatRatePercent) || vatRatePercent < 0 || vatRatePercent > 100)) {
+      Alert.alert('IVA no válido', 'Introduce un porcentaje entero entre 0 y 100.');
       return false;
     }
     if (costCents === null && trimmedCost) {
@@ -1309,6 +1334,7 @@ export default function App(): React.JSX.Element {
         category: nextCategory,
         priceCents,
         costCents,
+        vatRatePercent,
       });
       await loadManagedProducts();
       await actions.reloadMenu();
@@ -2051,6 +2077,8 @@ export default function App(): React.JSX.Element {
     setProductPrice,
     productCost,
     setProductCost,
+    productVatRate,
+    setProductVatRate,
     productSku,
     setProductSku,
     productDescription,

@@ -51,6 +51,7 @@ export interface MenuItem {
   primaryName?: string | null;
   secondaryName?: string | null;
   priceCents: number;
+  vatRatePercent?: number | null;
   costCents?: number | null;
   sku?: string;
   category: string;
@@ -67,6 +68,7 @@ export interface OrderItem {
   secondaryName?: string | null;
   qty: number;
   unitPriceCents?: number;
+  vatRatePercent?: number | null;
   totalPriceCents?: number;
 }
 
@@ -95,6 +97,7 @@ export interface PreOrderItem {
   secondaryName?: string | null;
   qty: number;
   unitPriceCents: number;
+  vatRatePercent?: number | null;
   totalPriceCents: number;
 }
 
@@ -133,6 +136,7 @@ export interface PaidTicketItem {
   secondaryName?: string | null;
   qty: number;
   unitPriceCents: number;
+  vatRatePercent?: number | null;
   totalPriceCents: number;
 }
 
@@ -147,6 +151,7 @@ export interface PaidTicket {
   taxableBaseCents: number;
   vatCents: number;
   vatRatePercent: number;
+  taxBreakdownJson?: string | null;
   splitPeople?: number | null;
   businessName?: string;
   tradeName?: string;

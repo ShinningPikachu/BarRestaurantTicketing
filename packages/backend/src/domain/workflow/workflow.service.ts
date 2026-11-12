@@ -3,10 +3,10 @@ import { Prisma } from '@prisma/client';
 import { config } from '../../config/index.js';
 import { ApiError } from '../../middleware/errorHandler.js';
 import { PaidTicketLine, workflowRepository } from './workflow.repository.js';
+import { calculateTicketTax } from './tax.js';
 
 const VALID_TABLE_ZONES = new Set(['outside', 'floor1', 'floor2']);
 const VALID_PAYMENT_METHODS = new Set(['cash', 'card']);
-const DEFAULT_VAT_RATE_PERCENT = 10;
 const TICKET_SERIES = 'PT';
 const MAX_DATABASE_INT = 2_147_483_647;
 
@@ -62,19 +62,6 @@ function normalizePaymentMethod(method: string): string {
     throw new ApiError(400, 'Invalid payment method', 'INVALID_PAYMENT_METHOD');
   }
   return normalized;
-}
-
-function calculateTax(totalCents: number) {
-  const configuredVatRate = config.ticket.vatRatePercent;
-  const vatRatePercent = Number.isFinite(configuredVatRate) && configuredVatRate >= 0
-    ? Math.round(configuredVatRate)
-    : DEFAULT_VAT_RATE_PERCENT;
-  const taxableBaseCents = Math.round(totalCents / (1 + vatRatePercent / 100));
-  return {
-    taxableBaseCents,
-    vatCents: totalCents - taxableBaseCents,
-    vatRatePercent
-  };
 }
 
 function nextPaidTicketNumber(sequence: number): string {
@@ -379,7 +366,9 @@ export class WorkflowService {
       const draftSession = (await workflowRepository.getDraftPreOrderSession(table.id, tx))
         ?? (await workflowRepository.createDraftPreOrderSession(table.id, tx));
 
+      const vatRatePercent = menu.vatRatePercent ?? config.ticket.vatRatePercent;
       const existing = draftSession.items.find((item) =>
+        (item.vatRatePercent ?? config.ticket.vatRatePercent) === vatRatePercent &&
         item.menuItemId === menu.id &&
         item.unitPriceCents === menu.priceCents &&
         item.name === menu.name &&
@@ -402,7 +391,8 @@ export class WorkflowService {
           primaryName: menu.primaryName,
           secondaryName: menu.secondaryName,
           qty: 1,
-          unitPriceCents: menu.priceCents
+          unitPriceCents: menu.priceCents,
+          vatRatePercent
         }, tx);
       }
 
@@ -499,7 +489,8 @@ export class WorkflowService {
         primaryName: item.primaryName,
         secondaryName: item.secondaryName,
         qty: item.qty,
-        unitPriceCents: item.unitPriceCents
+        unitPriceCents: item.unitPriceCents,
+        vatRatePercent: item.vatRatePercent
       }));
       checkedCentsSum(normalizedItems.map((item) => checkedLineTotal(item.qty, item.unitPriceCents)));
 
@@ -530,6 +521,7 @@ export class WorkflowService {
         ?? (await workflowRepository.createDraftPreOrderSession(table.id, tx));
 
       const existing = draftSession.items.find((item) =>
+        item.vatRatePercent === orderItem.vatRatePercent &&
         item.menuItemId === orderItem.menuItemId &&
         item.unitPriceCents === orderItem.unitPriceCents &&
         item.name === orderItem.name &&
@@ -552,7 +544,8 @@ export class WorkflowService {
           primaryName: orderItem.primaryName,
           secondaryName: orderItem.secondaryName,
           qty: orderItem.qty,
-          unitPriceCents: orderItem.unitPriceCents
+          unitPriceCents: orderItem.unitPriceCents,
+          vatRatePercent: orderItem.vatRatePercent
         }, tx);
       }
 
@@ -637,6 +630,7 @@ export class WorkflowService {
           qty: item.qty,
           unitPriceCents: item.unitPriceCents,
           totalPriceCents: item.totalPriceCents,
+          vatRatePercent: item.vatRatePercent,
         }))
       );
 
@@ -646,7 +640,7 @@ export class WorkflowService {
 
       const totalCents = checkedCentsSum(lines.map((line) => line.totalPriceCents), 'Ticket total');
       const sequence = await workflowRepository.allocateTicketSequence(TICKET_SERIES, tx);
-      const tax = calculateTax(totalCents);
+      const tax = calculateTicketTax(lines, config.ticket.vatRatePercent);
       const mode = normalizedSplitPeople ? 'split' : 'full';
       const paidTicket = await workflowRepository.createPaidTicket({
         ticketNumber: nextPaidTicketNumber(sequence),
@@ -752,12 +746,13 @@ export class WorkflowService {
           qty: selected.qty,
           unitPriceCents: orderItem.unitPriceCents,
           totalPriceCents: checkedLineTotal(selected.qty, orderItem.unitPriceCents),
+          vatRatePercent: orderItem.vatRatePercent,
         });
       }
 
       const totalCents = checkedCentsSum(lines.map((line) => line.totalPriceCents), 'Ticket total');
       const sequence = await workflowRepository.allocateTicketSequence(TICKET_SERIES, tx);
-      const tax = calculateTax(totalCents);
+      const tax = calculateTicketTax(lines, config.ticket.vatRatePercent);
       const mode = 'aa';
       const paidTicket = await workflowRepository.createPaidTicket({
         ticketNumber: nextPaidTicketNumber(sequence),

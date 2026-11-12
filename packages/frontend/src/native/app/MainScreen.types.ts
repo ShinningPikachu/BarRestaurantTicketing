@@ -69,6 +69,8 @@ export interface MainScreenProps {
   setProductPrice: (value: string) => void;
   productCost: string;
   setProductCost: (value: string) => void;
+  productVatRate: string;
+  setProductVatRate: (value: string) => void;
   productSku: string;
   setProductSku: (value: string) => void;
   productDescription: string;
@@ -78,7 +80,7 @@ export interface MainScreenProps {
   importProductsCsv: () => void;
   chooseProductImage: (onSelected: (imageDataUrl: string) => void) => Promise<void>;
   saveNewProduct: () => Promise<boolean>;
-  updateProductDetails: (item: MenuItem, values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string }) => Promise<boolean>;
+  updateProductDetails: (item: MenuItem, values: { name: string; primaryName: string; secondaryName: string; category: string; price: string; cost: string; vatRate: string }) => Promise<boolean>;
   updateProductName: (item: MenuItem, value: string) => Promise<void>;
   updateProductDisplayNames: (item: MenuItem, primaryName: string, secondaryName: string) => Promise<void>;
   updateProductCategory: (item: MenuItem, value: string) => Promise<void>;

@@ -18,6 +18,7 @@ const menuItemBodySchema = z.object({
   primaryName: z.string().trim().max(200).optional().nullable(),
   secondaryName: z.string().trim().max(200).optional().nullable(),
   priceCents: z.number().int().min(0).max(MAX_CENTS),
+  vatRatePercent: z.number().int().min(0).max(100).optional().nullable(),
   costCents: z.number().int().min(0).max(MAX_CENTS).optional().nullable(),
   category: z.string().trim().min(1).max(100),
   sku: z.string().trim().max(100).optional().nullable(),

@@ -10,6 +10,7 @@ const ALLOWED_COLUMNS = new Set([
   'primaryName',
   'secondaryName',
   'priceCents',
+  'vatRatePercent',
   'price',
   'costCents',
   'cost',
@@ -59,6 +60,7 @@ export interface MenuImportItem {
   primaryName?: string | null;
   secondaryName?: string | null;
   priceCents: number;
+  vatRatePercent?: number | null;
   costCents?: number | null;
   category: string;
   sku?: string | null;
@@ -151,6 +153,9 @@ export function parseMenuImportCsv(csv: string): MenuImportItem[] {
       secondaryName: boundedOptional('secondaryName', 200),
       category,
       priceCents: parseCents(record, 'priceCents', 'price', rowNumber, true)!,
+      vatRatePercent: record.vatRatePercent?.trim()
+        ? Number(record.vatRatePercent.trim())
+        : undefined,
       costCents: parseCents(record, 'costCents', 'cost', rowNumber, false),
       sku: boundedOptional('sku', 100),
       description: boundedOptional('description', 2_000),
@@ -158,6 +163,13 @@ export function parseMenuImportCsv(csv: string): MenuImportItem[] {
       available: parseBoolean(record.available, rowNumber),
     };
   });
+
+  for (const [index, item] of items.entries()) {
+    if (item.vatRatePercent !== null && item.vatRatePercent !== undefined &&
+      (!Number.isInteger(item.vatRatePercent) || item.vatRatePercent < 0 || item.vatRatePercent > 100)) {
+      throw new MenuImportValidationError(`Invalid CSV row ${index + 2}: vatRatePercent must be an integer between 0 and 100`);
+    }
+  }
 
   const seenKeys = new Set<string>();
   for (const [index, item] of items.entries()) {

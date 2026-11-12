@@ -134,6 +134,7 @@ router.post(
         taxableBaseCents: ticket.taxableBaseCents,
         vatCents: ticket.vatCents,
         vatRatePercent: ticket.vatRatePercent,
+        vatBreakdown: ticket.taxBreakdownJson ? JSON.parse(ticket.taxBreakdownJson) : undefined,
         totalCents: ticket.totalCents,
         ticketNote: ticket.mode,
         splitPeople: ticket.splitPeople,
