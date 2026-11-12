@@ -710,3 +710,9 @@ After a crash or a print timeout, a dispatch may be `unknown`. Inspect the print
 ## Operational queue visibility
 
 The **Impresora** screen now shows outstanding kitchen dispatches ahead of recently acknowledged orders, so routine service traffic cannot push an older unreceived order off the list. It displays the total outstanding count and an explicit warning if the first 500 unresolved dispatches are insufficient. Handle older items first and refresh the queue. The same screen shows the most recent persisted printer attempts, including unknown or failed deliveries that need physical checking. This history records print attempts; an `accepted` status indicates adapter or spooler acceptance and never guarantees paper was delivered.
+
+## Manager accounting reconciliation
+
+The authenticated manager-only endpoint `GET /api/audit/reconciliation` validates stored ticket line arithmetic, tax totals, VAT band consistency, and refund correction relationships without modifying historical data. It reports gross sales, negative corrections, net recorded sales, issue counts and machine-readable issue descriptions. The optional `maxTickets` query parameter accepts 1 to 50,000 (default 10,000). When the database contains more tickets than the requested limit, the endpoint sets `truncated=true`; cross-ticket validation is then incomplete. For a full historical audit, request a sufficient limit or export records for an external accountant.
+
+This check compares **internal POS records** only. It cannot confirm card processor settlement, actual cash drawer contents, legal tax classification, missing transactions never captured by the POS, or tax authority submissions. Investigate every reported inconsistency manually and preserve backups before any corrective operation.
