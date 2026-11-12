@@ -335,7 +335,7 @@ function DesktopHistorySummary(props: MainScreenProps): React.JSX.Element {
       </View>
       <View style={styles.accountingSummaryGrid}>
         <View style={styles.accountingStat}>
-          <Text style={styles.accountingStatLabel}>Tickets</Text>
+          <Text style={styles.accountingStatLabel}>Tickets cargados</Text>
           <Text style={styles.accountingStatValue}>{summary.ticketCount}</Text>
         </View>
         <View style={styles.accountingStat}>
