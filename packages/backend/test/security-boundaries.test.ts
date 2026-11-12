@@ -120,3 +120,28 @@ test('provisional printer payload strips client-controlled transport and fiscal 
   assert.equal('openCashDrawer' in parsed, false);
   assert.equal('fiscal' in parsed, false);
 });
+
+test('cashier credentials cannot modify prices or open the cash drawer', async () => {
+  const server = createApp().listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
+  const send = (path: string, token: string, body: object) => fetch(base + path, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  try {
+    const cashierMenu = await send('/api/menu', config.auth.sessionToken, {});
+    assert.equal(cashierMenu.status, 403);
+    assert.equal((await cashierMenu.json()).error.code, 'MANAGER_REQUIRED');
+    const managerMenu = await send('/api/menu', config.auth.managerSessionToken, {});
+    assert.equal(managerMenu.status, 400, 'manager passes authorization and reaches body validation');
+    const cashierDrawer = await send('/api/printers/xprinter/drawer', config.auth.sessionToken, {});
+    assert.equal(cashierDrawer.status, 403);
+  } finally {
+    server.close();
+    await once(server, 'close');
+  }
+});
