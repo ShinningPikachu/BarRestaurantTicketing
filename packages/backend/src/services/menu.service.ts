@@ -95,7 +95,7 @@ export class MenuService {
           primaryName: item.primaryName || null,
           secondaryName: item.secondaryName || null,
           priceCents: item.priceCents,
-          vatRatePercent: item.vatRatePercent ?? null,
+          vatRatePercent: item.vatRatePercent,
           costCents: item.costCents ?? null,
           category: item.category,
           sku: item.sku || null,
