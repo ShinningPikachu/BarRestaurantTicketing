@@ -324,9 +324,9 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     if (payload.phone) push(center(`Movil: ${payload.phone}`));
     push('');
     push('='.repeat(receiptWidth));
-    push(center('FACTURA SIMPLIFICADA'));
+    push(center(payload.fiscal === true ? 'FACTURA SIMPLIFICADA' : 'PRECUENTA - NO FISCAL'));
     push('='.repeat(receiptWidth));
-    push(line('TICKET ID', payload.invoiceNumber));
+    push(line(payload.fiscal === true ? 'TICKET ID' : 'REFERENCIA', payload.invoiceNumber));
     push(line('FECHA', payload.issuedAt));
     push(line('MESA', payload.tableLabel));
     if (payload.ticketNote) push(line('MODALIDAD', payload.ticketNote));
@@ -355,6 +355,7 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     }
     push('='.repeat(receiptWidth));
     push(center('IVA incluido'));
+    if (payload.fiscal !== true) push(center('SIN VALIDEZ FISCAL'));
     push(center('Gracias por su visita'));
     push('');
     return rows;
