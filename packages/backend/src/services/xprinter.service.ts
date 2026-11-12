@@ -40,6 +40,7 @@ export interface XprinterTicketPayload {
   splitPeople?: number | null;
   openCashDrawer?: boolean | null;
   fiscal?: boolean;
+  documentKind?: 'receipt' | 'correction';
 }
 
 export interface XprinterFinancialSummaryPayload {
@@ -325,7 +326,9 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     if (payload.phone) push(center(`Movil: ${payload.phone}`));
     push('');
     push('='.repeat(receiptWidth));
-    push(center(payload.fiscal === true ? 'FACTURA SIMPLIFICADA' : 'PRECUENTA - NO FISCAL'));
+    push(center(payload.fiscal === true
+      ? payload.documentKind === 'correction' ? 'FACTURA RECTIFICATIVA' : 'FACTURA SIMPLIFICADA'
+      : 'PRECUENTA - NO FISCAL'));
     push('='.repeat(receiptWidth));
     push(line(payload.fiscal === true ? 'TICKET ID' : 'REFERENCIA', payload.invoiceNumber));
     push(line('FECHA', payload.issuedAt));
