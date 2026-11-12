@@ -196,3 +196,19 @@ model PrintJob {
 
   @@index([status, createdAt])
 }
+
+model KitchenDispatch {
+  id             String    @id @default(cuid())
+  orderId        String    @unique
+  tableNumber    Int
+  tableZone      String
+  linesJson      String
+  status         String    @default("pending")
+  printerJobId   String?
+  lastErrorCode  String?
+  acknowledgedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+}
