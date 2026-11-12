@@ -335,9 +335,20 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
   const cashierName = ticket.cashierName || 'No registrado';
   const customerName = ticket.customerName || 'Cliente no identificado';
   const customerTaxId = ticket.customerTaxId || 'No registrado';
+  const taxBreakdown = (() => {
+    try {
+      const parsed: unknown = ticket.taxBreakdownJson ? JSON.parse(ticket.taxBreakdownJson) : [];
+      return Array.isArray(parsed) ? parsed.filter((band): band is { ratePercent: number; taxableBaseCents: number; vatCents: number } =>
+        band && typeof band.ratePercent === 'number' && typeof band.taxableBaseCents === 'number' && typeof band.vatCents === 'number') : [];
+    } catch { return []; }
+  })();
+  const vatSummary = taxBreakdown.length
+    ? taxBreakdown.map((band) => `<div><span>IVA ${band.ratePercent}%</span><span>${centsToCurrency(band.vatCents)}</span></div>`).join('')
+    : `<div><span>IVA ${ticket.vatRatePercent}%</span><span>${centsToCurrency(ticket.vatCents)}</span></div>`;
   const rows = ticket.items.map((item) => {
     const displayName = getItemDisplayName(item);
-    const lineTaxableBaseCents = Math.round(item.totalPriceCents / (1 + ticket.vatRatePercent / 100));
+    const itemRate = item.vatRatePercent ?? ticket.vatRatePercent;
+    const lineTaxableBaseCents = Math.round(item.totalPriceCents / (1 + itemRate / 100));
     const lineVatCents = item.totalPriceCents - lineTaxableBaseCents;
     return `
       <tr>
@@ -348,7 +359,7 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
         </td>
         <td>${centsToCurrency(item.unitPriceCents)}</td>
         <td>${centsToCurrency(lineTaxableBaseCents)}</td>
-        <td>${ticket.vatRatePercent}%</td>
+        <td>${itemRate}%</td>
         <td>${centsToCurrency(lineVatCents)}</td>
         <td>${centsToCurrency(item.totalPriceCents)}</td>
       </tr>`;
@@ -394,7 +405,7 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
     <div class="totals">
       <div><span>Descuentos</span><span>${centsToCurrency(0)}</span></div>
       <div><span>Base imponible</span><span>${centsToCurrency(ticket.taxableBaseCents)}</span></div>
-      <div><span>IVA ${ticket.vatRatePercent}%</span><span>${centsToCurrency(ticket.vatCents)}</span></div>
+      ${vatSummary}
       <div class="total"><span>Total</span><span>${centsToCurrency(ticket.totalCents)}</span></div>
     </div>
   </section>`;
