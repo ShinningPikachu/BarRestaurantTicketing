@@ -523,6 +523,8 @@ export default function App(): React.JSX.Element {
   const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
   const [menuSearchText, setMenuSearchText] = useState('');
   const [paidTickets, setPaidTickets] = useState<PaidTicket[]>([]);
+  const [ticketNextCursor, setTicketNextCursor] = useState<string | null>(null);
+  const [ticketPageLoading, setTicketPageLoading] = useState(false);
   const [selectedPaidTicket, setSelectedPaidTicket] = useState<PaidTicket | null>(null);
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
   const [ticketSearchText, setTicketSearchText] = useState('');
@@ -602,6 +604,8 @@ export default function App(): React.JSX.Element {
     actions.resetData(prepareForLogin);
     setIsRefreshingData(false);
     setPaidTickets([]);
+    setTicketNextCursor(null);
+    setTicketPageLoading(false);
     setSelectedPaidTicket(null);
     setSessionSummary(null);
     setManagedMenuItems([]);
@@ -954,15 +958,17 @@ export default function App(): React.JSX.Element {
     }
 
     try {
-      const tickets = await apiService.fetchPaidTickets({
+      const page = await apiService.fetchPaidTicketPage({
         startAt: range.startAt,
         endAt: range.endAt,
+        limit: 100,
       });
       if (
         scopeGeneration === dataScopeGenerationRef.current
         && requestGeneration === ticketHistoryRequestGenerationRef.current
       ) {
-        setPaidTickets(tickets);
+        setPaidTickets(page.tickets);
+        setTicketNextCursor(page.nextCursor);
       }
     } catch {
       if (
@@ -972,6 +978,45 @@ export default function App(): React.JSX.Element {
       ) {
         Alert.alert('Error', 'No se pudo cargar el historial de tickets.');
       }
+    }
+  }
+
+  async function loadMoreTicketHistory(): Promise<void> {
+    if (!ticketNextCursor || ticketPageLoading) return;
+    const range = resolveTicketDateRange(
+      ticketDateFilterRef.current.preset,
+      ticketDateFilterRef.current.customStartDate,
+      ticketDateFilterRef.current.customEndDate,
+      new Date()
+    );
+    if (range.error || !range.startAt || !range.endAt) return;
+    const scopeGeneration = dataScopeGenerationRef.current;
+    const requestGeneration = ticketHistoryRequestGenerationRef.current;
+    setTicketPageLoading(true);
+    try {
+      const page = await apiService.fetchPaidTicketPage({
+        startAt: range.startAt,
+        endAt: range.endAt,
+        cursor: ticketNextCursor,
+        limit: 100,
+      });
+      if (
+        scopeGeneration === dataScopeGenerationRef.current &&
+        requestGeneration === ticketHistoryRequestGenerationRef.current
+      ) {
+        setPaidTickets((previous) => {
+          const ids = new Set(previous.map((ticket) => ticket.id));
+          return [...previous, ...page.tickets.filter((ticket) => !ids.has(ticket.id))];
+        });
+        setTicketNextCursor(page.nextCursor);
+      }
+    } catch {
+      if (
+        scopeGeneration === dataScopeGenerationRef.current &&
+        requestGeneration === ticketHistoryRequestGenerationRef.current
+      ) Alert.alert('Error', 'No se pudo cargar la siguiente página del historial.');
+    } finally {
+      if (scopeGeneration === dataScopeGenerationRef.current) setTicketPageLoading(false);
     }
   }
 
@@ -2188,6 +2233,9 @@ export default function App(): React.JSX.Element {
     clearSelectedPaidTicket: () => setSelectedPaidTicket(null),
     refreshSessionSummary,
     loadTicketHistory,
+    loadMoreTicketHistory,
+    ticketHasMore: ticketNextCursor !== null,
+    ticketPageLoading,
     printSimplifiedPaidTicket,
     refundPaidTicket: (ticket: PaidTicket) => { setRefundTarget(ticket); setRefundReason(''); },
     printFilteredTicketSummary,
