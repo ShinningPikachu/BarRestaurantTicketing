@@ -39,7 +39,9 @@ router.post('/login', validateBody(loginSchema), (req: Request, res: Response) =
     return;
   }
 
-  if (!secureCompare(req.body.accessCode, config.auth.accessCode)) {
+  const isManager = secureCompare(req.body.accessCode, config.auth.managerAccessCode);
+  const isCashier = secureCompare(req.body.accessCode, config.auth.accessCode);
+  if (!isManager && !isCashier) {
     const next = previous && now - previous.windowStartedAt < LOGIN_WINDOW_MS
       ? { ...previous, count: previous.count + 1 }
       : { count: 1, windowStartedAt: now };
@@ -50,7 +52,7 @@ router.post('/login', validateBody(loginSchema), (req: Request, res: Response) =
 
   loginFailures.delete(clientKey);
   res.setHeader('Cache-Control', 'no-store');
-  res.json(successResponse({ token: config.auth.sessionToken }));
+  res.json(successResponse({ token: isManager ? config.auth.managerSessionToken : config.auth.sessionToken, role: isManager ? 'manager' : 'cashier' }));
 });
 
 export default router;
