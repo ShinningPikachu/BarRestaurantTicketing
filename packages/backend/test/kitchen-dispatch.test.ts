@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import { workflowRepository } from '../src/domain/workflow/workflow.repository.ts';
 import { workflowService } from '../src/domain/workflow/workflow.service.ts';
 import { createTestDatabase } from './test-database.ts';
+import { markInterruptedKitchenDispatchesUnknown } from '../src/services/kitchen-dispatch.service.ts';
 
 test('confirming a preorder atomically persists an order and kitchen handoff snapshot', async () => {
   const db = await createTestDatabase();
@@ -30,6 +31,28 @@ test('confirming a preorder atomically persists an order and kitchen handoff sna
     assert.equal(await db.client.kitchenDispatch.count(), 1);
   } finally {
     bound.client = previous;
+    await db.cleanup();
+  }
+});
+
+test('an interrupted kitchen print stays in the unknown state for operator review', async () => {
+  const db = await createTestDatabase();
+  try {
+    const handoff = await db.client.kitchenDispatch.create({
+      data: {
+        orderId: 'test-order',
+        tableNumber: 4,
+        tableZone: 'outside',
+        linesJson: JSON.stringify([{ name: 'Water', qty: 1 }]),
+        status: 'sending',
+      },
+    });
+    assert.equal(await markInterruptedKitchenDispatchesUnknown(db.client), 1);
+    const updated = await db.client.kitchenDispatch.findUniqueOrThrow({ where: { id: handoff.id } });
+    assert.equal(updated.status, 'unknown');
+    assert.equal(updated.lastErrorCode, 'PROCESS_INTERRUPTED');
+    assert.equal(await markInterruptedKitchenDispatchesUnknown(db.client), 0);
+  } finally {
     await db.cleanup();
   }
 });
