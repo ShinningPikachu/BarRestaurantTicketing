@@ -1,10 +1,10 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
 import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service.js';
 import { validateBody, validateParams } from '../middleware/validation.js';
 import { requireManager } from '../middleware/auth.js';
 import { signalDataChange } from '../services/sync.service.js';
-import { successResponse } from '../types/api.js';
+import { errorResponse, successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -21,6 +21,7 @@ const payTableSchema = z.object({
   method: paymentMethodSchema,
   splitPeople: z.number().int().min(1).max(1_000).optional(),
   idempotencyKey: idempotencyKeySchema,
+  cardConfirmed: z.boolean().optional(),
 });
 
 const paySelectedItemsSchema = z.object({
@@ -35,7 +36,18 @@ const paySelectedItemsSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
 });
 
-const removeSelectedItemsSchema = paySelectedItemsSchema.omit({ method: true });
+const removeSelectedItemsSchema = paySelectedItemsSchema.omit({ method: true, cardConfirmed: true });
+
+const requireCardConfirmation: RequestHandler = (req, res, next) => {
+  if (req.body.method === 'card' && req.body.cardConfirmed !== true) {
+    res.status(409).json(errorResponse(
+      'CARD_PAYMENT_NOT_CONFIRMED',
+      'Confirm approval on the external payment terminal before recording this card payment'
+    ));
+    return;
+  }
+  next();
+};
 
 export const moveToPreorderParamSchema = z.object({
   id: z.string().trim().min(1, 'Order ID is required').max(128),
@@ -47,6 +59,7 @@ const orderIdParamSchema = z.object({ id: z.string().trim().min(1).max(128) });
 router.post(
   '/pay-table',
   validateBody(payTableSchema),
+  requireCardConfirmation,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tableNumber, tableZone, method, splitPeople, idempotencyKey } = req.body;
@@ -66,6 +79,7 @@ router.post(
 router.post(
   '/pay-items',
   validateBody(paySelectedItemsSchema),
+  requireCardConfirmation,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tableNumber, tableZone, method, items, idempotencyKey } = req.body;
