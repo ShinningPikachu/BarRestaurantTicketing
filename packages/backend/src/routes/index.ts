@@ -9,6 +9,7 @@ import syncRouter from './sync.js';
 import authRouter from './auth.js';
 import { requireAuth } from '../middleware/auth.js';
 import kitchenRouter from './kitchen-dispatches.js';
+import auditRouter from './audit.js';
 import { errorResponse, successResponse } from '../types/api.js';
 import { getPairingApiBaseUrl } from '../utils/pairing.js';
 
@@ -31,6 +32,7 @@ router.use('/api/tables', tablesRouter);
 router.use('/api/tickets', ticketsRouter);
 router.use('/api/printers', printersRouter);
 router.use('/api/kitchen-dispatches', kitchenRouter);
+router.use('/api/audit', auditRouter);
 router.use('/api/sync', syncRouter);
 
 export default router;
