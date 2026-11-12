@@ -34,6 +34,7 @@ export interface XprinterTicketPayload {
   taxableBaseCents: number;
   vatCents: number;
   vatRatePercent: number;
+  vatBreakdown?: Array<{ ratePercent: number; taxableBaseCents: number; vatCents: number; totalCents: number }>;
   totalCents: number;
   ticketNote?: string | null;
   splitPeople?: number | null;
@@ -345,8 +346,15 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     }
     push('-'.repeat(receiptWidth));
     push(center('RESUMEN'));
-    push(line(`BASE IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.taxableBaseCents)));
-    push(line(`IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.vatCents)));
+    if (payload.vatBreakdown?.length) {
+      for (const band of payload.vatBreakdown) {
+        push(line(`BASE IVA ${band.ratePercent}%`, money(band.taxableBaseCents)));
+        push(line(`IVA ${band.ratePercent}%`, money(band.vatCents)));
+      }
+    } else {
+      push(line(`BASE IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.taxableBaseCents)));
+      push(line(`IVA ${payload.vatRatePercent.toFixed(0)}%`, money(payload.vatCents)));
+    }
     push('-'.repeat(receiptWidth));
     push(line('TOTAL', money(payload.totalCents)));
     if (payload.splitPeople && payload.splitPeople > 1) {
