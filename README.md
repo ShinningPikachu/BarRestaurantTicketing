@@ -116,7 +116,7 @@ Start BarRestaurantTicketing
 Stop BarRestaurantTicketing
 ```
 
-Double-click the generated `Start BarRestaurantTicketing` button and choose to run it if your file manager asks. It verifies the installed dependency lock, refreshes dependencies only when needed, rebuilds and validates the operational app, checks the database migration state, opens a terminal window, starts the compiled backend and exported frontend, waits for both to pass readiness checks, then opens the configured desktop POS (port `8081` by default). It does not run Expo or TypeScript watchers in operational mode.
+Double-click the generated `Start BarRestaurantTicketing` button and choose to run it if your file manager asks. It checks the compiled build fingerprint and database migration state without rebuilding, installing libraries, or changing SQLite, starts the compiled backend and exported frontend, waits for readiness, then opens the configured desktop POS (port `8081` by default). It does not run Expo or TypeScript watchers in operational mode.
 
 ```text
 http://localhost:8081
@@ -661,3 +661,24 @@ packages/
 ## Provisional receipts
 
 Before a payment is recorded, the table print action issues a **PRECUENTA / SIN VALIDEZ FISCAL** with an order reference. It is not an issued invoice. To print a simplified invoice after payment, open *Historial de tickets* and reprint the saved `PaidTicket`, which has a durable ticket number and an accounting snapshot. Tax and invoicing rules depend on jurisdiction, and must be reviewed for the restaurant's legal context before using the system for statutory invoicing.
+
+## Fast Linux operation and backups
+
+The installer installs dependencies, compiles assets, and safely applies migrations. Routine startup validates the compiled build fingerprint, required configuration, and database migration state without modifying production data. After editing source files or EXPO_PUBLIC_ configuration, rerun the installer during a maintenance window.
+
+Create a consistent online backup, even while the backend is operating:
+
+```sh
+node scripts/backup-database.mjs --dir=/media/pos-backups
+```
+
+The backup folder must exist outside the application directory. The script uses SQLite VACUUM INTO, checks database integrity and foreign keys, and logs the SHA-256 digest. Keep copies on separate media, test restores, and monitor storage capacity. A backup directory on the same physical disk does not protect against disk failure.
+
+Optional systemd user-service and daily 04:00 backup timer:
+
+```sh
+bash scripts/install-systemd-user.sh /media/pos-backups
+systemctl --user enable --now bar-restaurant-ticketing.service
+```
+
+Use either the systemd service or desktop launcher to control a single POS instance, not both. Inspect service logs using `journalctl --user -u bar-restaurant-ticketing.service`. User timers require a running systemd user manager. A timed backup should be verified by periodically restoring a dated copy to a separate directory.
