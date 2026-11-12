@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 const repoRoot = resolve(import.meta.dirname, '..');
