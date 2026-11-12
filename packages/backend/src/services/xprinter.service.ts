@@ -43,6 +43,17 @@ export interface XprinterTicketPayload {
   documentKind?: 'receipt' | 'correction';
 }
 
+export interface KitchenTicketPayload {
+  dispatchId: string;
+  tableLabel: string;
+  items: Array<{
+    qty: number;
+    name: string;
+    primaryName?: string | null;
+    secondaryName?: string | null;
+  }>;
+}
+
 export interface XprinterFinancialSummaryPayload {
   businessName: string;
   tradeName: string;
@@ -71,7 +82,7 @@ export interface XprinterFinancialSummaryPayload {
   }>;
 }
 
-export type PrinterJobKind = 'ticket' | 'financial-summary' | 'test-print' | 'cash-drawer';
+export type PrinterJobKind = 'ticket' | 'kitchen-ticket' | 'financial-summary' | 'test-print' | 'cash-drawer';
 
 export interface PreparedPrinterJob {
   kind: PrinterJobKind;
@@ -473,6 +484,26 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
         text: textFromRows(rows),
       };
     },
+    kitchen(payload: KitchenTicketPayload) {
+      const rows: string[] = [
+        center('COMANDA COCINA'),
+        '='.repeat(receiptWidth),
+        line('MESA', payload.tableLabel),
+        line('REFERENCIA', payload.dispatchId),
+        '-'.repeat(receiptWidth),
+      ];
+      for (const item of payload.items) {
+        const display = getLineDisplayName(item);
+        for (const label of wrap(`${item.qty}x ${display.primary}`)) rows.push(label);
+        if (display.secondary) {
+          for (const label of wrap(display.secondary)) rows.push(`  ${label}`);
+        }
+      }
+      rows.push('='.repeat(receiptWidth));
+      rows.push(center('CONFIRMAR RECEPCION EN COCINA'));
+      rows.push('');
+      return { escpos: escposFromRows(rows), text: textFromRows(rows) };
+    },
     summary(payload: XprinterFinancialSummaryPayload) {
       const rows = summaryRows(payload);
       return { escpos: escposFromRows(rows), text: textFromRows(rows) };
@@ -776,6 +807,17 @@ export class XprinterService {
       .update(payload.invoiceNumber)
       .digest('hex')}`;
     return this.submit(prepared);
+  }
+
+  printKitchenTicket(payload: KitchenTicketPayload): Promise<PrinterJobResult> {
+    if (!payload.dispatchId || !payload.tableLabel || !payload.items.length ||
+        payload.items.length > 500 || payload.items.some((item) =>
+          !Number.isInteger(item.qty) || item.qty <= 0 || !item.name.trim())) {
+      return Promise.reject(new PrinterTransportError(
+        'Invalid kitchen dispatch payload', 'PRINTER_JOB_INVALID', false, 'error'
+      ));
+    }
+    return this.submit(this.prepared('kitchen-ticket', this.formatter.kitchen(payload)));
   }
 
   printFinancialSummary(payload: XprinterFinancialSummaryPayload): Promise<PrinterJobResult> {

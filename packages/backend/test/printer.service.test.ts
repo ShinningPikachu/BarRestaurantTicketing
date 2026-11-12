@@ -272,3 +272,18 @@ test('provisional receipts never appear as paid simplified invoices', async () =
   assert.match(body, /SIN VALIDEZ FISCAL/);
   assert.doesNotMatch(body, /FACTURA SIMPLIFICADA/);
 });
+
+test('kitchen ticket contains order quantities but no customer prices or fiscal invoice heading', async () => {
+  const adapter = new MockPrinterAdapter();
+  const service = new XprinterService({ adapter });
+  await service.printKitchenTicket({
+    dispatchId: 'dispatch-001',
+    tableLabel: 'outside 12',
+    items: [{ name: 'Soup', primaryName: 'Sopa', qty: 2 }],
+  });
+  const text = adapter.printed[0].toString('ascii');
+  assert.match(text, /COMANDA COCINA/);
+  assert.match(text, /outside 12/);
+  assert.match(text, /2x Sopa/);
+  assert.doesNotMatch(text, /FACTURA|TOTAL|EUR|NIF/);
+});

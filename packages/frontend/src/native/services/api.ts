@@ -10,7 +10,20 @@ export interface SyncRevision {
 }
 
 export type PrinterConnectionState = 'connected' | 'disconnected' | 'unavailable' | 'busy' | 'out_of_paper' | 'error' | 'unknown';
-export type PrinterJobKind = 'ticket' | 'financial-summary' | 'test-print' | 'cash-drawer';
+export type PrinterJobKind = 'ticket' | 'kitchen-ticket' | 'financial-summary' | 'test-print' | 'cash-drawer';
+
+export interface KitchenDispatch {
+  id: string;
+  orderId: string;
+  tableNumber: number;
+  tableZone: string;
+  status: 'pending' | 'sending' | 'accepted' | 'failed' | 'unknown' | 'acknowledged';
+  printerJobId: string | null;
+  lastErrorCode: string | null;
+  createdAt: string;
+  acknowledgedAt: string | null;
+  items: Array<{ name: string; primaryName?: string | null; secondaryName?: string | null; qty: number }>;
+}
 
 export interface PrinterStatus {
   state: PrinterConnectionState;
@@ -337,11 +350,11 @@ export class ApiService {
     return parseOrThrow<BackendTable>(response, 'Failed to mark table ticket as printed');
   }
 
-  async sendTablePreOrderToKitchen(tableNumber: number, tableZone: string): Promise<TableWorkflow> {
+  async sendTablePreOrderToKitchen(tableNumber: number, tableZone: string): Promise<TableWorkflow & { kitchenDispatchId?: string }> {
     const response = await this.request(`/tables/${encodeURIComponent(tableZone)}/${tableNumber}/send-to-kitchen`, {
       method: 'POST'
     });
-    return parseOrThrow<TableWorkflow>(response, 'Failed to send pre-order to kitchen');
+    return parseOrThrow<TableWorkflow & { kitchenDispatchId?: string }>(response, 'Failed to send pre-order to kitchen');
   }
 
   async moveConfirmedItemToPreOrder(orderId: string, itemId: number): Promise<TableWorkflow> {
@@ -596,6 +609,29 @@ export class ApiService {
   async cancelPendingPrinterJobs(): Promise<{ cancelled: number; status: PrinterStatus }> {
     const response = await this.request('/printers/queue/pending', { method: 'DELETE' });
     return parseOrThrow<{ cancelled: number; status: PrinterStatus }>(response, 'Failed to cancel pending printer jobs');
+  }
+
+  async fetchKitchenDispatches(): Promise<KitchenDispatch[]> {
+    const response = await this.request('/kitchen-dispatches');
+    return parseOrThrow<KitchenDispatch[]>(response, 'Failed to load kitchen handoffs');
+  }
+
+  async printKitchenDispatch(id: string, confirmedNoOutput = false): Promise<PrinterJobResponse> {
+    const response = await this.request(`/kitchen-dispatches/${encodeURIComponent(id)}/print`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmedNoOutput }),
+    }, PRINTER_REQUEST_TIMEOUT_MS);
+    return parseOrThrow<PrinterJobResponse>(response, 'Failed to print kitchen order');
+  }
+
+  async acknowledgeKitchenDispatch(id: string, manualHandoff = false): Promise<KitchenDispatch> {
+    const response = await this.request(`/kitchen-dispatches/${encodeURIComponent(id)}/acknowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manualHandoff }),
+    });
+    return parseOrThrow<KitchenDispatch>(response, 'Failed to acknowledge kitchen handoff');
   }
 
   async fetchPrinterDiagnostics(): Promise<PrinterDiagnostics> {
