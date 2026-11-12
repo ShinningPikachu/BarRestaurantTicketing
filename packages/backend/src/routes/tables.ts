@@ -80,6 +80,7 @@ router.post(
 
 router.delete(
   '/:zone/:number',
+  requireManager,
   validateParams(tableParamsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -143,6 +144,11 @@ router.patch(
   '/:zone/:number/preorder/items/:itemId',
   validateParams(tableParamsSchema.extend({ itemId: z.coerce.number().int().min(1).max(MAX_DATABASE_ID) })),
   validateBody(updatePreOrderItemSchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    // Cashiers may adjust quantities, but changing a product price needs management approval.
+    if (req.body.unitPriceCents !== undefined) return requireManager(req, res, next);
+    next();
+  },
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const zone = req.params.zone;
