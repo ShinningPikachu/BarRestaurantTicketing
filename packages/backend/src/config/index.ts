@@ -43,7 +43,7 @@ function choiceValue<T extends string>(name: string, fallback: T, values: readon
   throw new Error(`${name} must be one of: ${values.join(', ')}`);
 }
 
-function requiredCredential(name: 'POS_ACCESS_CODE' | 'POS_AUTH_TOKEN', testValue: string): string {
+function requiredCredential(name: 'POS_ACCESS_CODE' | 'POS_AUTH_TOKEN' | 'POS_MANAGER_ACCESS_CODE' | 'POS_MANAGER_AUTH_TOKEN', testValue: string): string {
   const value = process.env[name]?.trim();
   if (value) return value;
   if (isTest) return testValue;
@@ -83,6 +83,22 @@ if (sessionToken.length < 32 || sessionToken.length > 512) {
 }
 rejectInsecureProductionValue('POS_ACCESS_CODE', accessCode);
 rejectInsecureProductionValue('POS_AUTH_TOKEN', sessionToken);
+
+const managerAccessCode = requiredCredential('POS_MANAGER_ACCESS_CODE', 'test-manager-access-code');
+const managerSessionToken = requiredCredential(
+  'POS_MANAGER_AUTH_TOKEN', 'test-manager-session-token-long-enough-for-authentication'
+);
+if (managerAccessCode.length < 6 || managerAccessCode.length > 128) {
+  throw new Error('POS_MANAGER_ACCESS_CODE must contain between 6 and 128 characters');
+}
+if (managerSessionToken.length < 32 || managerSessionToken.length > 512) {
+  throw new Error('POS_MANAGER_AUTH_TOKEN must contain between 32 and 512 characters');
+}
+if (managerAccessCode === accessCode || managerSessionToken === sessionToken) {
+  throw new Error('Manager credentials must differ from cashier credentials');
+}
+rejectInsecureProductionValue('POS_MANAGER_ACCESS_CODE', managerAccessCode);
+rejectInsecureProductionValue('POS_MANAGER_AUTH_TOKEN', managerSessionToken);
 
 const businessName = ticketIdentity(
   'TICKET_BUSINESS_NAME',
@@ -145,6 +161,8 @@ export const config = {
   auth: {
     accessCode,
     sessionToken,
+    managerAccessCode,
+    managerSessionToken,
   },
   ticket: {
     businessName,
