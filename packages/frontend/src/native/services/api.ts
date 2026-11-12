@@ -534,39 +534,13 @@ export class ApiService {
     return parseOrThrow<PrinterJobResponse & { ticketId: string }>(response, 'Failed to reprint paid ticket');
   }
 
-  async printXprinterFinancialSummary(payload: {
-    businessName: string;
-    tradeName: string;
-    nif: string;
-    periodLabel: string;
-    issuedAt: string;
-    ticketCount: number;
-    itemQuantity: number;
-    taxableBaseCents: number;
-    vatCents: number;
-    vatRateLabel?: string | null;
-    totalCents: number;
-    cashCents: number;
-    cardCents: number;
-    firstTicketNumber?: string | null;
-    lastTicketNumber?: string | null;
-    dailyTotals: Array<{
-      dayLabel: string;
-      ticketCount: number;
-      itemQuantity: number;
-      taxableBaseCents: number;
-      vatCents: number;
-      totalCents: number;
-      cashCents: number;
-      cardCents: number;
-    }>;
-  }): Promise<PrinterJobResponse> {
+  async printXprinterFinancialSummary(ticketIds: string[]): Promise<PrinterJobResponse> {
     const response = await this.request('/printers/xprinter/financial-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ticketIds })
     }, PRINTER_REQUEST_TIMEOUT_MS);
-    return parseOrThrow<PrinterJobResponse>(response, 'Failed to print Xprinter financial summary');
+    return parseOrThrow<PrinterJobResponse>(response, 'Failed to print recorded financial summary');
   }
 
   async openXprinterCashDrawer(): Promise<PrinterJobResponse & { opened: boolean }> {
