@@ -23,6 +23,7 @@ export function productionSourceDigest() {
     if (stat.isDirectory()) {
       for (const name of readdirSync(path).sort()) {
         if (['node_modules', 'dist', 'backups', '.cache'].includes(name)) continue;
+        if (/\\.db(?:$|[-.])|-(?:journal|wal|shm)$/.test(name)) continue;
         visit(join(path, name));
       }
     } else if (stat.isFile()) {
