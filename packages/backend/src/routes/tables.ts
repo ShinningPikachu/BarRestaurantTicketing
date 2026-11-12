@@ -221,10 +221,10 @@ router.post(
 
       logger.info({ zone, number }, 'Sending pre-order to kitchen');
 
-      await workflowService.sendToKitchen(number, zone);
+      const result = await workflowService.sendToKitchen(number, zone);
       const workflow = await workflowService.getTableWorkflow(number, zone);
       signalDataChange('orders');
-      res.json(successResponse(workflow));
+      res.json(successResponse({ ...workflow, kitchenDispatchId: result.dispatchId }));
     } catch (error) {
       logger.error({ error }, 'Failed to send to kitchen');
       next(error);
