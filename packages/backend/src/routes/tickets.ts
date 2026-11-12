@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../db.js';
+import { config } from '../config/index.js';
 import { z } from 'zod';
 import { workflowService } from '../domain/workflow/workflow.service.js';
 import { requireManager } from '../middleware/auth.js';
@@ -16,6 +17,8 @@ function toPublicTicket<T extends { idempotencyKey: string | null; idempotencyFi
 }
 
 export function getSessionWindow(reference = new Date()): { start: Date; end: Date } {
+  // `config` initializes TZ before local Date setters are used for session windows.
+  void config.timeZone;
   const start = new Date(reference);
   start.setHours(6, 0, 0, 0);
 
