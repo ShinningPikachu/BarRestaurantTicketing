@@ -1,3 +1,4 @@
+import type { PrismaClient } from '@prisma/client';
 import prisma from '../db.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { PrinterTransportError } from './printer-adapter.js';
@@ -8,8 +9,8 @@ const AMBIGUOUS_TRANSPORT_CODES = new Set([
   'PRINTER_TIMEOUT', 'PRINTER_DISCONNECTED', 'PRINTER_IO_ERROR', 'PRINTER_COMMAND_FAILED',
 ]);
 
-export async function markInterruptedKitchenDispatchesUnknown() {
-  const changed = await prisma.kitchenDispatch.updateMany({
+export async function markInterruptedKitchenDispatchesUnknown(db: PrismaClient = prisma) {
+  const changed = await db.kitchenDispatch.updateMany({
     where: { status: 'sending' },
     data: { status: 'unknown', lastErrorCode: 'PROCESS_INTERRUPTED' },
   });
