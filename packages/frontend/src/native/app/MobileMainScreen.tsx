@@ -652,6 +652,11 @@ export function MobileMainScreen(props: MainScreenProps): React.JSX.Element {
           <PrinterStatusPanel
             status={props.printerStatus}
             diagnostics={props.printerDiagnostics}
+            kitchenDispatches={props.kitchenDispatches}
+            kitchenAction={props.kitchenAction}
+            onRefreshKitchen={props.refreshKitchenDispatches}
+            onPrintKitchen={props.printPendingKitchenDispatch}
+            onAcknowledgeKitchen={props.acknowledgeKitchenHandoff}
             action={props.printerAction}
             onRefresh={props.refreshPrinterStatus}
             onReconnect={props.reconnectPrinter}
