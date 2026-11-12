@@ -23,7 +23,7 @@ import { translateCategory } from './src/native/components/MenuZoneGroup/MenuCat
 import { MenuItem, normalizeTableZone, PaidTicket, SessionSummary, tableZoneLabel, TicketHistorySummary, TicketPeriodPreset } from './src/native/types';
 import { apiService, setApiUnauthorizedHandler } from './src/native/services';
 import { ApiRequestError, getApiBaseUrl, normalizeApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/native/services/api';
-import type { PrinterDiagnostics, PrinterStatus } from './src/native/services/api';
+import type { KitchenDispatch, PrinterDiagnostics, PrinterStatus } from './src/native/services/api';
 import { getItemDisplayName } from './src/native/helpers/itemDisplayName';
 import { getSimplifiedInvoiceConfig } from './src/native/helpers/kitchenTicketPrinter';
 import { DesktopMainScreen } from './src/native/app/DesktopMainScreen';
@@ -557,6 +557,8 @@ export default function App(): React.JSX.Element {
   const [productDescription, setProductDescription] = useState('');
   const [productImageDataUrl, setProductImageDataUrl] = useState<string | null>(null);
   const [printerStatus, setPrinterStatus] = useState<PrinterStatus | null>(null);
+  const [kitchenDispatches, setKitchenDispatches] = useState<KitchenDispatch[]>([]);
+  const [kitchenAction, setKitchenAction] = useState<string | null>(null);
   const [printerDiagnostics, setPrinterDiagnostics] = useState<PrinterDiagnostics | null>(null);
   const [printerAction, setPrinterAction] = useState<'refresh' | 'reconnect' | 'test' | 'cancel' | 'diagnostics' | null>(null);
   const ticketPrintCooldown = useActionCooldown(PRINTER_ACTION_COOLDOWN_MS);
@@ -616,6 +618,8 @@ export default function App(): React.JSX.Element {
     setProductDescription('');
     setProductImageDataUrl(null);
     setPrinterStatus(null);
+    setKitchenDispatches([]);
+    setKitchenAction(null);
     setPrinterDiagnostics(null);
     setPrinterAction(null);
   }
@@ -1582,6 +1586,65 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function confirmKitchenAction(question: string): Promise<boolean> {
+    if (Platform.OS === 'web') {
+      return (globalThis as typeof globalThis & { confirm?: (value: string) => boolean }).confirm?.(question) === true;
+    }
+    return new Promise<boolean>((resolve) => {
+      Alert.alert('Confirmación de cocina', question, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Confirmar', onPress: () => resolve(true) },
+      ], { cancelable: false });
+    });
+  }
+
+  async function refreshKitchenDispatches(): Promise<void> {
+    try {
+      setKitchenDispatches(await apiService.fetchKitchenDispatches());
+    } catch {
+      Alert.alert('Cola de cocina', 'No se pudieron consultar las comandas pendientes.');
+    }
+  }
+
+  async function printPendingKitchenDispatch(dispatch: KitchenDispatch): Promise<void> {
+    if (kitchenAction) return;
+    if (dispatch.status === 'unknown' &&
+      !await confirmKitchenAction('Esta impresión tiene un resultado desconocido. Confirma que no se imprimió ninguna comanda antes de repetirla.')) {
+      return;
+    }
+    setKitchenAction(dispatch.id);
+    try {
+      await apiService.printKitchenDispatch(dispatch.id, dispatch.status === 'unknown');
+      Alert.alert('Comanda aceptada', 'El sistema de impresión aceptó la comanda. Confirma la recepción física cuando corresponda.');
+    } catch (error) {
+      const details = error instanceof ApiRequestError ? error.message : 'Consulta el estado antes de reintentar.';
+      Alert.alert('Impresión pendiente', details);
+    } finally {
+      try { setKitchenDispatches(await apiService.fetchKitchenDispatches()); } catch { /* refresh manually */ }
+      setKitchenAction(null);
+    }
+  }
+
+  async function acknowledgeKitchenHandoff(dispatch: KitchenDispatch): Promise<void> {
+    if (kitchenAction) return;
+    const manualHandoff = dispatch.status !== 'accepted';
+    if (manualHandoff &&
+      !await confirmKitchenAction('Confirma que el pedido ha llegado físicamente a cocina, incluso sin una impresión aceptada.')) {
+      return;
+    }
+    setKitchenAction(dispatch.id);
+    try {
+      await apiService.acknowledgeKitchenDispatch(dispatch.id, manualHandoff);
+      setKitchenDispatches(await apiService.fetchKitchenDispatches());
+      Alert.alert('Recepción confirmada', 'La comanda ha quedado registrada como recibida en cocina.');
+    } catch (error) {
+      const details = error instanceof ApiRequestError ? error.message : 'Actualiza la cola e inténtalo de nuevo.';
+      Alert.alert('Confirmación no registrada', details);
+    } finally {
+      setKitchenAction(null);
+    }
+  }
+
   async function openPrinterDiagnostics(): Promise<void> {
     if (printerAction) return;
     setPrinterAction('diagnostics');
@@ -1810,8 +1873,14 @@ export default function App(): React.JSX.Element {
     let active = true;
     const updateStatus = async () => {
       try {
-        const status = await apiService.fetchPrinterStatus();
-        if (active) setPrinterStatus(status);
+        const [status, dispatches] = await Promise.all([
+          apiService.fetchPrinterStatus(),
+          apiService.fetchKitchenDispatches(),
+        ]);
+        if (active) {
+          setPrinterStatus(status);
+          setKitchenDispatches(dispatches);
+        }
       } catch {
         // Keep the last known state. Manual refresh provides user feedback.
       }
@@ -2106,6 +2175,11 @@ export default function App(): React.JSX.Element {
     downloadFilteredTicketPdfs,
     printerStatus,
     printerDiagnostics,
+    kitchenDispatches,
+    kitchenAction,
+    refreshKitchenDispatches: () => void refreshKitchenDispatches(),
+    printPendingKitchenDispatch: (dispatch: KitchenDispatch) => void printPendingKitchenDispatch(dispatch),
+    acknowledgeKitchenHandoff: (dispatch: KitchenDispatch) => void acknowledgeKitchenHandoff(dispatch),
     printerAction,
     refreshPrinterStatus: () => void refreshPrinterStatus(),
     reconnectPrinter: () => void reconnectPrinter(),
