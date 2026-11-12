@@ -299,7 +299,18 @@ export function useWorkflowController() {
         (workflow) => workflow
       );
       if (!result) return false;
-      Alert.alert('Enviado a cocina', 'Los artículos del prepedido están confirmados y listos para preparar.');
+      // Order creation and the kitchen print queue are atomic on the backend.
+      // An unsuccessful physical print must never be presented as delivered.
+      if (result.kitchenDispatchId && process.env.EXPO_PUBLIC_KITCHEN_AUTO_PRINT === 'true') {
+        try {
+          await apiService.printKitchenDispatch(result.kitchenDispatchId);
+          Alert.alert('Comanda enviada a impresora', 'La impresora aceptó el trabajo. Comprueba la salida y confirma la recepción en Impresora.');
+        } catch {
+          Alert.alert('Comanda pendiente', 'El pedido se ha guardado, pero no se pudo imprimir la comanda. Revisa la cola de cocina en Impresora.');
+        }
+      } else {
+        Alert.alert('Pedido confirmado', 'La comanda se ha guardado y está pendiente de entrega o impresión. Revísala en Impresora.');
+      }
       return true;
     } catch {
       Alert.alert('Error', 'No se pudo enviar el pedido a cocina.');
