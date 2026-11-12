@@ -1,8 +1,8 @@
 import net from 'node:net';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
@@ -43,7 +43,28 @@ async function waitForExit(child, timeoutMs) {
 
 const port = await reservePort();
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'bar-ticketing-smoke-'));
-const temporaryDatabaseUrl = `file:${join(temporaryDirectory, 'smoke.db')}`;
+const testPrismaDir = join(temporaryDirectory, 'prisma');
+cpSync(resolve('packages/backend/prisma'), testPrismaDir, {
+  recursive: true,
+  filter: (source) => !/(?:^|[\\/])(?:dev\\.db(?:$|[-.])|backups(?:[\\/]|$))/.test(source),
+});
+writeFileSync(join(testPrismaDir, 'dev.db'), '');
+const temporaryDatabaseUrl = `file:${join(testPrismaDir, 'dev.db')}`;
+
+// The compiled-server smoke test must exercise the current migrated schema,
+// including future tables that are queried during startup.
+await new Promise((resolvePromise, reject) => {
+  const migrate = spawn(resolve('node_modules/.bin/prisma'), [
+    'migrate', 'deploy', '--schema', join(testPrismaDir, 'schema.prisma'),
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  for (const stream of [migrate.stdout, migrate.stderr]) {
+    stream.setEncoding('utf8');
+    stream.on('data', (chunk) => { output += chunk; });
+  }
+  migrate.once('error', reject);
+  migrate.once('exit', (code) => code === 0 ? resolvePromise() : reject(new Error(output)));
+});
 const output = [];
 const child = spawn(npmCommand, ['run', '-w', 'backend', 'start'], {
   cwd: process.cwd(),

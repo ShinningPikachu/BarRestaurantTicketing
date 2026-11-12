@@ -5,6 +5,7 @@ import { buildRecordedFinancialSummary } from '../services/financial-summary.ser
 import { validateBody, validateParams } from '../middleware/validation.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { successResponse } from '../types/api.js';
+import { trackPrinterOperation } from '../services/print-job.service.js';
 import { PrinterTransportError, xprinterService } from '../services/xprinter.service.js';
 
 const router = Router();
@@ -74,7 +75,7 @@ router.post(
   validateBody(xprinterTicketSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const job = await xprinterService.printTicket(req.body);
+      const job = await trackPrinterOperation('provisional-ticket', req.body.invoiceNumber, () => xprinterService.printTicket(req.body));
       res.json(successResponse({ printed: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
@@ -96,7 +97,7 @@ router.post(
       if (tickets.length !== ticketIds.length) {
         throw new ApiError(409, 'Some selected tickets are missing or not paid', 'INVALID_SUMMARY_SELECTION');
       }
-      const job = await xprinterService.printFinancialSummary(buildRecordedFinancialSummary(tickets));
+      const job = await trackPrinterOperation('financial-summary', null, () => xprinterService.printFinancialSummary(buildRecordedFinancialSummary(tickets)));
       res.json(successResponse({ printed: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
@@ -117,7 +118,7 @@ router.post(
       if (!ticket) throw new ApiError(404, 'Paid ticket not found', 'PAID_TICKET_NOT_FOUND');
       if (ticket.status !== 'paid') throw new ApiError(409, 'Only paid tickets can be printed', 'TICKET_NOT_PAYABLE');
 
-      const job = await xprinterService.printTicket({
+      const job = await trackPrinterOperation('paid-ticket', ticket.id, () => xprinterService.printTicket({
         businessName: ticket.businessName,
         tradeName: ticket.tradeName,
         nif: ticket.businessTaxId,
@@ -135,7 +136,7 @@ router.post(
         ticketNote: ticket.mode,
         splitPeople: ticket.splitPeople,
         fiscal: true,
-      });
+      }));
       res.json(successResponse({ printed: true, ticketId: ticket.id, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
@@ -148,7 +149,7 @@ router.post(
   validateBody(emptyBodySchema),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const job = await xprinterService.openCashDrawer();
+      const job = await trackPrinterOperation('cash-drawer', null, () => xprinterService.openCashDrawer());
       res.json(successResponse({ opened: true, ...job }));
     } catch (error) {
       next(toPrinterApiError(error));
@@ -174,7 +175,7 @@ router.post('/reconnect', validateBody(emptyBodySchema), async (_req: Request, r
 
 router.post('/test-print', validateBody(emptyBodySchema), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const job = await xprinterService.runSafeTestPrint();
+    const job = await trackPrinterOperation('test-print', null, () => xprinterService.runSafeTestPrint());
     res.json(successResponse({ printed: true, ...job }));
   } catch (error) {
     next(toPrinterApiError(error));
@@ -195,6 +196,18 @@ router.get('/diagnostics', async (_req: Request, res: Response, next: NextFuncti
     res.json(successResponse(await xprinterService.getDiagnostics()));
   } catch (error) {
     next(toPrinterApiError(error));
+  }
+});
+
+router.get('/history', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const jobs = await prisma.printJob.findMany({
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(successResponse(jobs));
+  } catch (error) {
+    next(error);
   }
 });
 
