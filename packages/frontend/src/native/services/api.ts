@@ -361,12 +361,13 @@ export class ApiService {
     tableZone: string,
     method: PaymentMethod,
     splitPeople: number | undefined,
-    idempotencyKey: string
+    idempotencyKey: string,
+    cardConfirmed = false
   ): Promise<PaymentResult> {
     const response = await this.request('/orders/pay-table', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableNumber, tableZone, method, splitPeople, idempotencyKey })
+      body: JSON.stringify({ tableNumber, tableZone, method, splitPeople, idempotencyKey, cardConfirmed })
     });
     return parseOrThrow<PaymentResult>(response, 'Failed to pay table');
   }
@@ -376,12 +377,13 @@ export class ApiService {
     tableZone: string,
     method: PaymentMethod,
     items: Array<{ orderId: string; itemId: number; qty: number }>,
-    idempotencyKey: string
+    idempotencyKey: string,
+    cardConfirmed = false
   ): Promise<PaymentResult> {
     const response = await this.request('/orders/pay-items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableNumber, tableZone, method, items, idempotencyKey })
+      body: JSON.stringify({ tableNumber, tableZone, method, items, idempotencyKey, cardConfirmed })
     });
     return parseOrThrow<PaymentResult>(response, 'Failed to pay selected items');
   }
@@ -489,6 +491,20 @@ export class ApiService {
     const queryString = query.toString();
     const response = await this.request(`/tickets${queryString ? `?${queryString}` : ''}`);
     return parseOrThrow<PaidTicket[]>(response, 'Failed to fetch paid tickets');
+  }
+
+  async refundPaidTicket(
+    ticketId: string,
+    reason: string,
+    idempotencyKey: string,
+    externalCardRefundConfirmed: boolean
+  ): Promise<{ paidTicket: PaidTicket }> {
+    const response = await this.request(`/tickets/${encodeURIComponent(ticketId)}/refund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason, idempotencyKey, externalCardRefundConfirmed }),
+    });
+    return parseOrThrow<{ paidTicket: PaidTicket }>(response, 'Failed to record corrective refund');
   }
 
   async fetchSessionSummary(): Promise<SessionSummary> {
