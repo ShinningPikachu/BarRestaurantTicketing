@@ -45,6 +45,7 @@ model OrderItem {
   secondaryName   String?
   qty             Int
   unitPriceCents  Int       @default(0)
+  vatRatePercent Int?
   totalPriceCents Int       @default(0)
 
   @@index([orderId])
@@ -57,6 +58,7 @@ model MenuItem {
   primaryName   String?
   secondaryName String?
   priceCents    Int
+  vatRatePercent Int?
   costCents     Int?
   sku           String?        @unique
   category      String         @default("Uncategorized")
@@ -92,6 +94,7 @@ model PaidTicket {
   taxableBaseCents       Int
   vatCents               Int
   vatRatePercent         Int
+  taxBreakdownJson String?
   splitPeople            Int?
   businessName           String           @default("")
   tradeName              String           @default("")
@@ -127,6 +130,7 @@ model PaidTicketItem {
   secondaryName   String?
   qty             Int
   unitPriceCents  Int
+  vatRatePercent Int?
   totalPriceCents Int
 
   @@index([ticketId])
@@ -155,6 +159,7 @@ model PreOrderItem {
   secondaryName   String?
   qty             Int
   unitPriceCents  Int             @default(0)
+  vatRatePercent Int?
   totalPriceCents Int             @default(0)
 
   @@index([sessionId])
