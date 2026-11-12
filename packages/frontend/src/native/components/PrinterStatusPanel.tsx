@@ -1,11 +1,16 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { PrinterDiagnostics, PrinterStatus } from '../services/api';
+import type { KitchenDispatch, PrinterDiagnostics, PrinterStatus } from '../services/api';
 import { colors } from '../theme';
 
 export interface PrinterStatusPanelProps {
   status: PrinterStatus | null;
   diagnostics: PrinterDiagnostics | null;
+  kitchenDispatches: KitchenDispatch[];
+  kitchenAction: string | null;
+  onRefreshKitchen: () => void;
+  onPrintKitchen: (dispatch: KitchenDispatch) => void;
+  onAcknowledgeKitchen: (dispatch: KitchenDispatch) => void;
   action: 'refresh' | 'reconnect' | 'test' | 'cancel' | 'diagnostics' | null;
   onRefresh: () => void;
   onReconnect: () => void;
@@ -83,6 +88,49 @@ export function PrinterStatusPanel(props: PrinterStatusPanelProps): React.JSX.El
         <Text style={styles.detailValue}>{status?.queue.active ? `Trabajo activo: ${status.queue.activeJobKind ?? 'impresión'}` : 'Sin trabajo activo'}</Text>
         <Text style={styles.detailValue}>{`${status?.queue.pending ?? 0} trabajos pendientes`}</Text>
         <Text style={styles.detailValue}>{status?.queue.external === null || status?.queue.external === undefined ? 'Cola externa no disponible' : `${status.queue.external} trabajos en la cola del sistema`}</Text>
+      </View>
+
+      <View style={styles.queueCard}>
+        <View style={styles.titleRow}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.sectionTitle}>Comandas de cocina</Text>
+            <Text style={styles.helpText}>Guardadas en SQLite. La aceptación de impresión requiere confirmar después la entrega física.</Text>
+          </View>
+          <ActionButton label="Actualizar comandas" onPress={props.onRefreshKitchen} />
+        </View>
+        {props.kitchenDispatches.slice(0, 30).map((dispatch) => (
+          <View key={dispatch.id} style={styles.jobRow}>
+            <Text style={styles.jobTitle}>
+              {`Mesa ${dispatch.tableZone} ${dispatch.tableNumber} · ${dispatch.status}`}
+            </Text>
+            <Text style={styles.helpText}>
+              {dispatch.items.map((item) => `${item.qty}x ${item.primaryName || item.name}`).join(', ')}
+            </Text>
+            <Text style={styles.helpText}>{dateLabel(dispatch.createdAt)}</Text>
+            {dispatch.lastErrorCode ? <Text style={styles.errorText}>{dispatch.lastErrorCode}</Text> : null}
+            {dispatch.status !== 'acknowledged' ? (
+              <View style={styles.actions}>
+                {['pending', 'failed', 'unknown'].includes(dispatch.status) ? (
+                  <ActionButton
+                    label={props.kitchenAction === dispatch.id ? 'Enviando...' : 'Imprimir comanda'}
+                    disabled={props.kitchenAction !== null}
+                    onPress={() => props.onPrintKitchen(dispatch)}
+                  />
+                ) : null}
+                {dispatch.status !== 'sending' ? (
+                  <ActionButton
+                    label={props.kitchenAction === dispatch.id ? 'Confirmando...' : 'Confirmar recepción'}
+                    disabled={props.kitchenAction !== null}
+                    onPress={() => props.onAcknowledgeKitchen(dispatch)}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ))}
+        {props.kitchenDispatches.length === 0
+          ? <Text style={styles.helpText}>No hay comandas registradas.</Text>
+          : null}
       </View>
 
       {status?.error ? <View style={styles.errorCard}><Text style={styles.errorTitle}>Error</Text><Text style={styles.errorText}>{status.error}</Text></View> : null}
