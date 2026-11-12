@@ -28,8 +28,8 @@ After=network.target
 Type=simple
 WorkingDirectory=$APP_DIR
 Environment=BAR_TICKETING_DESKTOP_STATIC=1
-ExecStartPre=$NODE_BIN $APP_DIR/scripts/check-production-ready.mjs
-ExecStart=$NODE_BIN $APP_DIR/scripts/dev-lan.mjs --production
+ExecStartPre="$NODE_BIN" "$APP_DIR/scripts/check-production-ready.mjs"
+ExecStart="$NODE_BIN" "$APP_DIR/scripts/dev-lan.mjs" --production
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
@@ -45,7 +45,7 @@ Description=BarRestaurantTicketing verified SQLite snapshot
 [Service]
 Type=oneshot
 WorkingDirectory=$APP_DIR
-ExecStart=$NODE_BIN $APP_DIR/scripts/backup-database.mjs --dir=$BACKUP_DIR
+ExecStart="$NODE_BIN" "$APP_DIR/scripts/backup-database.mjs" "--dir=$BACKUP_DIR"
 NoNewPrivileges=true
 EOF
 
