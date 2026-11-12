@@ -19,7 +19,7 @@ export function buildRecordedFinancialSummary(tickets: RecordedTicket[]): Xprint
   const days = new Map<string, XprinterFinancialSummaryPayload['dailyTotals'][number]>();
   const totals = { ticketCount: 0, itemQuantity: 0, taxableBaseCents: 0, vatCents: 0, totalCents: 0, cashCents: 0, cardCents: 0 };
   for (const ticket of ordered) {
-    if (ticket.status !== 'paid' || !['cash', 'card'].includes(ticket.method)) {
+    if (!['paid', 'refunded', 'correction'].includes(ticket.status) || !['cash', 'card'].includes(ticket.method)) {
       throw new Error('Summary requires paid tickets with supported payment methods');
     }
     const dayLabel = businessDate(ticket.createdAt);
