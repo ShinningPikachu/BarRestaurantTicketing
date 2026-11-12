@@ -346,7 +346,9 @@ function createFormatter(paperColumns: number, cutMode: 'none' | 'full' | 'parti
     }
     push('-'.repeat(receiptWidth));
     push(center('RESUMEN'));
-    if (payload.vatBreakdown?.length) {
+    if (payload.fiscal !== true) {
+      push(center('IVA DETALLADO EN FACTURA FINAL'));
+    } else if (payload.vatBreakdown?.length) {
       for (const band of payload.vatBreakdown) {
         push(line(`BASE IVA ${band.ratePercent}%`, money(band.taxableBaseCents)));
         push(line(`IVA ${band.ratePercent}%`, money(band.vatCents)));
