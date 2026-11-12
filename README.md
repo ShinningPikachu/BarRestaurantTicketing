@@ -720,3 +720,7 @@ This check compares **internal POS records** only. It cannot confirm card proces
 ## Scalable ticket history
 
 The ticket history screen loads a bounded page of 100 tickets by default and offers **Cargar 100 tickets más** to load older pages. The backend exposes `GET /api/tickets/page?startAt=<ISO>&endAt=<ISO>&limit=100&cursor=<ticket-id>` using stable descending date and ID ordering. Cursor and date range are validated; the maximum page size is 250. Existing unpaginated `GET /api/tickets` remains for legacy API compatibility. Search, filtering, and on-screen subtotals operate on **currently loaded tickets**, and therefore must not be used as a complete-period financial report until all pages are loaded. For bookkeeping, use the authorized server-side reconciliation/reporting functionality instead.
+
+## Restaurant timezone
+
+Set `POS_TIME_ZONE` in the private `.env` file to an IANA timezone such as `Europe/Madrid` or `Europe/Brussels`. The backend validates the value and applies it to local business-day/session boundaries. SQLite timestamps remain UTC, while the morning 06:00 session cutoff follows the restaurant's local timezone and daylight-saving transitions. Restart the backend after changing this setting; run a reporting check when transitioning between daylight-saving and standard time.

@@ -69,6 +69,21 @@ function ticketVatRate(): number {
   return value;
 }
 
+function restaurantTimeZone(): string {
+  const zone = process.env.POS_TIME_ZONE?.trim() || 'Europe/Madrid';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone }).format(new Date());
+  } catch {
+    throw new Error('POS_TIME_ZONE must be a valid IANA time zone, for example Europe/Madrid');
+  }
+  return zone;
+}
+
+// POS session cutoffs are calculated using the restaurant's local civil time.
+// Node supports updating TZ at runtime; this is configured once at startup.
+const configuredTimeZone = restaurantTimeZone();
+process.env.TZ = configuredTimeZone;
+
 const accessCode = requiredCredential('POS_ACCESS_CODE', 'test-access-code');
 const sessionToken = requiredCredential(
   'POS_AUTH_TOKEN',
@@ -137,6 +152,7 @@ if (configuredPrinterTargets.length > 1) {
 
 export const config = {
   port: boundedInteger('PORT', 3000, 1, 65_535),
+  timeZone: configuredTimeZone,
   host: process.env.HOST || '0.0.0.0',
   nodeEnv,
   isDev: !isProduction,
