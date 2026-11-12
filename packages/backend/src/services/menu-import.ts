@@ -155,7 +155,7 @@ export function parseMenuImportCsv(csv: string): MenuImportItem[] {
       priceCents: parseCents(record, 'priceCents', 'price', rowNumber, true)!,
       vatRatePercent: record.vatRatePercent?.trim()
         ? Number(record.vatRatePercent.trim())
-        : null,
+        : undefined,
       costCents: parseCents(record, 'costCents', 'cost', rowNumber, false),
       sku: boundedOptional('sku', 100),
       description: boundedOptional('description', 2_000),
