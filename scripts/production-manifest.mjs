@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { join, relative, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
+const publicRuntimeFile = resolve(root, '.env');
 const marker = resolve(root, '.cache/production-build.sha256');
 const sources = [
   'package.json', 'package-lock.json', 'tsconfig.base.json',
@@ -34,6 +35,14 @@ export function productionSourceDigest() {
     }
   }
   for (const entry of sources) visit(resolve(root, entry));
+  if (existsSync(publicRuntimeFile)) {
+    // Expo inlines public configuration into the browser build; secrets are excluded.
+    const publicValues = readFileSync(publicRuntimeFile, 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => /^(?:EXPO_PUBLIC_[A-Z0-9_]+|PORT)=/.test(line.trim()))
+      .sort();
+    digest.update(publicValues.join('\n'));
+  }
   return digest.digest('hex');
 }
 
