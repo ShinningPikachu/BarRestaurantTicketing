@@ -325,12 +325,7 @@ function buildSimplifiedInvoiceHtml(params: {
         <strong>${escapeHtml(ticketNote)}</strong>
       </div>` : ''}
       <div class="summary-row">
-        <span>Base imponible IVA ${config.vatRatePercent.toFixed(0)}%</span>
-        <strong>${formatEuroFromCents(taxableBaseCents)}</strong>
-      </div>
-      <div class="summary-row">
-        <span>IVA ${config.vatRatePercent.toFixed(0)}%</span>
-        <strong>${formatEuroFromCents(vatCents)}</strong>
+        <span>IVA</span><strong>Desglose en factura final</strong>
       </div>
       <div class="summary-row total">
         <span>Total IVA incluido</span>
