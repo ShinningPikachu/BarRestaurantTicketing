@@ -34,6 +34,7 @@ const paySelectedItemsSchema = z.object({
     qty: z.number().int().min(1).max(10_000),
   })).min(1).max(500),
   idempotencyKey: idempotencyKeySchema,
+  cardConfirmed: z.boolean().optional(),
 });
 
 const removeSelectedItemsSchema = paySelectedItemsSchema.omit({ method: true, cardConfirmed: true });
