@@ -494,11 +494,28 @@ export class WorkflowService {
       }));
       checkedCentsSum(normalizedItems.map((item) => checkedLineTotal(item.qty, item.unitPriceCents)));
 
-      await workflowRepository.createOrderFromPreOrder(table.id, normalizedItems, tx);
+      const confirmedOrder = await workflowRepository.createOrderFromPreOrder(table.id, normalizedItems, tx);
+      // The kitchen handoff is persisted atomically with order confirmation.
+      // Physical printing or delivery is a separate, recoverable step.
+      const dispatch = await tx.kitchenDispatch.create({
+        data: {
+          orderId: confirmedOrder.id,
+          tableNumber: table.number,
+          tableZone: table.zone ?? normalizedZone,
+          linesJson: JSON.stringify(normalizedItems.map((item) => ({
+            menuItemId: item.menuItemId,
+            name: item.name,
+            primaryName: item.primaryName,
+            secondaryName: item.secondaryName,
+            qty: item.qty,
+          }))),
+        },
+      });
       await workflowRepository.deleteDraftSession(draftSession!.id, tx);
       await this.invalidatePrintedTicket(table.id, tx);
 
       return {
+        dispatchId: dispatch.id,
         tableNumber: table.number,
         tableZone: table.zone ?? normalizedZone
       };
