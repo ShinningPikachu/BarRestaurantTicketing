@@ -2161,6 +2161,37 @@ export default function App(): React.JSX.Element {
         ? <MobileMainScreen {...mainScreenProps} />
         : <DesktopMainScreen {...mainScreenProps} />}
       {!isDesktopHost ? connectionModal : null}
+      <Modal
+        visible={refundTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!refundPending) setRefundTarget(null); }}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 14, gap: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111' }}>Devolución total y factura rectificativa</Text>
+            <Text style={{ color: '#111' }}>
+              {refundTarget ? `${refundTarget.ticketNumber} · ${centsToCurrency(refundTarget.totalCents)}` : ''}
+            </Text>
+            <Text style={{ color: '#444' }}>Requiere acceso de responsable. Una devolución con tarjeta debe haberse completado en el datáfono.</Text>
+            <TextInput
+              value={refundReason}
+              onChangeText={setRefundReason}
+              editable={!refundPending}
+              placeholder="Motivo de devolución (mínimo 4 caracteres)"
+              placeholderTextColor="#666"
+              multiline
+              style={{ borderColor: '#888', borderWidth: 1, borderRadius: 8, color: '#111', padding: 10 }}
+            />
+            <TouchableOpacity onPress={() => void submitRefund()} disabled={refundPending} style={{ backgroundColor: '#174ea6', padding: 12, borderRadius: 8 }}>
+              <Text style={{ color: '#fff', textAlign: 'center' }}>{refundPending ? 'Registrando...' : 'Registrar devolución'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setRefundTarget(null)} disabled={refundPending} style={{ padding: 8 }}>
+              <Text style={{ textAlign: 'center', color: '#111' }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
