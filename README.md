@@ -690,3 +690,11 @@ The POS generates two separate private access codes and independent bearer crede
 ## Item-level VAT
 
 Each product can specify an integer VAT percentage from 0 to 100 in the manager product editor, API payload, or optional `vatRatePercent` CSV column. Leaving it blank uses the configured default VAT rate. When an item is added to a draft, its applicable rate is saved; the rate travels with the confirmed order and paid ticket. Subsequent menu tax edits do not rewrite historical receipts. Paid-ticket snapshots store per-rate base and tax amounts, with mixed-rate breakdowns printed on thermal receipts and PDF copies. Existing historical ticket VAT remains unchanged. Set legally correct rates for the actual product category and restaurant jurisdiction; a generic VAT setting is not proof of regulatory compliance.
+
+## Card terminal confirmation and refund corrections
+
+The POS records card payments only after the operator confirms that the external terminal has approved the transaction. No payment processor is integrated: this confirmation is a manual declaration and does not independently verify settlement.
+
+For a full refund, sign in with the manager code, find the paid ticket in the history, choose **Devolver**, provide a reason and confirm the operation. If the payment was made by card, complete the refund on the external terminal **before** confirming it in the POS. The API records an immutable negative correction ticket with a separate RT sequence, preserves the original ticket, and appends reversing payment entries to the transaction history. Repeated refund requests with the same idempotency key return the same correction. A second refund of an already corrected sale is blocked.
+
+This implementation provides **full-ticket corrections**. Partial returns, customer-specific invoice details, and jurisdiction-specific fiscal electronic reporting require additional work and professional tax review before using them for statutory invoicing. The POS does not automatically reverse a physical cash transfer or card processor transaction.

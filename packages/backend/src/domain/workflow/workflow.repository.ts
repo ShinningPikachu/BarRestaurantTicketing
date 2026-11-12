@@ -14,6 +14,11 @@ export interface PaidTicketLine {
   vatRatePercent?: number | null;
 }
 
+export type TicketSnapshotLine = Omit<PaidTicketLine, 'orderId' | 'orderItemId'> & {
+  orderId?: string | null;
+  orderItemId?: number | null;
+};
+
 export class WorkflowRepository {
   constructor(private readonly client: PrismaClient = prisma) {}
 
@@ -312,7 +317,7 @@ export class WorkflowRepository {
       relatedTicketNumber?: string | null;
       pdfFileReference?: string | null;
       auditMetadata?: string | null;
-      items: PaidTicketLine[];
+      items: TicketSnapshotLine[];
     },
     tx?: Prisma.TransactionClient
   ) {
@@ -352,8 +357,8 @@ export class WorkflowRepository {
         ...snapshot,
         items: {
           create: payload.items.map((item) => ({
-            orderId: item.orderId,
-            orderItemId: item.orderItemId,
+            orderId: item.orderId ?? null,
+            orderItemId: item.orderItemId ?? null,
             menuItemId: item.menuItemId ?? null,
             name: item.name,
             primaryName: item.primaryName ?? null,

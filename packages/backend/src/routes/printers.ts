@@ -92,7 +92,7 @@ router.post(
     try {
       const ticketIds = [...new Set(req.body.ticketIds as string[])];
       const tickets = await prisma.paidTicket.findMany({
-        where: { id: { in: ticketIds }, status: 'paid' },
+        where: { id: { in: ticketIds }, status: { in: ['paid', 'refunded', 'correction'] } },
         include: { items: true },
         orderBy: [{ createdAt: 'asc' }, { ticketNumber: 'asc' }],
       });
@@ -118,7 +118,7 @@ router.post(
         include: { items: true },
       });
       if (!ticket) throw new ApiError(404, 'Paid ticket not found', 'PAID_TICKET_NOT_FOUND');
-      if (ticket.status !== 'paid') throw new ApiError(409, 'Only paid tickets can be printed', 'TICKET_NOT_PAYABLE');
+      if (!['paid', 'refunded', 'correction'].includes(ticket.status)) throw new ApiError(409, 'Ticket cannot be printed', 'TICKET_NOT_PAYABLE');
 
       const job = await trackPrinterOperation('paid-ticket', ticket.id, () => xprinterService.printTicket({
         businessName: ticket.businessName,
@@ -136,8 +136,11 @@ router.post(
         vatRatePercent: ticket.vatRatePercent,
         vatBreakdown: ticket.taxBreakdownJson ? JSON.parse(ticket.taxBreakdownJson) : undefined,
         totalCents: ticket.totalCents,
-        ticketNote: ticket.mode,
+        ticketNote: ticket.status === 'correction'
+          ? `Rectifica ${ticket.relatedTicketNumber ?? ''}`
+          : ticket.status === 'refunded' ? `Rectificado por ${ticket.relatedTicketNumber ?? ''}` : ticket.mode,
         splitPeople: ticket.splitPeople,
+        documentKind: ticket.status === 'correction' ? 'correction' : 'receipt',
         fiscal: true,
       }));
       res.json(successResponse({ printed: true, ticketId: ticket.id, ...job }));

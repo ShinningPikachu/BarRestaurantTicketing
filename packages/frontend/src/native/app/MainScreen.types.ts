@@ -38,6 +38,7 @@ export interface MainScreenProps {
   refreshSessionSummary: (showFeedback?: boolean) => Promise<void>;
   loadTicketHistory: () => Promise<void>;
   printSimplifiedPaidTicket: (ticket: PaidTicket) => Promise<void>;
+  refundPaidTicket: (ticket: PaidTicket) => void;
   printFilteredTicketSummary: () => Promise<void>;
   ticketPrintCoolingDown: boolean;
   downloadTicket: (ticket: PaidTicket) => Promise<void>;

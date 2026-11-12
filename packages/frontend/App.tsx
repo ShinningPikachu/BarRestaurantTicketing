@@ -303,6 +303,7 @@ function getTicketModeLabel(mode: string): string {
 }
 
 function getTicketStatusLabel(status: string | null | undefined): string {
+  if (status === 'correction') return 'Rectificativa';
   if (status === 'refunded') {
     return 'Devuelto';
   }
@@ -369,7 +370,7 @@ function buildPaidTicketArticle(ticket: PaidTicket): string {
   <section class="ticket">
     <header class="ticket-header">
       <div>
-        <h1>Factura simplificada ${escapeHtml(ticket.ticketNumber)}</h1>
+        <h1>${ticket.status === 'correction' ? 'Factura rectificativa' : 'Factura simplificada'} ${escapeHtml(ticket.ticketNumber)}</h1>
         <div class="meta">${escapeHtml(tradeName)} · ${escapeHtml(businessName)}</div>
         <div class="meta">NIF/CIF: ${escapeHtml(businessTaxId)}</div>
         <div class="meta">${escapeHtml(businessAddress)}${businessCity ? ` · ${escapeHtml(businessCity)}` : ''}${businessPhone ? ` · Tel. ${escapeHtml(businessPhone)}` : ''}</div>
@@ -489,6 +490,10 @@ function useActionCooldown(durationMs: number): { active: boolean; tryStart: () 
 export default function App(): React.JSX.Element {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [accessCode, setAccessCode] = useState('');
+  const [refundTarget, setRefundTarget] = useState<PaidTicket | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundPending, setRefundPending] = useState(false);
+  const refundAttemptKeys = useRef(new Map<string, string>());
   const [loginLoading, setLoginLoading] = useState(false);
   const [, requestCameraPermission] = useCameraPermissions();
   const [configuredApiBaseUrl, setConfiguredApiBaseUrl] = useState(getApiBaseUrl());
@@ -1628,6 +1633,52 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function confirmExternalCardOperation(operation: 'payment' | 'refund'): Promise<boolean> {
+    const question = operation === 'payment'
+      ? '¿Has comprobado que el datáfono ha aprobado el cobro? Registra el pago únicamente después de su confirmación.'
+      : '¿Has confirmado que el datáfono ha realizado la devolución a la tarjeta?';
+    if (Platform.OS === 'web') {
+      return (globalThis as typeof globalThis & { confirm?: (prompt: string) => boolean }).confirm?.(question) === true;
+    }
+    return new Promise<boolean>((resolve) => {
+      Alert.alert('Confirmación del datáfono', question, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Confirmar', onPress: () => resolve(true) },
+      ], { cancelable: false });
+    });
+  }
+
+  async function submitRefund(): Promise<void> {
+    const ticket = refundTarget;
+    const reason = refundReason.trim();
+    if (!ticket || refundPending) return;
+    if (reason.length < 4 || reason.length > 250) {
+      Alert.alert('Motivo requerido', 'Introduce una explicación de 4 a 250 caracteres.');
+      return;
+    }
+    const confirmed = ticket.method !== 'card' || await confirmExternalCardOperation('refund');
+    if (!confirmed) return;
+    const fingerprint = `${ticket.id}:${reason}`;
+    const idempotencyKey = refundAttemptKeys.current.get(fingerprint)
+      ?? `refund-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+    refundAttemptKeys.current.set(fingerprint, idempotencyKey);
+    setRefundPending(true);
+    try {
+      await apiService.refundPaidTicket(ticket.id, reason, idempotencyKey, ticket.method === 'card');
+      refundAttemptKeys.current.delete(fingerprint);
+      setRefundTarget(null);
+      setRefundReason('');
+      setSelectedPaidTicket(null);
+      await Promise.all([loadTicketHistory({ showError: false }), refreshSessionSummary()]);
+      Alert.alert('Rectificación registrada', `Se ha generado un abono para ${ticket.ticketNumber}.`);
+    } catch (error) {
+      const details = error instanceof ApiRequestError ? error.message : 'Verifica el estado del ticket antes de volver a intentarlo.';
+      Alert.alert('Devolución no registrada', details);
+    } finally {
+      setRefundPending(false);
+    }
+  }
+
   async function openCashDrawer(): Promise<void> {
     if (!cashDrawerCooldown.tryStart()) return;
     if (!await ensurePrinterAvailable()) return;
@@ -1679,14 +1730,16 @@ export default function App(): React.JSX.Element {
       if (!ticketPrintCooldown.tryStart()) return;
       void actions.printTicket(options);
     },
-    onPayTicket: (method: Parameters<typeof actions.payTable>[0], splitPeople?: number) => {
-      return actions.payTable(method, splitPeople);
+    onPayTicket: async (method: Parameters<typeof actions.payTable>[0], splitPeople?: number) => {
+      if (method === 'card' && !(await confirmExternalCardOperation('payment'))) return false;
+      return actions.payTable(method, splitPeople, method === 'card');
     },
-    onPaySelectedItems: (
+    onPaySelectedItems: async (
       method: Parameters<typeof actions.paySelectedItems>[0],
       items: Parameters<typeof actions.paySelectedItems>[1]
     ) => {
-      return actions.paySelectedItems(method, items);
+      if (method === 'card' && !(await confirmExternalCardOperation('payment'))) return false;
+      return actions.paySelectedItems(method, items, method === 'card');
     },
     onRemoveSelectedItems: (items: Parameters<typeof actions.removeSelectedItems>[0]) => {
       return actions.removeSelectedItems(items);
@@ -2046,6 +2099,7 @@ export default function App(): React.JSX.Element {
     refreshSessionSummary,
     loadTicketHistory,
     printSimplifiedPaidTicket,
+    refundPaidTicket: (ticket: PaidTicket) => { setRefundTarget(ticket); setRefundReason(''); },
     printFilteredTicketSummary,
     ticketPrintCoolingDown: ticketPrintCooldown.active,
     downloadTicket,
@@ -2107,6 +2161,37 @@ export default function App(): React.JSX.Element {
         ? <MobileMainScreen {...mainScreenProps} />
         : <DesktopMainScreen {...mainScreenProps} />}
       {!isDesktopHost ? connectionModal : null}
+      <Modal
+        visible={refundTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!refundPending) setRefundTarget(null); }}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 14, gap: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111' }}>Devolución total y factura rectificativa</Text>
+            <Text style={{ color: '#111' }}>
+              {refundTarget ? `${refundTarget.ticketNumber} · ${centsToCurrency(refundTarget.totalCents)}` : ''}
+            </Text>
+            <Text style={{ color: '#444' }}>Requiere acceso de responsable. Una devolución con tarjeta debe haberse completado en el datáfono.</Text>
+            <TextInput
+              value={refundReason}
+              onChangeText={setRefundReason}
+              editable={!refundPending}
+              placeholder="Motivo de devolución (mínimo 4 caracteres)"
+              placeholderTextColor="#666"
+              multiline
+              style={{ borderColor: '#888', borderWidth: 1, borderRadius: 8, color: '#111', padding: 10 }}
+            />
+            <TouchableOpacity onPress={() => void submitRefund()} disabled={refundPending} style={{ backgroundColor: '#174ea6', padding: 12, borderRadius: 8 }}>
+              <Text style={{ color: '#fff', textAlign: 'center' }}>{refundPending ? 'Registrando...' : 'Registrar devolución'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setRefundTarget(null)} disabled={refundPending} style={{ padding: 8 }}>
+              <Text style={{ textAlign: 'center', color: '#111' }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }

@@ -363,7 +363,7 @@ export function useWorkflowController() {
     }
   }
 
-  async function payTable(table: TableId, method: PaymentMethod, splitPeople?: number): Promise<boolean> {
+  async function payTable(table: TableId, method: PaymentMethod, splitPeople?: number, cardConfirmed = false): Promise<boolean> {
     const orderFingerprint = paymentOrdersFingerprint(ordersRef.current);
     const fingerprint = `table:${tableKey(table)}:${method}:${splitPeople ?? 0}:${orderFingerprint}`;
     if (paymentLockRef.current) {
@@ -378,7 +378,7 @@ export function useWorkflowController() {
       const idempotencyKey = paymentIdempotencyKeysRef.current.getOrCreate(fingerprint);
       const result = await enqueueWorkflowMutation(
         table,
-        () => apiService.payTable(table.number, table.zone, method, splitPeople, idempotencyKey),
+        () => apiService.payTable(table.number, table.zone, method, splitPeople, idempotencyKey, cardConfirmed),
         (paymentResult) => paymentResult.workflow
       );
       if (!result) return false;
@@ -399,7 +399,8 @@ export function useWorkflowController() {
   async function paySelectedItems(
     table: TableId,
     method: PaymentMethod,
-    items: Array<{ orderId: string; itemId: number; qty: number }>
+    items: Array<{ orderId: string; itemId: number; qty: number }>,
+    cardConfirmed = false
   ): Promise<boolean> {
     const fingerprint = `items:${tableKey(table)}:${method}:${paymentItemsFingerprint(items)}`;
     if (paymentLockRef.current) {
@@ -414,7 +415,7 @@ export function useWorkflowController() {
       const idempotencyKey = paymentIdempotencyKeysRef.current.getOrCreate(fingerprint);
       const result = await enqueueWorkflowMutation(
         table,
-        () => apiService.paySelectedItems(table.number, table.zone, method, items, idempotencyKey),
+        () => apiService.paySelectedItems(table.number, table.zone, method, items, idempotencyKey, cardConfirmed),
         (paymentResult) => paymentResult.workflow
       );
       if (!result) return false;

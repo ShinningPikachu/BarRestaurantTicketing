@@ -918,6 +918,115 @@ export class WorkflowService {
       };
     });
   }
+
+  /**
+   * Creates an immutable negative correction and marks the source receipt as
+   * refunded within one SQLite transaction. The original remains auditable.
+   */
+  async refundPaidTicket(ticketId: string, reason: string, idempotencyKey: string, cardConfirmed = false) {
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 4 || normalizedReason.length > 250) {
+      throw new ApiError(400, 'Refund reason must contain 4 to 250 characters', 'INVALID_REFUND_REASON');
+    }
+    const key = normalizeIdempotencyKey(idempotencyKey);
+    const fingerprint = createPaymentFingerprint({
+      version: 1, operation: 'refund-ticket', ticketId, reason: normalizedReason,
+    });
+    const result = await this.runPaymentTransaction(key, fingerprint, async (tx) => {
+      const existing = await workflowRepository.getPaidTicketByIdempotencyKey(key, tx);
+      if (existing) return this.toIdempotentPaymentResult(existing, fingerprint);
+
+      const original = await tx.paidTicket.findUnique({
+        where: { id: ticketId },
+        include: { items: true },
+      });
+      if (!original) throw new ApiError(404, 'Original paid ticket not found', 'PAID_TICKET_NOT_FOUND');
+      if (original.status !== 'paid' || original.mode === 'refund') {
+        throw new ApiError(409, 'Only an unrefunded paid ticket can be corrected', 'TICKET_ALREADY_CORRECTED');
+      }
+      if (original.method === 'card' && !cardConfirmed) {
+        throw new ApiError(409, 'Confirm the external card refund before recording it', 'CARD_REFUND_NOT_CONFIRMED');
+      }
+      const number = await workflowRepository.allocateTicketSequence('RT', tx);
+      const ticketNumber = `RT-${String(number).padStart(6, '0')}`;
+      const reversedBreakdown = original.taxBreakdownJson
+        ? JSON.stringify((JSON.parse(original.taxBreakdownJson) as Array<{
+            ratePercent: number;
+            taxableBaseCents: number;
+            vatCents: number;
+            totalCents: number;
+          }>).map((band) => ({
+            ratePercent: band.ratePercent,
+            taxableBaseCents: -band.taxableBaseCents,
+            vatCents: -band.vatCents,
+            totalCents: -band.totalCents,
+          })))
+        : null;
+      const correction = await workflowRepository.createPaidTicket({
+        ticketNumber,
+        idempotencyKey: key,
+        idempotencyFingerprint: fingerprint,
+        mode: 'refund',
+        method: original.method,
+        tableNumber: original.tableNumber,
+        tableZone: original.tableZone,
+        totalCents: -original.totalCents,
+        taxableBaseCents: -original.taxableBaseCents,
+        vatCents: -original.vatCents,
+        vatRatePercent: original.vatRatePercent,
+        taxBreakdownJson: reversedBreakdown,
+        businessName: original.businessName,
+        tradeName: original.tradeName,
+        businessTaxId: original.businessTaxId,
+        businessAddress: original.businessAddress,
+        businessCity: original.businessCity,
+        businessPhone: original.businessPhone,
+        terminalId: original.terminalId,
+        cashierName: original.cashierName,
+        customerName: original.customerName,
+        customerTaxId: original.customerTaxId,
+        status: 'correction',
+        relatedTicketNumber: original.ticketNumber,
+        auditMetadata: JSON.stringify({
+          source: 'manual-full-refund',
+          originalTicketId: original.id,
+          reason: normalizedReason,
+          externalCardRefundConfirmed: original.method === 'card' ? cardConfirmed : null,
+          capturedAt: new Date().toISOString(),
+        }),
+        items: original.items.map((item) => ({
+          orderId: item.orderId,
+          orderItemId: item.orderItemId,
+          menuItemId: item.menuItemId,
+          name: item.name,
+          primaryName: item.primaryName,
+          secondaryName: item.secondaryName,
+          qty: -item.qty,
+          unitPriceCents: item.unitPriceCents,
+          totalPriceCents: -item.totalPriceCents,
+          vatRatePercent: item.vatRatePercent,
+        })),
+      }, tx);
+      await tx.paidTicket.update({
+        where: { id: original.id },
+        data: { status: 'refunded', relatedTicketNumber: correction.ticketNumber },
+      });
+      const amounts = new Map<string, number>();
+      for (const item of original.items) {
+        if (item.orderId) amounts.set(item.orderId, (amounts.get(item.orderId) ?? 0) + item.totalPriceCents);
+      }
+      for (const [orderId, amountCents] of amounts) {
+        await workflowRepository.createPayment(orderId, -amountCents, original.method, tx);
+      }
+      return {
+        paidTicket: correction,
+        tableNumber: correction.tableNumber,
+        tableZone: correction.tableZone,
+      };
+    });
+    return this.toPublicPaymentResult(result);
+  }
+
 }
 
 export const workflowService = new WorkflowService();
