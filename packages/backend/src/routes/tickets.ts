@@ -1,5 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../db.js';
+import { z } from 'zod';
+import { workflowService } from '../domain/workflow/workflow.service.js';
+import { requireManager } from '../middleware/auth.js';
+import { validateBody, validateParams } from '../middleware/validation.js';
+import { signalDataChange } from '../services/sync.service.js';
 import { errorResponse, successResponse } from '../types/api.js';
 import { logger } from '../utils/logger.js';
 
@@ -168,5 +173,33 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     next(error);
   }
 });
+
+const refundParamsSchema = z.object({ id: z.string().trim().min(1).max(128) });
+const refundBodySchema = z.object({
+  reason: z.string().trim().min(4).max(250),
+  idempotencyKey: z.string().trim().min(8).max(128),
+  externalCardRefundConfirmed: z.boolean().optional(),
+});
+
+router.post(
+  '/:id/refund',
+  requireManager,
+  validateParams(refundParamsSchema),
+  validateBody(refundBodySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const correction = await workflowService.refundPaidTicket(
+        req.params.id,
+        req.body.reason,
+        req.body.idempotencyKey,
+        req.body.externalCardRefundConfirmed === true
+      );
+      signalDataChange('orders');
+      res.json(successResponse(correction));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;
