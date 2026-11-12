@@ -136,6 +136,7 @@ export interface PaidTicketItem {
   secondaryName?: string | null;
   qty: number;
   unitPriceCents: number;
+  vatRatePercent?: number | null;
   totalPriceCents: number;
 }
 
