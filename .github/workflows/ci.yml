@@ -23,6 +23,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Check POS shell and JavaScript syntax
+        run: |
+          bash -n Install_BarRestaurantTicketing.sh Start_BarRestaurantTicketing.sh Stop_BarRestaurantTicketing.sh scripts/install-systemd-user.sh
+          find scripts -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
       - run: npm ci
       - run: npm run check
         env:
