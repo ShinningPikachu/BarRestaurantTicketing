@@ -678,6 +678,9 @@ export function DesktopMainScreen(props: MainScreenProps): React.JSX.Element {
             status={props.printerStatus}
             diagnostics={props.printerDiagnostics}
             kitchenDispatches={props.kitchenDispatches}
+            kitchenUnresolvedCount={props.kitchenUnresolvedCount}
+            kitchenQueueTruncated={props.kitchenQueueTruncated}
+            persistedPrintJobs={props.persistedPrintJobs}
             kitchenAction={props.kitchenAction}
             onRefreshKitchen={props.refreshKitchenDispatches}
             onPrintKitchen={props.printPendingKitchenDispatch}

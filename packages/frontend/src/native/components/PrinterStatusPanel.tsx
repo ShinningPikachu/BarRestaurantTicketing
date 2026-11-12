@@ -1,12 +1,15 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { KitchenDispatch, PrinterDiagnostics, PrinterStatus } from '../services/api';
+import type { KitchenDispatch, PersistedPrintJob, PrinterDiagnostics, PrinterStatus } from '../services/api';
 import { colors } from '../theme';
 
 export interface PrinterStatusPanelProps {
   status: PrinterStatus | null;
   diagnostics: PrinterDiagnostics | null;
   kitchenDispatches: KitchenDispatch[];
+  kitchenUnresolvedCount: number;
+  kitchenQueueTruncated: boolean;
+  persistedPrintJobs: PersistedPrintJob[];
   kitchenAction: string | null;
   onRefreshKitchen: () => void;
   onPrintKitchen: (dispatch: KitchenDispatch) => void;
@@ -93,12 +96,17 @@ export function PrinterStatusPanel(props: PrinterStatusPanelProps): React.JSX.El
       <View style={styles.queueCard}>
         <View style={styles.titleRow}>
           <View style={styles.titleBlock}>
-            <Text style={styles.sectionTitle}>Comandas de cocina</Text>
+            <Text style={styles.sectionTitle}>{`Comandas de cocina · ${props.kitchenUnresolvedCount} pendientes`}</Text>
             <Text style={styles.helpText}>Guardadas en SQLite. La aceptación de impresión requiere confirmar después la entrega física.</Text>
           </View>
           <ActionButton label="Actualizar comandas" onPress={props.onRefreshKitchen} />
         </View>
-        {props.kitchenDispatches.slice(0, 30).map((dispatch) => (
+        {props.kitchenQueueTruncated ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>Hay más de 500 comandas pendientes. Esta lista está incompleta. Revisa y confirma las más antiguas antes de seguir.</Text>
+          </View>
+        ) : null}
+        {props.kitchenDispatches.slice(0, 100).map((dispatch) => (
           <View key={dispatch.id} style={styles.jobRow}>
             <Text style={styles.jobTitle}>
               {`Mesa ${dispatch.tableZone} ${dispatch.tableNumber} · ${dispatch.status}`}
@@ -130,6 +138,22 @@ export function PrinterStatusPanel(props: PrinterStatusPanelProps): React.JSX.El
         ))}
         {props.kitchenDispatches.length === 0
           ? <Text style={styles.helpText}>No hay comandas registradas.</Text>
+          : null}
+      </View>
+
+      <View style={styles.queueCard}>
+        <Text style={styles.sectionTitle}>Historial de intentos de impresión</Text>
+        <Text style={styles.helpText}>Persistido en SQLite. Un trabajo aceptado puede necesitar comprobación física.</Text>
+        {props.persistedPrintJobs.slice(0, 25).map((job) => (
+          <View key={job.id} style={styles.jobRow}>
+            <Text style={styles.jobTitle}>{`${job.kind} · ${job.status}`}</Text>
+            <Text style={styles.helpText}>{dateLabel(job.createdAt)}</Text>
+            {job.referenceId ? <Text style={styles.helpText}>{`Referencia: ${job.referenceId}`}</Text> : null}
+            {job.errorCode ? <Text style={styles.errorText}>{job.errorCode}</Text> : null}
+          </View>
+        ))}
+        {props.persistedPrintJobs.length === 0
+          ? <Text style={styles.helpText}>Sin intentos de impresión registrados.</Text>
           : null}
       </View>
 
