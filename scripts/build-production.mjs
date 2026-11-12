@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { loadEnvFile } from './runtime-env.mjs';
+import { recordProductionBuild } from './production-manifest.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 loadEnvFile(resolve(repoRoot, '.env'));
@@ -31,4 +32,5 @@ await run(['run', '-w', 'frontend', 'build'], 'Frontend production export', {
   EXPO_PUBLIC_TPV_SCREEN: 'desktop',
 });
 
+recordProductionBuild();
 console.log(`Production build uses backend API ${frontendApiBaseUrl}`);

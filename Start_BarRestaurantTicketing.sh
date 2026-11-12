@@ -78,37 +78,23 @@ if [ "$RUNNING_STATUS" -eq 3 ]; then
   exit 1
 fi
 
-if ! node scripts/ensure-dependencies.mjs; then
-  echo
-  echo "Library installation failed. Check the messages above."
-  read -r -p "Press Enter to close this window..."
-  exit 1
-fi
-
+# A routine start must never download packages, rebuild assets or migrate data.
+# Such operations belong to the explicit installer/upgrade flow.
 if ! node scripts/ensure-runtime-env.mjs; then
-  echo
-  echo "Runtime settings setup failed. The application was not started."
-  read -r -p "Press Enter to close this window..."
-  exit 1
-fi
-
-if ! npm run build:production; then
-  echo
-  echo "Production build failed. The database was not migrated and the application was not started."
+  echo "Runtime settings setup failed."
   read -r -p "Press Enter to close this window..."
   exit 1
 fi
 
 if ! node scripts/validate-production-env.mjs; then
-  echo
-  echo "Production settings are incomplete or unsafe. Update the private .env file before migration."
+  echo "Production settings are invalid."
   read -r -p "Press Enter to close this window..."
   exit 1
 fi
 
-if ! node scripts/prepare-database.mjs; then
-  echo
-  echo "Database setup failed. The previous database was preserved or restored."
+if ! node scripts/check-production-ready.mjs; then
+  echo "Application files or database need installation, backup or repair."
+  echo "Run Install_BarRestaurantTicketing.sh outside service hours."
   read -r -p "Press Enter to close this window..."
   exit 1
 fi
