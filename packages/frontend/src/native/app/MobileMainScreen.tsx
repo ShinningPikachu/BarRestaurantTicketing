@@ -12,6 +12,7 @@ type ProductEditValues = {
   category: string;
   price: string;
   cost: string;
+  vatRate: string;
 };
 
 function getProductEditValues(item: MenuItem): ProductEditValues {
@@ -22,6 +23,7 @@ function getProductEditValues(item: MenuItem): ProductEditValues {
     category: item.category,
     price: (item.priceCents / 100).toFixed(2),
     cost: item.costCents !== null && item.costCents !== undefined ? (item.costCents / 100).toFixed(2) : '',
+    vatRate: item.vatRatePercent === null || item.vatRatePercent === undefined ? '' : String(item.vatRatePercent),
   };
 }
 
@@ -32,7 +34,8 @@ function valuesChanged(first: ProductEditValues, second: ProductEditValues): boo
     first.secondaryName !== second.secondaryName ||
     first.category !== second.category ||
     first.price !== second.price ||
-    first.cost !== second.cost
+    first.cost !== second.cost ||
+    first.vatRate !== second.vatRate
   );
 }
 
@@ -379,7 +382,7 @@ function MobileProductEditRow({ item, props }: { item: MenuItem; props: MainScre
     setValues(nextValues);
     setSavedValues(nextValues);
     setSaveState((current) => current === 'saving' || current === 'saved' ? 'saved' : 'idle');
-  }, [item.id, item.name, item.primaryName, item.secondaryName, item.category, item.priceCents, item.costCents]);
+  }, [item.id, item.name, item.primaryName, item.secondaryName, item.category, item.priceCents, item.costCents, item.vatRatePercent]);
 
   const hasChanges = valuesChanged(values, savedValues);
   const saveDisabled = !hasChanges || saveState === 'saving';
@@ -469,6 +472,7 @@ function MobileProductEditRow({ item, props }: { item: MenuItem; props: MainScre
             />
             <TextInput style={styles.priceInput} value={values.price} keyboardType="decimal-pad" onChangeText={(value) => updateValue('price', value)} placeholder="Precio" placeholderTextColor="#6B7280" />
             <TextInput style={styles.priceInput} value={values.cost} keyboardType="decimal-pad" placeholder="Coste" placeholderTextColor="#6B7280" onChangeText={(value) => updateValue('cost', value)} />
+            <TextInput style={styles.priceInput} value={values.vatRate} keyboardType="numeric" placeholder="IVA %" placeholderTextColor="#6B7280" onChangeText={(value) => updateValue('vatRate', value)} />
           </View>
           <View style={styles.productRowControls}>
             <TouchableOpacity style={[styles.productRowActionButton, styles.productSaveChangesButton, saveDisabled ? styles.productSaveChangesButtonDisabled : null]} onPress={() => void saveChanges()} disabled={saveDisabled}>
@@ -529,6 +533,7 @@ function MobileNewProductModal({
                 <TextInput style={[styles.formInput, styles.formCompactInput]} value={props.productCategory} onChangeText={props.setProductCategory} placeholder="Tipo" placeholderTextColor="#6B7280" />
                 <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productPrice} onChangeText={props.setProductPrice} placeholder="Precio" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
                 <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productCost} onChangeText={props.setProductCost} placeholder="Coste" placeholderTextColor="#6B7280" keyboardType="decimal-pad" />
+                <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productVatRate} onChangeText={props.setProductVatRate} placeholder="IVA %" placeholderTextColor="#6B7280" keyboardType="numeric" />
                 <TextInput style={[styles.formInput, styles.formHalfInput]} value={props.productSku} onChangeText={props.setProductSku} placeholder="SKU" placeholderTextColor="#6B7280" />
               </View>
               <TextInput style={styles.formInput} value={props.productDescription} onChangeText={props.setProductDescription} placeholder="Descripcion opcional" placeholderTextColor="#6B7280" />
