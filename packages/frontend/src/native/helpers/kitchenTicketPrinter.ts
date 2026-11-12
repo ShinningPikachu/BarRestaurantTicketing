@@ -153,7 +153,7 @@ function buildSimplifiedInvoiceHtml(params: {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Factura simplificada</title>
+  <title>Precuenta - Sin validez fiscal</title>
   <style>
     * { box-sizing: border-box; }
     @page { margin: 8mm; }
@@ -290,9 +290,9 @@ function buildSimplifiedInvoiceHtml(params: {
     <div class="divider"></div>
 
     <section>
-      <p class="title center">Factura simplificada</p>
+      <p class="title center">Precuenta - Sin validez fiscal</p>
       <div class="meta">
-        <div><strong>Ticket ID</strong>${escapeHtml(ticketId)}</div>
+        <div><strong>Referencia provisional</strong>${escapeHtml(ticketId)}</div>
         <div><strong>Fecha</strong>${escapeHtml(formatDateTime(issuedAt))}</div>
         <div><strong>Mesa</strong>${escapeHtml(tableZoneLabel(selectedTable.zone))} ${selectedTable.number}</div>
       </div>
@@ -350,6 +350,7 @@ function buildSimplifiedInvoiceHtml(params: {
     <div class="divider"></div>
 
     <footer class="legal center">
+      <div>Documento provisional. Sin validez fiscal.</div>
       <div>Gracias por su visita.</div>
     </footer>
   </main>
