@@ -177,6 +177,9 @@ if (productionMode) {
 if (runtimeEnv.accessCode && (!productionMode || runtimeEnv.createdAccessCode || process.env.BAR_TICKETING_SHOW_ACCESS_CODE === '1')) {
   console.log(`POS access code: ${runtimeEnv.accessCode}\n`);
 }
+if (runtimeEnv.managerAccessCode && (runtimeEnv.createdManagerAccessCode || process.env.BAR_TICKETING_SHOW_MANAGER_CODE === '1')) {
+  console.log(`Manager access code: ${runtimeEnv.managerAccessCode}\n`);
+}
 
 function childHasExited(child) {
   return child.exitCode !== null || child.signalCode !== null;
